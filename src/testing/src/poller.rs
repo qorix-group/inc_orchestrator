@@ -70,3 +70,20 @@ impl<OutType> TestingFuturePoller<OutType> {
         self.poll_n_with_waker(n, &noop_waker())
     }
 }
+
+pub struct AlwaysPending {}
+
+impl Future for AlwaysPending {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
+        Poll::Pending
+    }
+}
+
+pub fn assert_poll_ready<T: PartialEq + std::fmt::Debug>(res: std::task::Poll<T>, val: T) {
+    match res {
+        std::task::Poll::Ready(v) => assert_eq!(val, v),
+        std::task::Poll::Pending => panic!("Expected Poll::Ready but got Poll::Pending"),
+    }
+}

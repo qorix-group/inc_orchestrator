@@ -11,6 +11,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+use foundation::prelude::FoundationAtomicPtr;
+
 use super::task::async_task::*;
 use core::task::{RawWaker, RawWakerVTable, Waker};
 
@@ -63,4 +65,118 @@ pub(crate) fn create_waker(ptr: TaskRef) -> Waker {
 
     // Convert RawWaker to Waker
     unsafe { Waker::from_raw(raw_waker) }
+}
+
+pub(crate) struct AtomicWakerStore {
+    data: FoundationAtomicPtr<TaskHeader>,
+}
+
+unsafe impl Send for AtomicWakerStore {}
+unsafe impl Sync for AtomicWakerStore {}
+
+impl AtomicWakerStore {
+    ///
+    /// Exchange waker and returns previous one
+    ///
+    pub(crate) fn swap(&self, waker: Option<Waker>) -> Option<Waker> {
+        let mut data = std::ptr::null_mut();
+
+        if let Some(task) = waker {
+            data = task.data() as *mut TaskHeader;
+            std::mem::forget(task);
+        }
+
+        let old = self.data.swap(data, std::sync::atomic::Ordering::AcqRel);
+
+        if old.is_null() {
+            None
+        } else {
+            let raw_waker = RawWaker::new(old as *const (), &VTABLE);
+            Some(unsafe { Waker::from_raw(raw_waker) })
+        }
+    }
+
+    ///
+    /// Sets  waker
+    ///
+    #[allow(dead_code)]
+    pub(crate) fn set(&self, waker: Waker) {
+        let _ = self.swap(Some(waker));
+    }
+
+    ///
+    /// Returns current waker
+    ///
+    pub(crate) fn take(&self) -> Option<Waker> {
+        self.swap(None)
+    }
+}
+
+impl From<Waker> for AtomicWakerStore {
+    fn from(value: Waker) -> Self {
+        let data = value.data() as *mut TaskHeader;
+        std::mem::forget(value);
+        assert!(!data.is_null()); // data cannot be nullptr
+
+        Self {
+            data: FoundationAtomicPtr::new(data),
+        }
+    }
+}
+
+impl Default for AtomicWakerStore {
+    fn default() -> Self {
+        Self {
+            data: FoundationAtomicPtr::new(std::ptr::null_mut()),
+        }
+    }
+}
+
+impl Drop for AtomicWakerStore {
+    fn drop(&mut self) {
+        // Free any data
+        let _ = self.take();
+    }
+}
+
+#[cfg(test)]
+#[cfg(loom)]
+mod tests {
+
+    use super::*;
+    use crate::testing::*;
+    use loom::model::Builder;
+    use std::sync::Arc;
+    use testing::*;
+
+    #[test]
+    fn test_atomic_waker_mt() {
+        let builder = Builder::new();
+
+        builder.check(|| {
+            let store = Arc::new(AtomicWakerStore::default());
+
+            let handle = {
+                let store_clone = store.clone();
+                loom::thread::spawn(move || store_clone.take())
+            };
+
+            let (w, _) = get_dummy_task_waker();
+
+            let prev = store.swap(Some(w.clone()));
+
+            let waker_from_thread = handle.join().unwrap();
+
+            match prev {
+                Some(waker) => {
+                    // If we had prev, then it shall be from current store
+                    assert_eq!(waker.data(), w.data());
+                }
+                None => {
+                    // The value must have been either here or there
+                    assert!(store.take().is_some() ^ waker_from_thread.is_some());
+                }
+            };
+        });
+    }
 }
