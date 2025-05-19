@@ -54,6 +54,7 @@ use scheduler::{
     workers::worker_types::UniqueWorkerId,
 };
 
+pub mod channels;
 pub mod core;
 pub mod futures;
 pub mod runtime;

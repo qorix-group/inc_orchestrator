@@ -36,6 +36,12 @@ impl FutureState {
     }
 }
 
+impl Default for FutureState {
+    fn default() -> Self {
+        Self::New
+    }
+}
+
 ///
 /// In Futures you need to return Pending or Ready with value. This small helper is able to connect type-less FutureState
 /// with value of type `T` than can be returned in case of ready. This also provides `into` to match [`Future`] API.
