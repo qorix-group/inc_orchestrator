@@ -11,9 +11,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-pub use iceoryx2_bb_container::vec::*;
-// pub use iceoryx2_bb_posix::mutex::*;
 pub use crate::sync::foundation_atomic::*;
+pub use iceoryx2_bb_container::vec::*;
+pub use iceoryx2_bb_lock_free::*;
 
 pub use crate::types::*;
 pub use tracing::{debug, error, info, span, trace, warn, Level};
