@@ -11,17 +11,16 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+use super::action::{ActionResult, ActionTrait, ClonableActionTrait};
+use crate::common::orch_tag::{OrchestrationTag, OrchestrationTagNotClonable};
+use crate::core::runtime_seq_acc::RuntimeSequentialAccess;
+use async_runtime::core::types::box_future;
 use std::{
     future::Future,
     sync::{Arc, Mutex},
 };
 
-use crate::core::runtime_seq_acc::RuntimeSequentialAccess;
-
-use super::action::{ActionResult, ActionTrait};
-use async_runtime::core::types::box_future;
-
-type FunctionType = fn() -> ActionResult;
+pub type FunctionType = fn() -> ActionResult;
 
 ///
 /// TODO: Capturing object (owned, arced, closure) seems to be tricky from runtime perspective. So in theory, we will never call it in parallel, but if there is a timeout and user resumes program, we can come back to the same Invoke while other was not yet aborted (clogged, whatever).
@@ -34,19 +33,30 @@ pub struct Invoke {} // Dummy struct to create fake namespace Invoke:: to hide t
 
 impl Invoke {
     ///
-    /// Creates Invoke action from plain function pointer
+    /// Creates Invoke action from a function pointer
     ///
-    pub fn from_fn(func: FunctionType) -> Box<dyn ActionTrait> {
+    pub fn from_fn(func: FunctionType) -> Box<dyn ClonableActionTrait> {
         Box::new(InvokeFn { action: func })
     }
 
     ///
-    /// Creates Invoke action from plain async function
+    /// Creates Invoke action from a non-clonable async function
     ///
     pub fn from_async<F, Fut>(function: F) -> Box<dyn ActionTrait>
     where
         F: FnMut() -> Fut + 'static + Send,
         Fut: Future<Output = ActionResult> + 'static + Send,
+    {
+        Box::new(InvokeAsyncFn { action: function })
+    }
+
+    ///
+    /// Creates Invoke action from a clonable async function
+    ///
+    pub fn from_async_clonable<F, Fut>(function: F) -> Box<dyn ClonableActionTrait>
+    where
+        F: FnMut() -> Fut + 'static + Send + Clone,
+        Fut: Future<Output = ActionResult> + 'static + Send + Clone,
     {
         Box::new(InvokeAsyncFn { action: function })
     }
@@ -61,7 +71,7 @@ impl Invoke {
         })
     }
 
-    pub fn from_arc<T: 'static + Send>(obj: Arc<Mutex<T>>, method: fn(&mut T) -> ActionResult) -> Box<dyn ActionTrait> {
+    pub fn from_arc<T: 'static + Send>(obj: Arc<Mutex<T>>, method: fn(&mut T) -> ActionResult) -> Box<dyn ClonableActionTrait> {
         Box::new(InvokeArc {
             object: obj,
             method: FnType::Mut(method),
@@ -72,6 +82,14 @@ impl Invoke {
     where
         F: FnMut(Arc<Mutex<T>>) -> Fut + 'static + Send,
         Fut: Future<Output = ActionResult> + 'static + Send,
+    {
+        Box::new(InvokeArcMtx { object: obj, method })
+    }
+
+    pub fn from_arc_mtx_clonable<T: 'static + Send, F, Fut>(obj: Arc<Mutex<T>>, method: F) -> Box<dyn ClonableActionTrait>
+    where
+        F: FnMut(Arc<Mutex<T>>) -> Fut + 'static + Send + Clone,
+        Fut: Future<Output = ActionResult> + 'static + Send + Clone,
     {
         Box::new(InvokeArcMtx { object: obj, method })
     }
@@ -95,8 +113,17 @@ impl Invoke {
             method: FnType::Mut(method),
         })
     }
+
+    pub fn from_tag(tag: &OrchestrationTag) -> Box<dyn ActionTrait> {
+        (*tag.action_provider()).borrow_mut().provide_invoke(*tag.key()).unwrap()
+    }
+
+    pub fn from_tag_not_clonable(tag: OrchestrationTagNotClonable) -> Box<dyn ActionTrait> {
+        tag.into_action()
+    }
 }
 
+#[derive(Clone)]
 struct InvokeFn {
     action: FunctionType,
 }
@@ -124,6 +151,23 @@ impl ActionTrait for InvokeFn {
     fn fill_runtime_info(&mut self, _p: &mut super::action::ActionRuntimeInfoProvider) {}
 }
 
+impl ClonableActionTrait for InvokeFn {
+    fn clone_boxed<'a>(&self) -> Box<dyn ClonableActionTrait + 'a>
+    where
+        Self: 'a,
+    {
+        Box::new(self.clone())
+    }
+
+    fn into_boxed_action<'a>(self: Box<Self>) -> Box<dyn ActionTrait + 'a>
+    where
+        Self: 'a,
+    {
+        self
+    }
+}
+
+#[derive(Clone)]
 struct InvokeAsyncFn<T, Fut>
 where
     T: FnMut() -> Fut + 'static + Send,
@@ -152,6 +196,26 @@ where
     }
 
     fn fill_runtime_info(&mut self, _p: &mut super::action::ActionRuntimeInfoProvider) {}
+}
+
+impl<T, Fut> ClonableActionTrait for InvokeAsyncFn<T, Fut>
+where
+    T: FnMut() -> Fut + 'static + Send + Clone,
+    Fut: Future<Output = ActionResult> + 'static + Send + Clone,
+{
+    fn clone_boxed<'a>(&self) -> Box<dyn ClonableActionTrait + 'a>
+    where
+        Self: 'a,
+    {
+        Box::new(self.clone())
+    }
+
+    fn into_boxed_action<'a>(self: Box<Self>) -> Box<dyn ActionTrait + 'a>
+    where
+        Self: 'a,
+    {
+        self
+    }
 }
 
 enum FnType<T> {
@@ -245,6 +309,25 @@ impl<T: 'static + Send> ActionTrait for InvokeArc<T> {
     fn fill_runtime_info(&mut self, _p: &mut super::action::ActionRuntimeInfoProvider) {}
 }
 
+impl<T: 'static + Send> ClonableActionTrait for InvokeArc<T> {
+    fn clone_boxed<'a>(&self) -> Box<dyn ClonableActionTrait + 'a>
+    where
+        Self: 'a,
+    {
+        Box::new(InvokeArc {
+            object: Arc::clone(&self.object),
+            method: self.method.clone(),
+        })
+    }
+
+    fn into_boxed_action<'a>(self: Box<Self>) -> Box<dyn ActionTrait + 'a>
+    where
+        Self: 'a,
+    {
+        self
+    }
+}
+
 struct InvokeArcMtx<T: 'static, F, Fut>
 where
     F: FnMut(Arc<Mutex<T>>) -> Fut + 'static + Send,
@@ -273,4 +356,27 @@ where
     }
 
     fn fill_runtime_info(&mut self, _p: &mut super::action::ActionRuntimeInfoProvider) {}
+}
+
+impl<T: 'static + Send, F, Fut> ClonableActionTrait for InvokeArcMtx<T, F, Fut>
+where
+    F: FnMut(Arc<Mutex<T>>) -> Fut + 'static + Send + Clone,
+    Fut: Future<Output = ActionResult> + 'static + Send + Clone,
+{
+    fn clone_boxed<'a>(&self) -> Box<dyn ClonableActionTrait + 'a>
+    where
+        Self: 'a,
+    {
+        Box::new(InvokeArcMtx {
+            object: Arc::clone(&self.object),
+            method: self.method.clone(),
+        })
+    }
+
+    fn into_boxed_action<'a>(self: Box<Self>) -> Box<dyn ActionTrait + 'a>
+    where
+        Self: 'a,
+    {
+        self
+    }
 }

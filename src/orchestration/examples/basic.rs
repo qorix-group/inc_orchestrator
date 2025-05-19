@@ -175,7 +175,11 @@ fn main() {
                             .with_branch(SomeAction::new())
                             .with_branch(Invoke::from_async(testasync))
                             .with_branch(Sequence::new().with_step(Sync::new(event_name)).with_step(Invoke::from_async(wait_ends)))
-                            .with_branch(Sequence::new().with_step(Invoke::from_fn(busy_sleep)).with_step(Trigger::new(event_name)))
+                            .with_branch(
+                                Sequence::new()
+                                    .with_step(Invoke::from_fn(busy_sleep).into_boxed_action())
+                                    .with_step(Trigger::new(event_name)),
+                            )
                             .with_branch(
                                 Sequence::new()
                                     .with_step(Sync::new(event_name2))
@@ -189,7 +193,7 @@ fn main() {
                             )
                             .with_branch(
                                 Sequence::new()
-                                    .with_step(Invoke::from_fn(busy_sleep))
+                                    .with_step(Invoke::from_fn(busy_sleep).into_boxed_action())
                                     .with_step(Trigger::new(event_name2)),
                             ),
                     ),

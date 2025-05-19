@@ -16,6 +16,7 @@ pub mod common;
 pub mod core;
 pub mod prelude;
 pub mod program;
+pub mod program_database;
 
 #[cfg(test)]
 mod testing;
