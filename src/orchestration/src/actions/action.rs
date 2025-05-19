@@ -51,6 +51,16 @@ pub trait ActionTrait: Send {
     fn fill_runtime_info(&mut self, p: &mut ActionRuntimeInfoProvider);
 }
 
+pub trait ClonableActionTrait: ActionTrait {
+    fn clone_boxed<'a>(&self) -> Box<dyn ClonableActionTrait + 'a>
+    where
+        Self: 'a;
+
+    fn into_boxed_action<'a>(self: Box<Self>) -> Box<dyn ActionTrait + 'a>
+    where
+        Self: 'a;
+}
+
 #[derive(Default)]
 pub struct ActionRuntimeInfoProvider {
     id: usize,

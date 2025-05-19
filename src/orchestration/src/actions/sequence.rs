@@ -115,7 +115,7 @@ mod tests {
     fn test_with_future() {
         let mut seq = Sequence::new()
             .with_step(Invoke::from_async(add_async::<42>))
-            .with_step(Invoke::from_fn(add_sync::<2>));
+            .with_step(Invoke::from_fn(add_sync::<2>).into_boxed_action());
 
         // create mock with the resulting future
         let mut mock = TestingFuturePoller::new(seq.execute());
@@ -126,7 +126,7 @@ mod tests {
     fn test_with_boxed_future() {
         let mut seq = Sequence::new()
             .with_step(Invoke::from_async(add_async::<1729>))
-            .with_step(Invoke::from_fn(add_sync::<711>));
+            .with_step(Invoke::from_fn(add_sync::<711>).into_boxed_action());
 
         // create mock with the resulting future as boxed future
         let mut mock = TestingFuturePoller::new(Box::pin(seq.execute()));
@@ -142,13 +142,13 @@ mod tests {
                     .with_step(Invoke::from_async(add_async::<1729>))
                     .with_step(
                         Sequence::new()
-                            .with_step(Invoke::from_fn(add_sync::<4242>))
+                            .with_step(Invoke::from_fn(add_sync::<4242>).into_boxed_action())
                             .with_step(Invoke::from_async(add_async::<2424>)),
                     )
-                    .with_step(Invoke::from_fn(add_sync::<1881>)),
+                    .with_step(Invoke::from_fn(add_sync::<1881>).into_boxed_action()),
             )
             .with_step(Invoke::from_async(add_async::<2>))
-            .with_step(Invoke::from_fn(add_sync::<711>));
+            .with_step(Invoke::from_fn(add_sync::<711>).into_boxed_action());
 
         // execute the action and check the results
         let mut mock = TestingFuturePoller::new(seq.execute());
@@ -157,7 +157,7 @@ mod tests {
 
     #[test]
     fn test_with_trackable_waker() {
-        let mut seq = Sequence::new().with_step(Invoke::from_fn(add_sync::<42>));
+        let mut seq = Sequence::new().with_step(Invoke::from_fn(add_sync::<42>).into_boxed_action());
 
         // use trackable waker for polling
         let waker = TrackableWaker::new();

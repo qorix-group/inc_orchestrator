@@ -12,14 +12,18 @@
 //
 
 use super::tag::Tag;
+use crate::actions::action::ActionTrait;
+use crate::program_database::ActionProvider;
 use iceoryx2_bb_container::slotmap::SlotMapKey;
+use std::cell::RefCell;
 
 #[derive(Debug, PartialEq)]
 #[allow(dead_code)]
 #[allow(clippy::enum_variant_names)]
 /// MapIdentifier is an enum that represents the type of SlotMap the orchestration tag belongs to.
 pub(crate) enum MapIdentifier {
-    InvokeMap,
+    ClonableInvokeMap,
+    NotClonableInvokeMap,
     EventMap,
     SimpleConditionMap,
     ComplexConditionMap,
@@ -36,25 +40,26 @@ pub(crate) struct OrchTagId {
 /// OrchestrationTag is a wrapper around OrchTagId that provides a convenient way to create and manage orchestration tags.
 /// It contains tag ID, a key for SlotMap, and a SlotMap identifier.
 /// The tag ID is used to uniquely identify the orchestration tag.
-#[derive(Debug, PartialEq)]
-pub struct OrchestrationTag {
+#[derive(Debug)]
+pub struct OrchestrationTag<'a> {
     id: OrchTagId,
-    // May have to add more fields in the future
+    action_provider: &'a RefCell<ActionProvider>,
 }
 
 #[allow(dead_code)]
-impl OrchestrationTag {
+impl<'a> OrchestrationTag<'a> {
     /// Create a new orchestration tag with the given Tag, SlotMapKey, and MapIdentifier.
-    pub(crate) fn new(tag: Tag, key: SlotMapKey, map_identifier: MapIdentifier) -> Self {
+    pub(crate) fn new(tag: Tag, key: SlotMapKey, map_identifier: MapIdentifier, action_provider: &'a RefCell<ActionProvider>) -> Self {
         Self {
             id: OrchTagId { tag, key, map_identifier },
+            action_provider,
         }
     }
 
     /// Get the tag ID of the orchestration tag.
     #[inline]
-    pub(crate) fn id(&self) -> Tag {
-        self.id.tag
+    pub(crate) fn tag(&self) -> &Tag {
+        &self.id.tag
     }
 
     /// Get the SlotMapKey of the orchestration tag.
@@ -68,6 +73,29 @@ impl OrchestrationTag {
     pub(crate) fn map_identifier(&self) -> &MapIdentifier {
         &self.id.map_identifier
     }
+
+    #[inline]
+    pub(crate) fn action_provider(&self) -> &RefCell<ActionProvider> {
+        self.action_provider
+    }
+}
+
+pub struct OrchestrationTagNotClonable<'a>(pub(crate) OrchestrationTag<'a>, pub(crate) Option<Box<dyn ActionTrait>>);
+
+impl<'a> OrchestrationTagNotClonable<'a> {
+    pub(crate) fn new(orch_tag: OrchestrationTag<'a>, action: Box<dyn ActionTrait>) -> Self {
+        Self(orch_tag, Some(action))
+    }
+
+    pub(crate) fn into_action(mut self) -> Box<dyn ActionTrait> {
+        self.1.take().unwrap()
+    }
+}
+
+impl Drop for OrchestrationTagNotClonable<'_> {
+    fn drop(&mut self) {
+        self.0.action_provider.borrow_mut().return_not_clonable_data(self);
+    }
 }
 
 #[cfg(test)]
@@ -77,34 +105,15 @@ mod tests {
 
     #[test]
     fn test_orchestration_tag_creation() {
-        let tag = OrchestrationTag::new(Tag::from_str_static("test_tag"), SlotMapKey::new(1), MapIdentifier::InvokeMap);
-        assert_eq!(tag.id(), Tag::from_str_static("test_tag"));
-        assert_eq!(*tag.key(), SlotMapKey::new(1));
-        assert_eq!(*tag.map_identifier(), MapIdentifier::InvokeMap);
-    }
-
-    #[test]
-    fn test_orchestration_tag_equality() {
-        let tag1 = OrchestrationTag::new(Tag::from_str_static("test_tag"), SlotMapKey::new(2), MapIdentifier::EventMap);
-        let tag2 = OrchestrationTag::new(Tag::from_str_static("test_tag"), SlotMapKey::new(2), MapIdentifier::EventMap);
-
-        // Equality is based on `id.tag`, `id.key` and `id.map_identifier`, these should be equal
-        assert_eq!(tag1, tag2);
-
-        let tag3 = OrchestrationTag::new(Tag::from_str_static("different_tag"), SlotMapKey::new(2), MapIdentifier::EventMap);
-        // These should not be equal because `id.tag` is different
-        assert_ne!(tag1, tag3);
-
-        let tag4 = OrchestrationTag::new(Tag::from_str_static("different_tag"), SlotMapKey::new(1), MapIdentifier::EventMap);
-        // These should not be equal because `id.key` is different
-        assert_ne!(tag3, tag4);
-
-        let tag5 = OrchestrationTag::new(
-            Tag::from_str_static("different_tag"),
+        let ap = RefCell::new(ActionProvider::new(4, 4));
+        let tag = OrchestrationTag::new(
+            Tag::from_str_static("test_tag"),
             SlotMapKey::new(1),
-            MapIdentifier::SimpleConditionMap,
+            MapIdentifier::ClonableInvokeMap,
+            &ap,
         );
-        // These should not be equal because `id.map_identifier` is different
-        assert_ne!(tag4, tag5);
+        assert_eq!(*tag.tag(), Tag::from_str_static("test_tag"));
+        assert_eq!(*tag.key(), SlotMapKey::new(1));
+        assert_eq!(*tag.map_identifier(), MapIdentifier::ClonableInvokeMap);
     }
 }
