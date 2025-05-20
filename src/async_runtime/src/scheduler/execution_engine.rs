@@ -93,6 +93,10 @@ impl Drop for ExecutionEngine {
         for worker in self.async_workers.iter_mut() {
             worker.stop();
         }
+
+        for dworker in self.dedicated_workers.iter_mut() {
+            dworker.stop();
+        }
     }
 }
 

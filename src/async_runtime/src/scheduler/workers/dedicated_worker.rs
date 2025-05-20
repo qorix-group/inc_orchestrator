@@ -10,9 +10,13 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
-use std::{sync::Arc, task::Context};
-
-use foundation::{containers::trigger_queue::TriggerQueueConsumer, threading::thread_wait_barrier::ThreadReadyNotifier};
+use foundation::{
+    containers::trigger_queue::TriggerQueueConsumer, prelude::FoundationAtomicBool, threading::thread_wait_barrier::ThreadReadyNotifier,
+};
+use std::{
+    sync::{atomic::Ordering, Arc},
+    task::Context,
+};
 
 use crate::{
     scheduler::{
@@ -36,11 +40,20 @@ const LOCAL_STORAGE_SIZE_REDUCTION: usize = 8;
 pub(crate) struct DedicatedWorker {
     thread_handle: Option<Thread>,
     id: WorkerId,
+    stop_signal: Arc<FoundationAtomicBool>,
 }
 
 impl DedicatedWorker {
     pub(crate) fn new(id: WorkerId) -> Self {
-        DedicatedWorker { id, thread_handle: None }
+        DedicatedWorker {
+            id,
+            thread_handle: None,
+            stop_signal: Arc::new(FoundationAtomicBool::new(false)),
+        }
+    }
+
+    pub(crate) fn stop(&self) {
+        self.stop_signal.store(true, Ordering::Release);
     }
 
     pub(crate) fn start(
@@ -54,6 +67,7 @@ impl DedicatedWorker {
             let queue = self.get_queue(&dedicated_scheduler);
             let id = self.id;
             let local_size = queue.capacity() / LOCAL_STORAGE_SIZE_REDUCTION;
+            let stop_signal = self.stop_signal.clone();
 
             Some(
                 spawn_thread(
@@ -64,6 +78,7 @@ impl DedicatedWorker {
                             consumer: queue,
                             local_storage: Vec::new(local_size),
                             id,
+                            stop_signal,
                         };
 
                         Self::run_internal(internal, scheduler, ready_notifier);
@@ -102,6 +117,7 @@ struct WorkerInner {
     consumer: TriggerQueueConsumer<TaskRef>,
     local_storage: Vec<TaskRef>,
     id: WorkerId,
+    stop_signal: Arc<FoundationAtomicBool>,
 }
 
 impl WorkerInner {
@@ -116,7 +132,7 @@ impl WorkerInner {
     }
 
     fn run(&mut self) {
-        loop {
+        while !self.stop_signal.load(Ordering::Acquire) {
             while !self.local_storage.is_empty() {
                 let task = self.local_storage.pop().unwrap(); // Since it was not empty, value must be there.
                 self.run_task(task);
@@ -139,6 +155,7 @@ impl WorkerInner {
                 Err(_) => todo!(),
             }
         }
+        debug!("Dedicated worker {:?} stopping", self.id.unique_id());
     }
 
     fn run_task(&mut self, task: TaskRef) {

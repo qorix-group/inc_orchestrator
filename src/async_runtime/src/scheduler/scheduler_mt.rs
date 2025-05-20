@@ -224,33 +224,34 @@ impl SchedulerTrait for DedicatedSchedulerLocalInner {
 }
 
 #[cfg(test)]
+pub(crate) fn scheduler_new(workers_cnt: usize, local_queue_size: usize) -> AsyncScheduler {
+    // artificially construct a scheduler
+    let mut worker_interactors = BoxInternal::<[WorkerInteractor]>::new_uninit_slice(workers_cnt);
+    let mut queues: Vec<TaskStealQueue> = Vec::new(workers_cnt);
+
+    for i in 0..workers_cnt {
+        let c = create_steal_queue(local_queue_size);
+
+        queues.push(c.clone());
+
+        unsafe {
+            worker_interactors[i].as_mut_ptr().write(WorkerInteractor::new(c));
+        }
+    }
+
+    let global_queue = MpmcQueue::new(32);
+    AsyncScheduler {
+        worker_access: unsafe { worker_interactors.assume_init() },
+        num_of_searching_workers: FoundationAtomicU8::new(0),
+        parked_workers_indexes: std::sync::Mutex::new(vec![]),
+        global_queue,
+    }
+}
+
+#[cfg(test)]
 #[cfg(not(loom))]
 mod tests {
     use super::*;
-
-    fn scheduler_new(workers_cnt: usize, local_queue_size: usize) -> AsyncScheduler {
-        // artificially construct a scheduler
-        let mut worker_interactors = BoxInternal::<[WorkerInteractor]>::new_uninit_slice(workers_cnt);
-        let mut queues: Vec<TaskStealQueue> = Vec::new(workers_cnt);
-
-        for i in 0..workers_cnt {
-            let c = create_steal_queue(local_queue_size);
-
-            queues.push(c.clone());
-
-            unsafe {
-                worker_interactors[i].as_mut_ptr().write(WorkerInteractor::new(c));
-            }
-        }
-
-        let global_queue = MpmcQueue::new(32);
-        AsyncScheduler {
-            worker_access: unsafe { worker_interactors.assume_init() },
-            num_of_searching_workers: FoundationAtomicU8::new(0),
-            parked_workers_indexes: std::sync::Mutex::new(vec![]),
-            global_queue,
-        }
-    }
 
     #[test]
     fn should_transition_to_searching_test() {

@@ -12,7 +12,7 @@
 //
 
 use std::ops::Deref;
-use std::sync::{self, Arc};
+use std::sync::{atomic::Ordering, Arc};
 
 use foundation::containers::spmc_queue::*;
 use foundation::prelude::*;
@@ -135,7 +135,7 @@ impl WorkerInteractor {
     }
 
     pub(crate) fn unpark(&self) {
-        match self.state.0.swap(WORKER_STATE_NOTIFIED, sync::atomic::Ordering::SeqCst) {
+        match self.state.0.swap(WORKER_STATE_NOTIFIED, Ordering::SeqCst) {
             WORKER_STATE_NOTIFIED => {
                 //Nothing to do, already someone did if for us
             }
@@ -146,9 +146,70 @@ impl WorkerInteractor {
             WORKER_STATE_EXECUTING => {
                 //Nothing to do, looks like we already running
             }
+            WORKER_STATE_SHUTTINGDOWN => {
+                // Put back SHUTTINGDOWN state, so we can shutdown properly
+                self.state.0.store(WORKER_STATE_SHUTTINGDOWN, Ordering::SeqCst);
+            }
             _ => {
                 panic!("Inconsistent/not handled state when unparking worker!")
             }
         };
+    }
+}
+
+#[cfg(test)]
+#[cfg(not(loom))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_worker_shutdown_state() {
+        let queue = create_steal_queue(4);
+        let worker = WorkerInteractor::new(queue);
+
+        // Set state to SHUTTINGDOWN
+        worker.state.0.store(WORKER_STATE_SHUTTINGDOWN, Ordering::SeqCst);
+
+        // Call unpark and ensure we do not panic and state remains SHUTTINGDOWN
+        worker.unpark();
+        let state = worker.state.0.load(Ordering::SeqCst);
+        assert_eq!(state, WORKER_STATE_SHUTTINGDOWN);
+    }
+
+    #[test]
+    fn test_worker_unpark_from_sleeping_cv() {
+        let queue = create_steal_queue(4);
+        let worker = WorkerInteractor::new(queue);
+
+        // Set state to SLEEPING_CV
+        worker.state.0.store(WORKER_STATE_SLEEPING_CV, Ordering::SeqCst);
+
+        // Call unpark and ensure state is set to NOTIFIED
+        worker.unpark();
+        let state = worker.state.0.load(Ordering::SeqCst);
+        assert_eq!(state, WORKER_STATE_NOTIFIED);
+    }
+
+    #[test]
+    fn test_worker_unpark_from_executing() {
+        let queue = create_steal_queue(4);
+        let worker = WorkerInteractor::new(queue);
+
+        // State is EXECUTING by default
+        worker.unpark();
+        let state = worker.state.0.load(Ordering::SeqCst);
+        // Should be NOTIFIED after unpark
+        assert_eq!(state, WORKER_STATE_NOTIFIED);
+    }
+
+    #[test]
+    #[should_panic(expected = "Inconsistent/not handled state when unparking worker!")]
+    fn test_worker_unpark_invalid_state() {
+        let queue = create_steal_queue(4);
+        let worker = WorkerInteractor::new(queue);
+
+        // Set to an invalid state
+        worker.state.0.store(0xFF, Ordering::SeqCst);
+        worker.unpark();
     }
 }
