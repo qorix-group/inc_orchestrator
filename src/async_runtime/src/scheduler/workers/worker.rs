@@ -150,13 +150,7 @@ impl WorkerInner {
     }
 
     fn run(&mut self) {
-        loop {
-            // Check if we should stop
-            if self.own_interactor.state.0.load(std::sync::atomic::Ordering::Acquire) == WORKER_STATE_SHUTTINGDOWN {
-                debug!("Worker{} received stop request, shutting down", self.id.worker_id());
-                return;
-            }
-
+        while self.own_interactor.state.0.load(std::sync::atomic::Ordering::Acquire) != WORKER_STATE_SHUTTINGDOWN {
             let (task_opt, should_notify) = self.try_pick_work();
 
             if let Some(task) = task_opt {
@@ -167,6 +161,7 @@ impl WorkerInner {
             self.park_worker();
             self.local_state = LocalState::Executing;
         }
+        debug!("Worker{} received stop request, shutting down", self.id.worker_id());
     }
 
     fn park_worker(&mut self) {
@@ -377,5 +372,109 @@ impl WorkerInner {
 
     fn get_worker_id(&self) -> usize {
         self.id.worker_id() as usize
+    }
+}
+
+#[cfg(test)]
+#[cfg(not(loom))]
+mod tests {
+    use crate::scheduler::scheduler_mt::scheduler_new;
+    use crate::scheduler::workers::{worker::Worker, worker_types::*};
+    use std::sync::atomic::Ordering;
+    use std::sync::Arc;
+
+    #[test]
+    fn test_worker_stop_sets_shutdown_state() {
+        let scheduler = Arc::new(scheduler_new(1, 4));
+        let mut worker = Worker {
+            thread_handle: None,
+            id: WorkerId::new(format!("arunner{}", 0).as_str().into(), 0, 0, WorkerType::Async),
+            scheduler: Some(scheduler.clone()),
+        };
+
+        worker.stop();
+
+        let state = scheduler.worker_access[0].state.0.load(Ordering::SeqCst);
+        assert_eq!(state, WORKER_STATE_SHUTTINGDOWN);
+
+        // Check that unpark does not panic and state remains SHUTTINGDOWN
+        scheduler.worker_access[0].unpark();
+        let state = scheduler.worker_access[0].state.0.load(Ordering::SeqCst);
+        assert_eq!(state, WORKER_STATE_SHUTTINGDOWN);
+    }
+
+    #[test]
+    // miri does not like this test for some reason. Disable it for now. The message is
+    // ```
+    // error: unsupported operation: can't call foreign function `pthread_attr_init` on OS `linux`
+    // ```
+    // See https://github.com/qorix-group/inc_orchestrator_internal/actions/runs/15205492004/job/42767523599#step:9:237
+    // for an example CI run.
+    #[cfg(not(miri))]
+    fn test_worker_stop() {
+        use crate::{box_future, AsyncTask, FoundationAtomicBool, TaskRef};
+        use foundation::prelude::debug;
+        use foundation::threading::thread_wait_barrier::ThreadWaitBarrier;
+        use std::sync::Arc;
+        use std::time::Duration;
+
+        async fn test_fn(b: Arc<FoundationAtomicBool>) {
+            b.store(true, std::sync::atomic::Ordering::SeqCst);
+        }
+
+        let scheduler = Arc::new(crate::scheduler::scheduler_mt::scheduler_new(1, 4));
+        let dedicated_scheduler = Arc::new(crate::scheduler::scheduler_mt::DedicatedScheduler {
+            dedicated_queues: Box::new([]),
+        });
+
+        let barrier = Arc::new(ThreadWaitBarrier::new(1));
+        let ready_notifier = barrier.get_notifier().unwrap();
+
+        let thread_params = crate::scheduler::workers::ThreadParameters::default();
+
+        let mut worker = Worker::new(WorkerId::new(format!("arunner{}", 0).as_str().into(), 0, 0, WorkerType::Async));
+        worker.start(scheduler.clone(), dedicated_scheduler, ready_notifier, &thread_params);
+
+        match barrier.wait_for_all(Duration::from_secs(5)) {
+            Ok(_) => {
+                debug!("Worker ready, continuing with test...");
+            }
+            Err(_) => {
+                panic!("Timeout waiting for worker to become ready");
+            }
+        }
+
+        // First, test that tasks are executed normally
+        let first_task_executed = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let first_task_executed_clone = first_task_executed.clone();
+
+        let task = Arc::new(AsyncTask::new(box_future(test_fn(first_task_executed_clone)), 0, scheduler.clone()));
+
+        scheduler.spawn_outside_runtime(TaskRef::new(task));
+        std::thread::sleep(Duration::from_millis(100));
+
+        assert!(
+            first_task_executed.load(std::sync::atomic::Ordering::SeqCst),
+            "First task was not executed while worker was still active"
+        );
+
+        // Now stop the worker
+        worker.stop();
+
+        // Try to execute a second task after stopping
+        let second_task_executed = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let second_task_executed_clone = second_task_executed.clone();
+
+        let task = Arc::new(AsyncTask::new(box_future(test_fn(second_task_executed_clone)), 0, scheduler.clone()));
+
+        scheduler.spawn_outside_runtime(TaskRef::new(task));
+
+        std::thread::sleep(Duration::from_millis(100));
+
+        // The second task should NOT have been executed
+        assert!(
+            !second_task_executed.load(std::sync::atomic::Ordering::SeqCst),
+            "Second task was executed even though worker was stopped"
+        );
     }
 }
