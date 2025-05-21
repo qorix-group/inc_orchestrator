@@ -11,7 +11,14 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use async_runtime::{runtime::async_runtime::AsyncRuntimeBuilder, scheduler::execution_engine::*, spawn, spawn_on_dedicated};
+use async_runtime::prelude::*;
+use async_runtime::{
+    runtime::async_runtime::AsyncRuntimeBuilder,
+    safety::{self, ensure_safety_enabled},
+    scheduler::execution_engine::*,
+    spawn, spawn_on_dedicated,
+};
+
 use foundation::prelude::*;
 use std::{future::Future, thread, time::Duration};
 
@@ -53,36 +60,37 @@ fn main() {
             ExecutionEngineBuilder::new()
                 .task_queue_size(256)
                 .workers(3)
-                .with_dedicated_worker("dedicated".into()),
+                .with_dedicated_worker("dedicated".into())
+                .enable_safety_worker(ThreadParameters::default()),
         )
         .build()
         .unwrap();
 
     let _ = runtime.enter_engine(async {
+        ensure_safety_enabled();
+        // TASK
         error!("We do have first enter into runtime ;)");
 
         let handle = spawn(async {
+            // TASK
             error!("And again from one we are in another ;)");
 
-            spawn(async {
-                error!("And again from one nested ;)");
+            let _ = safety::spawn(async {
+                //TASK
+                error!("And again from one nested from dedicated ;)");
 
-                1
+                Err(0) as Result<i32, i32>
             })
             .await
-            .unwrap();
+            .unwrap()
+            .is_err();
+
+            error!("I RUN FROM SAFETY FROM NOW ON !!!");
 
             spawn_on_dedicated(
                 async {
+                    // TASK
                     error!("I AM DEDICATED  ;)");
-
-                    spawn(async {
-                        error!("And again from one nested from dedicated ;)");
-
-                        1
-                    })
-                    .await
-                    .unwrap();
 
                     error!("I AM DEDICATED RESTORED  ;)");
                     1

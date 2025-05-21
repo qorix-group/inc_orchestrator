@@ -20,6 +20,18 @@
 #[macro_export]
 macro_rules! not_recoverable_error {
     // handles a case where we want to handle Result<> error as non recoverable in form not_recoverable_error!(err RESULT, "MSG");
+    ( on_cond $result_obj:expr, $literal_str:expr ) => {{
+        const MSG: &str = $literal_str;
+        if !($result_obj) {
+            error!("not_recoverable_error: {} at {}:{}", $literal_str, file!(), line!());
+            panic!(
+                "Currently no custom handler connected for panic, using rust one. Panicked with {}",
+                $literal_str
+            );
+        }
+    }};
+
+    // handles a case where we want to handle Result<> error as non recoverable in form not_recoverable_error!(err RESULT, "MSG");
     ( on_err $result_obj:expr, $literal_str:expr ) => {{
         const MSG: &str = $literal_str;
         if ($result_obj).is_err() {
