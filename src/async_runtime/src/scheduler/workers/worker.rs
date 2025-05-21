@@ -33,6 +33,7 @@ use super::worker_types::*;
 pub(crate) struct Worker {
     thread_handle: Option<Thread>,
     id: WorkerId,
+    engine_has_safety_worker: bool,
     scheduler: Option<Arc<AsyncScheduler>>,
 }
 
@@ -65,10 +66,11 @@ struct WorkerInner {
 ///
 ///
 impl Worker {
-    pub(crate) fn new(id: WorkerId) -> Self {
+    pub(crate) fn new(_prio: Option<u8>, id: WorkerId, engine_has_safety_worker: bool) -> Self {
         Self {
             thread_handle: None,
             id,
+            engine_has_safety_worker,
             scheduler: None,
         }
     }
@@ -84,9 +86,11 @@ impl Worker {
         self.thread_handle = {
             let interactor = scheduler.worker_access[self.id.worker_id() as usize].clone();
             let id = self.id;
+            let with_safety = self.engine_has_safety_worker;
 
             // Entering a thread
             let thread = spawn_thread(
+                "aworker_",
                 &self.id,
                 move || {
                     let prod_consumer = interactor.steal_handle.get_boundedl().unwrap();
@@ -100,7 +104,7 @@ impl Worker {
                         randomness_source: FastRand::new(82382389432984 / (id.worker_id() as u64 + 1)), // Random seed for now as const
                     };
 
-                    Self::run_internal(internal, dedicated_scheduler, ready_notifier);
+                    Self::run_internal(internal, dedicated_scheduler, ready_notifier, with_safety);
                 },
                 thread_params,
             )
@@ -109,8 +113,8 @@ impl Worker {
         };
     }
 
-    fn run_internal(mut worker: WorkerInner, dedicated_scheduler: Arc<DedicatedScheduler>, ready_notifier: ThreadReadyNotifier) {
-        worker.pre_run(dedicated_scheduler);
+    fn run_internal(mut worker: WorkerInner, dedicated_scheduler: Arc<DedicatedScheduler>, ready_notifier: ThreadReadyNotifier, with_safety: bool) {
+        worker.pre_run(dedicated_scheduler, with_safety);
 
         // Let the engine know what we are ready to handle tasks
         ready_notifier.ready();
@@ -133,11 +137,15 @@ impl Worker {
 }
 
 impl WorkerInner {
-    fn pre_run(&mut self, dedicated_scheduler: Arc<DedicatedScheduler>) {
-        let builder = ContextBuilder::new()
+    fn pre_run(&mut self, dedicated_scheduler: Arc<DedicatedScheduler>, with_safety: bool) {
+        let mut builder = ContextBuilder::new()
             .thread_id(0)
             .with_async_handle(self.producer_consumer.clone(), self.scheduler.clone(), dedicated_scheduler)
             .with_worker_id(self.id);
+
+        if with_safety {
+            builder = builder.with_safety();
+        }
 
         // Setup context
         ctx_initialize(builder);
@@ -389,6 +397,7 @@ mod tests {
         let mut worker = Worker {
             thread_handle: None,
             id: WorkerId::new(format!("arunner{}", 0).as_str().into(), 0, 0, WorkerType::Async),
+            engine_has_safety_worker: false,
             scheduler: Some(scheduler.clone()),
         };
 
@@ -432,7 +441,12 @@ mod tests {
 
         let thread_params = crate::scheduler::workers::ThreadParameters::default();
 
-        let mut worker = Worker::new(WorkerId::new(format!("arunner{}", 0).as_str().into(), 0, 0, WorkerType::Async));
+        let mut worker = Worker {
+            thread_handle: None,
+            id: WorkerId::new(format!("arunner{}", 0).as_str().into(), 0, 0, WorkerType::Async),
+            engine_has_safety_worker: false,
+            scheduler: Some(scheduler.clone()),
+        };
         worker.start(scheduler.clone(), dedicated_scheduler, ready_notifier, &thread_params);
 
         match barrier.wait_for_all(Duration::from_secs(5)) {

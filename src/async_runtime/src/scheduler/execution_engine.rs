@@ -16,6 +16,7 @@ use std::time::Duration;
 use super::scheduler_mt::*;
 use super::task::async_task::TaskRef;
 use super::workers::dedicated_worker::DedicatedWorker;
+use super::workers::safety_worker::SafetyWorker;
 use super::workers::worker::Worker;
 use super::workers::worker_types::*;
 
@@ -35,6 +36,7 @@ pub struct ExecutionEngine {
     dedicated_workers: Vec<DedicatedWorker>,
     dedicated_scheduler: Arc<DedicatedScheduler>,
 
+    safety_worker: Option<SafetyWorker>,
     thread_params: ThreadParameters,
 }
 
@@ -47,9 +49,23 @@ impl ExecutionEngine {
                 .unwrap_or_else(|_| panic!("Failed to enter runtime while pushing init task"));
         }
 
+        let safety_worker_count = self.safety_worker.is_some() as u32;
+
         let start_barrier = Arc::new(ThreadWaitBarrier::new(
-            self.async_workers.len() as u32 + self.dedicated_workers.len() as u32,
+            self.async_workers.len() as u32 + self.dedicated_workers.len() as u32 + safety_worker_count,
         ));
+
+        if safety_worker_count > 0 {
+            self.safety_worker
+                .as_mut()
+                .expect("Safety worker has to present as check was done above")
+                .start(
+                    self.async_scheduler.clone(),
+                    self.dedicated_scheduler.clone(),
+                    start_barrier.get_notifier().unwrap(),
+                    &self.thread_params,
+                );
+        }
 
         self.async_workers.iter_mut().for_each(|w| {
             w.start(
@@ -97,6 +113,10 @@ impl Drop for ExecutionEngine {
         for dworker in self.dedicated_workers.iter_mut() {
             dworker.stop();
         }
+
+        if let Some(ref sworker) = self.safety_worker {
+            sworker.stop();
+        }
     }
 }
 
@@ -106,6 +126,7 @@ pub struct ExecutionEngineBuilder {
     thread_params: ThreadParameters,
 
     dedicated_workers_ids: GrowableVec<UniqueWorkerId>,
+    with_safe_worker: (bool, ThreadParameters), //enabled, params
 }
 
 impl Default for ExecutionEngineBuilder {
@@ -120,6 +141,7 @@ impl ExecutionEngineBuilder {
             async_workers_cnt: 1,
             queue_size: 256,
             dedicated_workers_ids: GrowableVec::new(2),
+            with_safe_worker: (false, ThreadParameters::default()),
             thread_params: ThreadParameters::default(),
         }
     }
@@ -162,6 +184,11 @@ impl ExecutionEngineBuilder {
         self
     }
 
+    pub fn enable_safety_worker(mut self, params: ThreadParameters) -> Self {
+        self.with_safe_worker = (true, params);
+        self
+    }
+
     ///
     /// Adds new dedicated worker to the engine identified by `id`
     ///
@@ -182,6 +209,18 @@ impl ExecutionEngineBuilder {
         let mut worker_interactors = Box::<[WorkerInteractor]>::new_uninit_slice(self.async_workers_cnt);
         let mut async_queues: Vec<TaskStealQueue> = Vec::new(self.async_workers_cnt);
 
+        let safety_worker_queue;
+        let safety_worker = {
+            if self.with_safe_worker.0 {
+                let w = SafetyWorker::new(WorkerId::new("SafetyWorker".into(), 0, 0, WorkerType::Dedicated));
+                safety_worker_queue = Some(w.get_queue());
+                Some(w)
+            } else {
+                safety_worker_queue = None;
+                None
+            }
+        };
+
         for i in 0..self.async_workers_cnt {
             async_queues.push(create_steal_queue(self.queue_size));
 
@@ -196,17 +235,17 @@ impl ExecutionEngineBuilder {
             num_of_searching_workers: FoundationAtomicU8::new(0),
             parked_workers_indexes: Mutex::new(vec![]),
             global_queue,
+            safety_worker_queue,
         });
 
         let mut async_workers = Vec::new(self.async_workers_cnt);
 
         for i in 0..self.async_workers_cnt {
-            async_workers.push(Worker::new(WorkerId::new(
-                format!("arunner{}", i).as_str().into(),
-                0,
-                i as u8,
-                WorkerType::Async,
-            )));
+            async_workers.push(Worker::new(
+                self.thread_params.priority,
+                WorkerId::new(format!("arunner{}", i).as_str().into(), 0, i as u8, WorkerType::Async),
+                self.with_safe_worker.0,
+            ));
         }
 
         // Create dedicated workers part
@@ -217,7 +256,7 @@ impl ExecutionEngineBuilder {
             let id = self.dedicated_workers_ids[i];
             let real_id = WorkerId::new(id, 0, i as u8, WorkerType::Dedicated);
 
-            dedicated_workers.push(DedicatedWorker::new(real_id));
+            dedicated_workers.push(DedicatedWorker::new(real_id, self.with_safe_worker.0));
             unsafe {
                 dedicated_queues[i]
                     .as_mut_ptr()
@@ -235,6 +274,7 @@ impl ExecutionEngineBuilder {
             async_scheduler,
             dedicated_workers,
             dedicated_scheduler,
+            safety_worker,
             thread_params: self.thread_params,
         }
     }

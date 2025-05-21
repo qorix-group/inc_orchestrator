@@ -30,8 +30,8 @@ const TASK_JOIN_HANDLE_ATTACHED: u32 = 0b0001_0000;
 /// The task was already notified and waiting for processing `somewhere`
 const TASK_NOTIFIED: u32 = 0b0010_0000;
 
-/// The task was already notified and waiting for processing into specific exclusive executor (ie. safety executor). TODO: Store executor id on upper bits of a state, for now this is always safety one
-const TASK_NOTIFIED_EXCLUSIVE: u32 = 0b0100_0000;
+/// The task was already notified into safety
+const TASK_NOTIFIED_SAFETY: u32 = 0b0100_0000;
 
 //
 // Below transitions model small state machine in TaskState to assure correct behavior for callers
@@ -46,6 +46,7 @@ pub enum TransitionToIdle {
 pub enum TransitionToRunning {
     Done,
     Aborted,
+    AlreadyRunning,
 }
 
 pub enum TransitionToCompleted {
@@ -55,6 +56,12 @@ pub enum TransitionToCompleted {
 }
 
 pub enum TransitionToNotified {
+    Done,
+    AlreadyNotified,
+    Running,
+}
+
+pub enum TransitionToSafetyNotified {
     Done,
     AlreadyNotified,
     Running,
@@ -102,7 +109,12 @@ impl TaskStateSnapshot {
 
     #[inline(always)]
     pub(crate) fn is_notified(&self) -> bool {
-        (self.0 & (TASK_NOTIFIED | TASK_NOTIFIED_EXCLUSIVE)) != 0
+        (self.0 & (TASK_NOTIFIED | TASK_NOTIFIED_SAFETY)) != 0
+    }
+
+    #[inline(always)]
+    pub(crate) fn is_safety_notified(&self) -> bool {
+        (self.0 & (TASK_NOTIFIED_SAFETY)) != 0
     }
 
     #[inline(always)]
@@ -133,13 +145,18 @@ impl TaskStateSnapshot {
     }
 
     #[inline(always)]
+    pub(crate) fn set_safety_notified(&mut self) {
+        self.0 |= TASK_NOTIFIED_SAFETY;
+    }
+
+    #[inline(always)]
     pub(crate) fn set_canceled(&mut self) {
         self.0 |= TASK_STATE_CANCELED;
     }
 
     #[inline(always)]
     pub(crate) fn unset_notified(&mut self) {
-        let mask = !(TASK_NOTIFIED | TASK_NOTIFIED_EXCLUSIVE);
+        let mask = !(TASK_NOTIFIED | TASK_NOTIFIED_SAFETY);
 
         self.0 &= mask;
     }
@@ -186,10 +203,11 @@ impl TaskState {
     ///
     pub(crate) fn transition_to_running(&self) -> TransitionToRunning {
         self.fetch_update_with_return(|prev| {
-            assert!(!prev.is_running()); // TODO add error handling
-            assert!(prev.is_idle()); // TODO add error handling
+            if prev.is_running() {
+                return (None, TransitionToRunning::AlreadyRunning);
+            }
 
-            let mut next = prev;
+            assert!(prev.is_idle());
 
             if prev.is_completed() {
                 return (None, TransitionToRunning::Done);
@@ -198,6 +216,8 @@ impl TaskState {
             if prev.is_canceled() {
                 return (None, TransitionToRunning::Aborted);
             }
+
+            let mut next = prev;
 
             next.unset_notified(); // we clear notification bit so we can be again notified from this moment as this weights on reschedule action
             next.set_running();
@@ -283,6 +303,27 @@ impl TaskState {
 
             let mut new = old;
             new.set_notified();
+            (Some(new), res)
+        })
+    }
+
+    ///
+    /// Return true if task was notified before, otherwise false
+    ///
+    pub(crate) fn set_safety_notified(&self) -> TransitionToSafetyNotified {
+        self.fetch_update_with_return(|old: TaskStateSnapshot| {
+            let mut res = TransitionToSafetyNotified::Done;
+
+            if old.is_completed() || old.is_safety_notified() || old.is_canceled() {
+                return (None, TransitionToSafetyNotified::AlreadyNotified);
+            }
+
+            if old.is_running() {
+                res = TransitionToSafetyNotified::Running;
+            }
+
+            let mut new = old;
+            new.set_safety_notified();
             (Some(new), res)
         })
     }

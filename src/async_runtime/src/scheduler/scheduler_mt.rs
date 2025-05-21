@@ -11,6 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+use foundation::not_recoverable_error;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -30,6 +31,11 @@ pub(crate) trait SchedulerTrait {
     /// Respawns task that was already once Polled and now is awaked.
     ///
     fn respawn(&self, task: TaskRef);
+
+    ///
+    /// Respawns task that was already once Polled and now is awaked into safety executor
+    ///
+    fn respawn_into_safety(&self, task: TaskRef);
 }
 
 pub(crate) const SCHEDULER_MAX_SEARCHING_WORKERS_DIVIDER: u8 = 2; // Tune point: We allow only half of worker to steal, to limit contention
@@ -43,6 +49,8 @@ pub(crate) struct AsyncScheduler {
     pub(super) parked_workers_indexes: std::sync::Mutex<std::vec::Vec<usize>>,
 
     pub(super) global_queue: MpmcQueue<TaskRef>,
+
+    pub(super) safety_worker_queue: Option<Arc<TriggerQueue<TaskRef>>>,
 }
 
 impl AsyncScheduler {
@@ -68,6 +76,7 @@ impl AsyncScheduler {
         }
     }
 }
+
 impl SchedulerTrait for AsyncScheduler {
     fn respawn(&self, task: TaskRef) {
         if let Some(handler) = ctx_get_handler() {
@@ -83,6 +92,15 @@ impl SchedulerTrait for AsyncScheduler {
             });
         } else {
             self.spawn_outside_runtime(task);
+        }
+    }
+
+    fn respawn_into_safety(&self, task: TaskRef) {
+        if let Some(ref safety) = self.safety_worker_queue {
+            let ret = safety.push(task);
+
+            // TODO: For now simply abort, we can consider blocking push here, or polling push
+            not_recoverable_error!(on_cond(ret), "Cannot push to safety queue anymore, overflow!");
         }
     }
 }
@@ -221,6 +239,10 @@ impl SchedulerTrait for DedicatedSchedulerLocalInner {
     fn respawn(&self, task: TaskRef) {
         self.scheduler.spawn(task, self.worker_id);
     }
+
+    fn respawn_into_safety(&self, _: TaskRef) {
+        not_recoverable_error!("Respawning into safety for a task that was created in dedicated worker is not allowed");
+    }
 }
 
 #[cfg(test)]
@@ -239,12 +261,15 @@ pub(crate) fn scheduler_new(workers_cnt: usize, local_queue_size: usize) -> Asyn
         }
     }
 
+    let safety_worker_queue = Some(Arc::new(TriggerQueue::new(64)));
+
     let global_queue = MpmcQueue::new(32);
     AsyncScheduler {
         worker_access: unsafe { worker_interactors.assume_init() },
         num_of_searching_workers: FoundationAtomicU8::new(0),
         parked_workers_indexes: std::sync::Mutex::new(vec![]),
         global_queue,
+        safety_worker_queue,
     }
 }
 

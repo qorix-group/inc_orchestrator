@@ -67,6 +67,12 @@ fn main() {
         }
         "check" => {
             check_license_header();
+            run_command(
+                &["fmt", "--", "--check"],
+                HashMap::default(),
+                &passthrough_args,
+                Some("Wrong formatting@"),
+            );
             debug_build(envs.clone(), cli_env_vars.clone(), &passthrough_args);
             clippy(envs.clone(), cli_env_vars.clone(), &passthrough_args);
             test(envs, cli_env_vars, &passthrough_args);
@@ -102,6 +108,10 @@ fn run_build(
         default_envs.insert(k, v);
     }
 
+    run_command(cargo_args, default_envs, extra_args, None);
+}
+
+fn run_command(cargo_args: &[&str], default_envs: HashMap<String, String>, extra_args: &[String], explain: Option<&str>) {
     let mut cmd = Command::new("cargo");
     cmd.args(cargo_args);
     cmd.args(extra_args);
@@ -113,7 +123,7 @@ fn run_build(
     println!("> Running: cargo {} {}", cargo_args.join(" "), extra_args.join(" "));
     println!("> With envs: {:?}", default_envs);
 
-    let status = cmd.status().expect("Failed to run cargo");
+    let status = cmd.status().unwrap_or_else(|_| panic!("Failed to run cargo with explain {:?}", explain));
     if !status.success() {
         exit(status.code().unwrap_or(1));
     }

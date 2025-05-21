@@ -486,7 +486,7 @@ mod tests {
 
     #[test]
     fn test_channel_mt_sender_receiver_single_message() {
-        let mut builder = Builder::new();
+        let builder = Builder::new();
 
         builder.check(|| {
             let (s, mut r) = create_channel_default::<u32>();

@@ -11,11 +11,16 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+use crate::core::types::BoxCustom;
 use crate::core::types::FutureBox;
 use crate::futures::reusable_box_future::ReusableBoxFuture;
+use crate::safety::SafetyResult;
 use core::cell::Cell;
 use core::cell::RefCell;
 use foundation::containers::spmc_queue::BoundProducerConsumer;
+use std::future::Future;
+
+use std::pin::Pin;
 use std::{rc::Rc, sync::Arc};
 
 use crate::core::types::TaskId;
@@ -24,6 +29,7 @@ use crate::JoinHandle;
 
 use super::scheduler_mt::DedicatedScheduler;
 use super::scheduler_mt::DedicatedSchedulerLocal;
+
 use super::workers::worker_types::UniqueWorkerId;
 use super::workers::worker_types::WorkerId;
 use super::{scheduler_mt::AsyncScheduler, task::async_task::TaskRef};
@@ -65,99 +71,78 @@ impl Handler {
     where
         T: Send + 'static,
     {
-        let task_ref;
-
-        match self.inner {
-            HandlerImpl::Async(ref async_inner) => {
-                let task = Arc::new(AsyncTask::new(boxed, ctx_get_worker_id().worker_id(), async_inner.scheduler.clone()));
-                task_ref = TaskRef::new(task.clone());
-
-                async_inner.scheduler.spawn_from_runtime(task_ref.clone(), &async_inner.prod_con);
-            }
-            HandlerImpl::Dedicated(ref dedicated_inner) => {
-                let task = Arc::new(AsyncTask::new(boxed, ctx_get_worker_id().worker_id(), dedicated_inner.scheduler.clone()));
-                task_ref = TaskRef::new(task.clone());
-                dedicated_inner.scheduler.spawn_outside_runtime(task_ref.clone());
-            }
-        }
-
-        JoinHandle::new(task_ref)
+        self.internal(boxed, |f, id, scheduler| Arc::new(AsyncTask::new(f, id, scheduler)))
     }
 
     pub(crate) fn spawn_reusable<T>(&self, reusable: ReusableBoxFuture<T>) -> JoinHandle<T>
     where
         T: Send + 'static,
     {
-        let task_ref;
-        match self.inner {
-            HandlerImpl::Async(ref async_inner) => {
-                let task = Arc::new(AsyncTask::new(
-                    reusable.into_pin(),
-                    ctx_get_worker_id().worker_id(),
-                    async_inner.scheduler.clone(),
-                ));
-                task_ref = TaskRef::new(task.clone());
-
-                async_inner.scheduler.spawn_from_runtime(task_ref.clone(), &async_inner.prod_con);
-            }
-            HandlerImpl::Dedicated(ref dedicated_inner) => {
-                let task = Arc::new(AsyncTask::new(
-                    reusable.into_pin(),
-                    ctx_get_worker_id().worker_id(),
-                    dedicated_inner.scheduler.clone(),
-                ));
-                task_ref = TaskRef::new(task.clone());
-
-                dedicated_inner.scheduler.spawn_outside_runtime(task_ref.clone());
-            }
-        }
-
-        JoinHandle::new(task_ref)
+        self.reusable_safety_internal(reusable, |reusable, id, scheduler| Arc::new(AsyncTask::new(reusable, id, scheduler)))
     }
 
     pub(crate) fn spawn_on_dedicated<T>(&self, boxed: FutureBox<T>, worker_id: UniqueWorkerId) -> JoinHandle<T>
     where
         T: Send + 'static,
     {
-        let scheduler = match self.inner {
-            HandlerImpl::Async(ref async_inner) => &async_inner.dedicated_scheduler,
-            HandlerImpl::Dedicated(ref dedicated_inner) => &dedicated_inner.dedicated_scheduler,
-        };
-
-        let task = Arc::new(AsyncTask::new(
-            boxed,
-            ctx_get_worker_id().worker_id(),
-            DedicatedSchedulerLocal::new(worker_id, scheduler.clone()),
-        ));
-        let task_ref = TaskRef::new(task.clone());
-
-        let ret = scheduler.spawn(task_ref.clone(), worker_id);
-        assert!(ret, "Tried to spawn on not registered dedicated worker {:?}", worker_id);
-
-        JoinHandle::new(task_ref)
+        self.on_dedicated_internal(boxed, worker_id, |f, id, scheduler| Arc::new(AsyncTask::new(f, id, scheduler)))
     }
 
     pub(crate) fn spawn_reusable_on_dedicated<T>(&self, reusable: ReusableBoxFuture<T>, worker_id: UniqueWorkerId) -> JoinHandle<T>
     where
         T: Send + 'static,
     {
-        let scheduler = match self.inner {
-            HandlerImpl::Async(ref async_inner) => &async_inner.dedicated_scheduler,
-            HandlerImpl::Dedicated(ref dedicated_inner) => &dedicated_inner.dedicated_scheduler,
-        };
+        self.reusable_on_dedicated_internal(reusable, worker_id, |reusable, id, scheduler| {
+            Arc::new(AsyncTask::new(reusable, id, scheduler))
+        })
+    }
 
-        let task = Arc::new(AsyncTask::new(
-            reusable.into_pin(),
-            ctx_get_worker_id().worker_id(),
-            DedicatedSchedulerLocal::new(worker_id, scheduler.clone()),
-        ));
+    pub(crate) fn spawn_safety<T, E>(&self, boxed: FutureBox<SafetyResult<T, E>>) -> JoinHandle<SafetyResult<T, E>>
+    where
+        T: Send + 'static,
+        E: Send + 'static,
+    {
+        self.internal(boxed, |f, id, scheduler| {
+            Arc::new(AsyncTask::new_safety(ctx_is_with_safety(), f, id, scheduler))
+        })
+    }
 
-        let task_ref = TaskRef::new(task.clone());
+    pub(crate) fn spawn_reusable_safety<T, E>(&self, reusable: ReusableBoxFuture<SafetyResult<T, E>>) -> JoinHandle<SafetyResult<T, E>>
+    where
+        T: Send + 'static,
+        E: Send + 'static,
+    {
+        self.reusable_safety_internal(reusable, |reusable, id, scheduler| {
+            Arc::new(AsyncTask::new_safety(ctx_is_with_safety(), reusable, id, scheduler))
+        })
+    }
 
-        let ret = scheduler.spawn(task_ref.clone(), worker_id);
-        assert!(ret, "Tried to spawn on not registered dedicated worker {:?}", worker_id);
+    pub(crate) fn spawn_on_dedicated_safety<T, E>(
+        &self,
+        boxed: FutureBox<SafetyResult<T, E>>,
+        worker_id: UniqueWorkerId,
+    ) -> JoinHandle<SafetyResult<T, E>>
+    where
+        T: Send + 'static,
+        E: Send + 'static,
+    {
+        self.on_dedicated_internal(boxed, worker_id, |f, id, scheduler| {
+            Arc::new(AsyncTask::new_safety(ctx_is_with_safety(), f, id, scheduler))
+        })
+    }
 
-        JoinHandle::new(task_ref)
+    pub(crate) fn spawn_reusable_on_dedicated_safety<T, E>(
+        &self,
+        reusable: ReusableBoxFuture<SafetyResult<T, E>>,
+        worker_id: UniqueWorkerId,
+    ) -> JoinHandle<SafetyResult<T, E>>
+    where
+        T: Send + 'static,
+        E: Send + 'static,
+    {
+        self.reusable_on_dedicated_internal(reusable, worker_id, |reusable, id, scheduler| {
+            Arc::new(AsyncTask::new_safety(ctx_is_with_safety(), reusable, id, scheduler))
+        })
     }
 
     ///
@@ -172,6 +157,127 @@ impl Handler {
                 a(None);
             }
         }
+    }
+
+    fn internal<T>(
+        &self,
+        boxed: FutureBox<T>,
+        c: impl Fn(FutureBox<T>, u8, Arc<AsyncScheduler>) -> Arc<AsyncTask<T, BoxCustom<dyn Future<Output = T> + Send>, Arc<AsyncScheduler>>>,
+    ) -> JoinHandle<T>
+    where
+        T: Send + 'static,
+    {
+        let task_ref;
+        let handle;
+
+        match self.inner {
+            HandlerImpl::Async(ref async_inner) => {
+                let task = c(boxed, ctx_get_worker_id().worker_id(), async_inner.scheduler.clone());
+                task_ref = TaskRef::new(task.clone());
+                handle = JoinHandle::new(task_ref.clone());
+
+                async_inner.scheduler.spawn_from_runtime(task_ref, &async_inner.prod_con);
+            }
+            HandlerImpl::Dedicated(ref dedicated_inner) => {
+                let task = c(boxed, ctx_get_worker_id().worker_id(), dedicated_inner.scheduler.clone());
+                task_ref = TaskRef::new(task.clone());
+                handle = JoinHandle::new(task_ref.clone());
+
+                dedicated_inner.scheduler.spawn_outside_runtime(task_ref);
+            }
+        }
+
+        handle
+    }
+
+    fn reusable_safety_internal<T>(
+        &self,
+        reusable: ReusableBoxFuture<T>,
+        c: impl Fn(Pin<ReusableBoxFuture<T>>, u8, Arc<AsyncScheduler>) -> Arc<AsyncTask<T, ReusableBoxFuture<T>, Arc<AsyncScheduler>>>,
+    ) -> JoinHandle<T>
+    where
+        T: Send + 'static,
+    {
+        let task_ref;
+        let handle;
+
+        match self.inner {
+            HandlerImpl::Async(ref async_inner) => {
+                let task = c(reusable.into_pin(), ctx_get_worker_id().worker_id(), async_inner.scheduler.clone());
+                task_ref = TaskRef::new(task.clone());
+                handle = JoinHandle::new(task_ref.clone());
+
+                async_inner.scheduler.spawn_from_runtime(task_ref, &async_inner.prod_con);
+            }
+            HandlerImpl::Dedicated(ref dedicated_inner) => {
+                let task = c(reusable.into_pin(), ctx_get_worker_id().worker_id(), dedicated_inner.scheduler.clone());
+                task_ref = TaskRef::new(task.clone());
+                handle = JoinHandle::new(task_ref.clone());
+
+                dedicated_inner.scheduler.spawn_outside_runtime(task_ref);
+            }
+        }
+
+        handle
+    }
+
+    fn on_dedicated_internal<T>(
+        &self,
+        boxed: FutureBox<T>,
+        worker_id: UniqueWorkerId,
+        c: impl Fn(FutureBox<T>, u8, DedicatedSchedulerLocal) -> Arc<AsyncTask<T, BoxCustom<dyn Future<Output = T> + Send>, DedicatedSchedulerLocal>>,
+    ) -> JoinHandle<T>
+    where
+        T: Send + 'static,
+    {
+        let scheduler = match self.inner {
+            HandlerImpl::Async(ref async_inner) => &async_inner.dedicated_scheduler,
+            HandlerImpl::Dedicated(ref dedicated_inner) => &dedicated_inner.dedicated_scheduler,
+        };
+
+        let task = c(
+            boxed,
+            ctx_get_worker_id().worker_id(),
+            DedicatedSchedulerLocal::new(worker_id, scheduler.clone()),
+        );
+
+        let task_ref = TaskRef::new(task.clone());
+        let handle = JoinHandle::new(task_ref.clone());
+
+        let ret = scheduler.spawn(task_ref, worker_id);
+        assert!(ret, "Tried to spawn on not registered dedicated worker {:?}", worker_id);
+
+        handle
+    }
+
+    fn reusable_on_dedicated_internal<T>(
+        &self,
+        reusable: ReusableBoxFuture<T>,
+        worker_id: UniqueWorkerId,
+        c: impl Fn(Pin<ReusableBoxFuture<T>>, u8, DedicatedSchedulerLocal) -> Arc<AsyncTask<T, ReusableBoxFuture<T>, DedicatedSchedulerLocal>>,
+    ) -> JoinHandle<T>
+    where
+        T: Send + 'static,
+    {
+        let scheduler = match self.inner {
+            HandlerImpl::Async(ref async_inner) => &async_inner.dedicated_scheduler,
+            HandlerImpl::Dedicated(ref dedicated_inner) => &dedicated_inner.dedicated_scheduler,
+        };
+
+        let task = c(
+            reusable.into_pin(),
+            ctx_get_worker_id().worker_id(),
+            DedicatedSchedulerLocal::new(worker_id, scheduler.clone()),
+        );
+
+        let task_ref = TaskRef::new(task.clone());
+
+        let handle = JoinHandle::new(task_ref.clone());
+
+        let ret = scheduler.spawn(task_ref, worker_id);
+        assert!(ret, "Tried to spawn on not registered dedicated worker {:?}", worker_id);
+
+        handle
     }
 }
 
@@ -188,6 +294,8 @@ pub(crate) struct WorkerContext {
 
     /// Access to scheduler and others, mounted in pre_run phase of each Worker
     pub(super) handler: RefCell<Option<Rc<Handler>>>,
+
+    is_safety_enabled: bool,
 }
 
 thread_local! {
@@ -198,6 +306,7 @@ pub(crate) struct ContextBuilder {
     tid: u64,
     handle: Option<Handler>,
     worker_id: Option<WorkerId>,
+    is_with_safety: bool,
 }
 
 impl ContextBuilder {
@@ -206,6 +315,7 @@ impl ContextBuilder {
             tid: 0,
             handle: None,
             worker_id: None,
+            is_with_safety: false,
         }
     }
 
@@ -216,6 +326,12 @@ impl ContextBuilder {
 
     pub(crate) fn with_worker_id(mut self, t: WorkerId) -> Self {
         self.worker_id = Some(t);
+        self
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn with_safety(mut self) -> Self {
+        self.is_with_safety = true;
         self
     }
 
@@ -257,6 +373,7 @@ impl ContextBuilder {
             running_task_id: Cell::new(None),
             worker_id: Cell::new(self.worker_id.expect("Worker type must be set in context builder!")),
             handler: RefCell::new(Some(Rc::new(self.handle.expect("Handler type must be set in context builder!")))),
+            is_safety_enabled: self.is_with_safety,
         }
     }
 }
@@ -298,6 +415,14 @@ pub(crate) fn ctx_get_worker_id() -> WorkerId {
     .unwrap_or_else(|e| {
         panic!("Something is really bad here, error {}!", e);
     })
+}
+
+///
+/// Check if safety was enabled
+///
+pub(crate) fn ctx_is_with_safety() -> bool {
+    CTX.try_with(|ctx| ctx.borrow().as_ref().expect("Called before CTX init?").is_safety_enabled)
+        .unwrap_or_default()
 }
 
 #[cfg(test)]

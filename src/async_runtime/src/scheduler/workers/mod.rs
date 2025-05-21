@@ -12,33 +12,28 @@
 //
 
 pub mod dedicated_worker;
+pub mod safety_worker;
 pub mod worker;
 pub mod worker_types;
 
-use crate::scheduler::{
-    workers::worker_types::{WorkerId, WorkerType},
-    SchedulerType,
-};
+use crate::scheduler::{workers::worker_types::WorkerId, SchedulerType};
 use iceoryx2_bb_posix::thread::{Thread, ThreadBuilder, ThreadName, ThreadSpawnError};
 use std::fmt::Debug;
 
 #[derive(Default)]
-pub(crate) struct ThreadParameters {
-    pub(crate) priority: Option<u8>,
-    pub(crate) scheduler_type: Option<SchedulerType>,
-    pub(crate) affinity: Option<usize>,
-    pub(crate) stack_size: Option<u64>,
+pub struct ThreadParameters {
+    pub priority: Option<u8>,
+    pub scheduler_type: Option<SchedulerType>,
+    pub affinity: Option<usize>,
+    pub stack_size: Option<u64>,
 }
 
-pub(crate) fn spawn_thread<T, F>(id: &WorkerId, f: F, thread_params: &ThreadParameters) -> Result<Thread, ThreadSpawnError>
+pub(crate) fn spawn_thread<T, F>(tname: &'static str, id: &WorkerId, f: F, thread_params: &ThreadParameters) -> Result<Thread, ThreadSpawnError>
 where
     T: Debug + Send + 'static,
     F: FnOnce() -> T + Send + 'static,
 {
-    let mut name = match id.typ() {
-        WorkerType::Async => ThreadName::from(b"aworker_"),
-        WorkerType::Dedicated => ThreadName::from(b"dworker_"),
-    };
+    let mut name = ThreadName::from_bytes(tname.as_bytes()).expect("thread name must be not longer than 15 chars");
 
     for digit in id.worker_id().to_string().into_bytes() {
         let _ = name.push(digit);

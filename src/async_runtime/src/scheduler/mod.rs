@@ -14,6 +14,7 @@
 pub mod context;
 pub mod execution_engine;
 pub mod join_handle;
+pub mod safety_waker;
 pub mod scheduler_mt;
 pub mod task;
 pub mod waker;

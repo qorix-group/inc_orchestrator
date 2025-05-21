@@ -13,6 +13,7 @@
 
 use super::task_state::*;
 use crate::core::types::*;
+use crate::scheduler::safety_waker::create_safety_waker;
 use crate::scheduler::scheduler_mt::SchedulerTrait;
 use core::{ptr::NonNull, task::Context, task::Waker};
 use foundation::cell::UnsafeCell;
@@ -41,6 +42,11 @@ struct TaskVTable {
     /// Reschedules task into runtime
     ///
     schedule: unsafe fn(NonNull<TaskHeader>, TaskRef),
+
+    ///
+    /// Reschedules task into safety worker if present
+    ///
+    schedule_safety: unsafe fn(NonNull<TaskHeader>, TaskRef),
 
     poll: unsafe fn(this: NonNull<TaskHeader>, ctx: &mut Context) -> TaskPollResult,
 
@@ -94,6 +100,20 @@ impl TaskHeader {
             vtable: create_task_vtable::<T, AllocatedFuture, SchedulerType>(),
         }
     }
+
+    pub(crate) fn new_safety<T: 'static, E: 'static, AllocatedFuture, SchedulerType>(worker_id: u8) -> Self
+    where
+        AllocatedFuture: Deref + DerefMut,
+        AllocatedFuture::Target: Future<Output = Result<T, E>> + Send + 'static,
+        SchedulerType: Deref,
+        SchedulerType::Target: SchedulerTrait,
+    {
+        Self {
+            state: TaskState::new(),
+            id: TaskId::new(worker_id),
+            vtable: create_task_s_vtable::<T, E, AllocatedFuture, SchedulerType>(),
+        }
+    }
 }
 
 #[derive(PartialEq, Debug)]
@@ -125,6 +145,7 @@ where
 
     handle_waker: UnsafeCell<Option<Waker>>, // Waker for the one that hold the JoinHandle, for now Option, but potentially needs a wrapper for sharing too
     scheduler: SchedulerType,
+    is_with_safety: bool, // Stash from ctx so we are not dependent on ctx
 }
 
 // We protect *Cells by task state, making sure there is no concurrency on those
@@ -135,6 +156,33 @@ where
     SchedulerType: Deref,
     SchedulerType::Target: SchedulerTrait,
 {
+}
+
+impl<T, E, AllocatedFuture, SchedulerType> AsyncTask<Result<T, E>, AllocatedFuture, SchedulerType>
+where
+    AllocatedFuture: Deref + DerefMut,
+    AllocatedFuture::Target: Future<Output = Result<T, E>> + Send + 'static,
+    SchedulerType: Deref,
+    SchedulerType::Target: SchedulerTrait,
+{
+    fn poll_safety(&self, cx: &mut Context) -> TaskPollResult {
+        self.poll_internal(cx, |res| res.is_err())
+    }
+
+    unsafe fn poll_safety_vtable(this: NonNull<TaskHeader>, ctx: &mut Context) -> TaskPollResult {
+        let instance = this.as_ptr().cast::<AsyncTask<Result<T, E>, AllocatedFuture, SchedulerType>>();
+        unsafe { (*instance).poll_safety(ctx) }
+    }
+
+    pub(crate) fn new_safety(is_with_safety: bool, future: Pin<AllocatedFuture>, worker_id: u8, scheduler: SchedulerType) -> Self {
+        Self {
+            header: TaskHeader::new_safety::<T, E, AllocatedFuture, SchedulerType>(worker_id),
+            stage: UnsafeCell::new(TaskStage::InProgress(future)),
+            handle_waker: UnsafeCell::new(None),
+            scheduler,
+            is_with_safety,
+        }
+    }
 }
 
 impl<T, AllocatedFuture, SchedulerType> AsyncTask<T, AllocatedFuture, SchedulerType>
@@ -150,6 +198,7 @@ where
             stage: UnsafeCell::new(TaskStage::InProgress(future)),
             handle_waker: UnsafeCell::new(None),
             scheduler,
+            is_with_safety: false, // does not matter if it is or not, this is not safety task
         }
     }
 
@@ -187,13 +236,21 @@ where
     }
 
     pub(crate) fn poll(&self, cx: &mut Context) -> TaskPollResult {
+        self.poll_internal(cx, |_| false)
+    }
+
+    fn poll_internal(&self, cx: &mut Context, safety_checker: impl Fn(&T) -> bool) -> TaskPollResult {
         match self.header.state.transition_to_running() {
             TransitionToRunning::Done => {
                 // means we are the only one who could be now running this future
-                self.poll_core(cx)
+                self.poll_core(cx, safety_checker)
             }
             TransitionToRunning::Aborted => {
                 // if we were aborted before, it means someone else cleared up everything and we are simply done here
+                TaskPollResult::Done
+            }
+            TransitionToRunning::AlreadyRunning => {
+                // This can happen if are waken into safety but were scheduled also into normal run (ie task with 3 spawns, where one finished and other timed out)
                 TaskPollResult::Done
             }
         }
@@ -202,8 +259,11 @@ where
     ///
     /// Safety: outer caller needs to ensure that the stage is synchronized by task state
     ///
-    fn poll_core(&self, ctx: &mut Context) -> TaskPollResult {
+    fn poll_core(&self, ctx: &mut Context, safety_checker: impl Fn(&T) -> bool) -> TaskPollResult {
         // Once we are here, we are the only one who can be running this future and/or stage itself
+
+        let mut is_safety_err = false;
+
         let res = self.stage.with_mut(|ptr| {
             let ref_to_stage = unsafe { &mut *ptr };
 
@@ -216,6 +276,7 @@ where
                     match future.as_mut().poll(ctx) {
                         std::task::Poll::Ready(ret) => {
                             // Store result, drops the future
+                            is_safety_err = safety_checker(&ret);
                             *ref_to_stage = TaskStage::Completed(ret);
                             None // Finish state transition outside cell access
                         }
@@ -246,7 +307,13 @@ where
                 TransitionToCompleted::HadConnectedJoinHandle => {
                     self.handle_waker.with_mut(|ptr: *mut Option<Waker>| match unsafe { (*ptr).take() } {
                         Some(v) => {
-                            v.wake_by_ref();
+                            if is_safety_err && self.is_with_safety {
+                                unsafe {
+                                    create_safety_waker(v).wake();
+                                }
+                            } else {
+                                v.wake();
+                            }
                         }
                         None => not_recoverable_error!("We shall never be here if we have HadConnectedJoinHandle set!"),
                     })
@@ -306,10 +373,6 @@ where
     }
 
     fn schedule(&self, task: TaskRef) {
-        // TODO: For now we do simple reschedule (even not in instance, for now not needed, but later will be needed) without:
-        // - no spawn into certain place (certain worker)
-        // - ...
-
         match self.header.state.set_notified() {
             TransitionToNotified::Done => {
                 // We need to reschedule on our own
@@ -319,6 +382,21 @@ where
                 // Do nothing as someone already did it
             }
             TransitionToNotified::Running => {
+                // Do nothing was we will be rescheduled by poll itself, still notification was marked
+            }
+        }
+    }
+
+    fn schedule_safety(&self, task: TaskRef) {
+        match self.header.state.set_safety_notified() {
+            TransitionToSafetyNotified::Done => {
+                // We need to reschedule on our own
+                self.scheduler.respawn_into_safety(task);
+            }
+            TransitionToSafetyNotified::AlreadyNotified => {
+                // Do nothing as someone already did i t
+            }
+            TransitionToSafetyNotified::Running => {
                 // Do nothing was we will be rescheduled by poll itself, still notification was marked
             }
         }
@@ -347,6 +425,11 @@ where
     fn schedule_vtable(this: NonNull<TaskHeader>, task: TaskRef) {
         let instance = this.as_ptr().cast::<AsyncTask<T, AllocatedFuture, SchedulerType>>();
         unsafe { (*instance).schedule(task) }
+    }
+
+    fn schedule_safety_vtable(this: NonNull<TaskHeader>, task: TaskRef) {
+        let instance = this.as_ptr().cast::<AsyncTask<T, AllocatedFuture, SchedulerType>>();
+        unsafe { (*instance).schedule_safety(task) }
     }
 
     fn poll_vtable(this: NonNull<TaskHeader>, ctx: &mut Context) -> TaskPollResult {
@@ -386,10 +469,33 @@ where
         drop: AsyncTask::<T, AllocatedFuture, SchedulerType>::drop_vtable,
         clone: AsyncTask::<T, AllocatedFuture, SchedulerType>::clone_vtable,
         schedule: AsyncTask::<T, AllocatedFuture, SchedulerType>::schedule_vtable,
+        schedule_safety: AsyncTask::<T, AllocatedFuture, SchedulerType>::schedule_safety_vtable,
         poll: AsyncTask::<T, AllocatedFuture, SchedulerType>::poll_vtable,
         set_join_handle_waker: AsyncTask::<T, AllocatedFuture, SchedulerType>::set_join_handle_waker_vtable,
         get_return_val: AsyncTask::<T, AllocatedFuture, SchedulerType>::get_return_val_vtable,
         abort: AsyncTask::<T, AllocatedFuture, SchedulerType>::abort_vtable,
+    }
+}
+
+///
+/// Creates static reference to VTable for specific `T` using `const promotion` of Rust
+///
+fn create_task_s_vtable<T: 'static, E: 'static, AllocatedFuture, SchedulerType>() -> &'static TaskVTable
+where
+    AllocatedFuture: Deref + DerefMut,
+    AllocatedFuture::Target: Future<Output = Result<T, E>> + Send + 'static,
+    SchedulerType: Deref,
+    SchedulerType::Target: SchedulerTrait,
+{
+    &TaskVTable {
+        drop: AsyncTask::<Result<T, E>, AllocatedFuture, SchedulerType>::drop_vtable,
+        clone: AsyncTask::<Result<T, E>, AllocatedFuture, SchedulerType>::clone_vtable,
+        schedule: AsyncTask::<Result<T, E>, AllocatedFuture, SchedulerType>::schedule_vtable,
+        schedule_safety: AsyncTask::<Result<T, E>, AllocatedFuture, SchedulerType>::schedule_safety_vtable,
+        poll: AsyncTask::<Result<T, E>, AllocatedFuture, SchedulerType>::poll_safety_vtable,
+        set_join_handle_waker: AsyncTask::<Result<T, E>, AllocatedFuture, SchedulerType>::set_join_handle_waker_vtable,
+        get_return_val: AsyncTask::<Result<T, E>, AllocatedFuture, SchedulerType>::get_return_val_vtable,
+        abort: AsyncTask::<Result<T, E>, AllocatedFuture, SchedulerType>::abort_vtable,
     }
 }
 
@@ -446,6 +552,15 @@ impl TaskRef {
     }
 
     ///
+    /// Proxy to `AsyncTask<T>::schedule_safety`
+    ///
+    pub(crate) fn schedule_safety(&self) {
+        unsafe {
+            (self.header.as_ref().vtable.schedule_safety)(self.header, self.clone());
+        }
+    }
+
+    ///
     /// Proxy to `AsyncTask<T>::poll`
     ///
     pub(crate) fn poll(&self, ctx: &mut Context) -> TaskPollResult {
@@ -494,14 +609,16 @@ mod tests {
 
     use crate::{
         core::types::{box_future, ArcInternal},
+        safety::SafetyResult,
         scheduler::{
             execution_engine::ExecutionEngineBuilder,
             scheduler_mt::SchedulerTrait,
             task::async_task::{TaskId, TaskRef},
         },
+        testing::*,
     };
 
-    use super::AsyncTask;
+    use super::*;
 
     impl<T, AllocatedFuture, SchedulerType> AsyncTask<T, AllocatedFuture, SchedulerType>
     where
@@ -523,6 +640,14 @@ mod tests {
         println!("test1234");
 
         Ok(true)
+    }
+
+    async fn dummy_safety_ret(fail: bool) -> SafetyResult<bool, bool> {
+        if fail {
+            Err(false)
+        } else {
+            Ok(true)
+        }
     }
 
     #[test]
@@ -598,17 +723,97 @@ mod tests {
         assert_eq!(ArcInternal::strong_count(&task), 1);
     }
 
-    // #[test]
-    // fn test_taskref_calling_task_api() {
-    //     let boxed = box_future(dummy());
-    //     let task = ArcInternal::new(AsyncTask::new(boxed, 1));
-    //     let id = task.id();
-    //     assert_eq!(id.0 & 0xFF, 1); // Test some internals
+    #[test]
+    fn test_safety_task_error_does_not_respawn_safety_if_not_enabled() {
+        let sched = create_mock_scheduler();
 
-    //     let task_ref = TaskRef::new(task.clone());
+        let safety_task_parent = ArcInternal::new(AsyncTask::new(box_future(dummy()), 1, sched.clone()));
+        let safety_task = ArcInternal::new(AsyncTask::new_safety(false, box_future(dummy_safety_ret(true)), 1, sched.clone()));
+        let safety_task_ref = TaskRef::new(safety_task.clone());
 
-    //     task_ref.schedule(); TODO: Fix a need for context in UT
-    // }
+        let waker = get_waker_from_task(&safety_task_parent);
+        safety_task_ref.set_join_handle_waker(waker.clone()); // Mimic that JoinHandler is set
+
+        let mut ctx = Context::from_waker(&waker);
+        assert_eq!(safety_task_ref.poll(&mut ctx), TaskPollResult::Done);
+
+        let mut result: SafetyResult<bool, bool> = Ok(true);
+        let ret_as_ptr = &mut result as *mut _;
+        safety_task_ref.get_return_val(ret_as_ptr as *mut u8);
+        assert!(result.is_err());
+
+        assert_eq!(sched.safety_spawn_count(), 0);
+        assert_eq!(sched.spawn_count(), 1);
+    }
+
+    #[test]
+    fn test_safety_task_error_does_respawn_safety_if_enabled() {
+        let sched = create_mock_scheduler();
+
+        let safety_task_parent = ArcInternal::new(AsyncTask::new(box_future(dummy()), 1, sched.clone()));
+        let safety_task = ArcInternal::new(AsyncTask::new_safety(true, box_future(dummy_safety_ret(true)), 1, sched.clone()));
+        let safety_task_ref = TaskRef::new(safety_task.clone());
+
+        let waker = get_waker_from_task(&safety_task_parent);
+        safety_task_ref.set_join_handle_waker(waker.clone()); // Mimic that JoinHandler is set
+
+        let mut ctx = Context::from_waker(&waker);
+        assert_eq!(safety_task_ref.poll(&mut ctx), TaskPollResult::Done);
+
+        let mut result: SafetyResult<bool, bool> = Ok(true);
+        let ret_as_ptr = &mut result as *mut _;
+        safety_task_ref.get_return_val(ret_as_ptr as *mut u8);
+        assert!(result.is_err());
+
+        assert_eq!(sched.safety_spawn_count(), 1);
+        assert_eq!(sched.spawn_count(), 0);
+    }
+
+    #[test]
+    fn test_safety_task_ok_does_not_respawn_safety_if_enabled() {
+        let sched = create_mock_scheduler();
+
+        let safety_task_parent = ArcInternal::new(AsyncTask::new(box_future(dummy()), 1, sched.clone()));
+        let safety_task = ArcInternal::new(AsyncTask::new_safety(true, box_future(dummy_safety_ret(false)), 1, sched.clone()));
+        let safety_task_ref = TaskRef::new(safety_task.clone());
+
+        let waker = get_waker_from_task(&safety_task_parent);
+        safety_task_ref.set_join_handle_waker(waker.clone()); // Mimic that JoinHandler is set
+
+        let mut ctx = Context::from_waker(&waker);
+        assert_eq!(safety_task_ref.poll(&mut ctx), TaskPollResult::Done);
+
+        let mut result: SafetyResult<bool, bool> = Ok(true);
+        let ret_as_ptr = &mut result as *mut _;
+        safety_task_ref.get_return_val(ret_as_ptr as *mut u8);
+        assert!(result.is_ok());
+
+        assert_eq!(sched.safety_spawn_count(), 0);
+        assert_eq!(sched.spawn_count(), 1);
+    }
+
+    #[test]
+    fn test_safety_task_ok_does_not_respawn_safety_if_not_enabled() {
+        let sched = create_mock_scheduler();
+
+        let safety_task_parent = ArcInternal::new(AsyncTask::new(box_future(dummy()), 1, sched.clone()));
+        let safety_task = ArcInternal::new(AsyncTask::new_safety(false, box_future(dummy_safety_ret(false)), 1, sched.clone()));
+        let safety_task_ref = TaskRef::new(safety_task.clone());
+
+        let waker = get_waker_from_task(&safety_task_parent);
+        safety_task_ref.set_join_handle_waker(waker.clone()); // Mimic that JoinHandler is set
+
+        let mut ctx = Context::from_waker(&waker);
+        assert_eq!(safety_task_ref.poll(&mut ctx), TaskPollResult::Done);
+
+        let mut result: SafetyResult<bool, bool> = Ok(true);
+        let ret_as_ptr = &mut result as *mut _;
+        safety_task_ref.get_return_val(ret_as_ptr as *mut u8);
+        assert!(result.is_ok());
+
+        assert_eq!(sched.safety_spawn_count(), 0);
+        assert_eq!(sched.spawn_count(), 1);
+    }
 
     #[test]
     fn task_taskref_can_be_send_to_another_thread() {
@@ -636,12 +841,12 @@ mod tests {
 #[cfg(test)]
 #[cfg(loom)]
 mod tests {
-    use std::task::{RawWaker, RawWakerVTable};
 
     use super::*;
-    use foundation::sync::foundation_atomic::FoundationAtomicU16;
+    use crate::testing::*;
+    use testing::prelude::*;
+
     use loom::model::Builder;
-    use std::sync::atomic::Ordering::Relaxed;
 
     use crate::{
         core::types::{box_future, ArcInternal},
@@ -666,43 +871,11 @@ mod tests {
         }
     }
 
-    fn noop_waker() -> Waker {
-        fn clone(_: *const ()) -> RawWaker {
-            noop_raw_waker()
-        }
-
-        fn wake(_: *const ()) {}
-
-        fn wake_by_ref(_: *const ()) {}
-
-        fn drop(_: *const ()) {}
-
-        static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, wake, wake_by_ref, drop);
-
-        fn noop_raw_waker() -> RawWaker {
-            RawWaker::new(std::ptr::null(), &VTABLE)
-        }
-
-        unsafe { Waker::from_raw(noop_raw_waker()) }
-    }
-
-    pub struct SchedulerMock {
-        pub spawn_count: FoundationAtomicU16,
-    }
-
-    impl SchedulerTrait for SchedulerMock {
-        fn respawn(&self, _: TaskRef) {
-            self.spawn_count.fetch_add(1, Relaxed);
-        }
-    }
-
     #[test]
     fn task_reschedule_is_never_done_twice_when_no_poll_happens() {
         loom::model(|| {
             let boxed = box_future(dummy());
-            let scheduler = ArcInternal::new(SchedulerMock {
-                spawn_count: FoundationAtomicU16::new(0),
-            });
+            let scheduler = create_mock_scheduler();
 
             let task = ArcInternal::new(AsyncTask::new(boxed, 1, scheduler.clone()));
             let handle1;
@@ -735,7 +908,7 @@ mod tests {
             handle3.join().unwrap();
             handle1.join().unwrap();
 
-            assert_eq!(1, scheduler.spawn_count.load(Relaxed));
+            assert_eq!(1, scheduler.spawn_count());
         });
     }
 
@@ -746,9 +919,7 @@ mod tests {
 
         builder.check(|| {
             let boxed = box_future(dummy_pending());
-            let scheduler = ArcInternal::new(SchedulerMock {
-                spawn_count: FoundationAtomicU16::new(0),
-            });
+            let scheduler = create_mock_scheduler();
             let task = ArcInternal::new(AsyncTask::new(boxed, 1, scheduler.clone()));
 
             let handle1;
@@ -786,11 +957,11 @@ mod tests {
 
             match ret {
                 TaskPollResult::Done => {
-                    let val = scheduler.spawn_count.load(Relaxed);
+                    let val = scheduler.spawn_count();
                     assert!(val == 1 || val == 2); // Either the schedule happen before pool or after. Loom will explore all interleaving
                 }
                 TaskPollResult::Notified => {
-                    let val = scheduler.spawn_count.load(Relaxed);
+                    let val = scheduler.spawn_count();
 
                     assert!(val == 0 || val == 1); // 0 - one threads calls when we are in running, 1 - one threads call before we running
                 }
