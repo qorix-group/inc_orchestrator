@@ -39,7 +39,7 @@ pub trait ActionTrait: Send {
     ///     - should avoid allocation due to the usage of reusable boxed future
     ///     - each action shall propagate ActionResult down the chain in Future and should immediately stop it's work once Err(_) is reached, propagating it down.
     ///
-    fn execute(&mut self) -> ReusableBoxFutureResult;
+    fn try_execute(&mut self) -> ReusableBoxFutureResult;
 
     ///
     /// Provide name of the action
