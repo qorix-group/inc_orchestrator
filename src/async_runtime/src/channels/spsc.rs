@@ -89,12 +89,13 @@ impl<T: Copy, const SIZE: usize> Receiver<T, SIZE> {
         ReceiverFuture {
             parent: self,
             state: FutureState::default(),
+            consumer: self.chan.queue.acquire_consumer().unwrap(),
         }
         .await
     }
 
-    fn receive(&self, waker: Waker) -> Result<T, CommonErrors> {
-        self.chan.receive(waker)
+    fn receive(&self, consumer: &mut spsc::queue::Consumer<'_, T, SIZE>, waker: Waker) -> Result<T, CommonErrors> {
+        self.chan.receive(consumer, waker)
     }
 }
 
@@ -123,7 +124,9 @@ impl<T: Copy, const SIZE: usize> Channel<T, SIZE> {
 
         if prev == BOTH_IN {
             // if receiver is still there, notify him
-            self.waker_store.take().map_or_else(|| {}, |w| w.wake());
+            if let Some(waker) = self.waker_store.take() {
+                waker.wake();
+            }
         }
     }
 
@@ -157,8 +160,8 @@ impl<T: Copy, const SIZE: usize> Channel<T, SIZE> {
     ///
     /// Safety: Upper layer needs to assure that there is no other `receive` caller at the same time, otherwise this will panic
     ///
-    fn receive(&self, waker: Waker) -> Result<T, CommonErrors> {
-        let res = loop {
+    fn receive(&self, consumer: &mut spsc::queue::Consumer<'_, T, SIZE>, waker: Waker) -> Result<T, CommonErrors> {
+        loop {
             let empty = self.queue.is_empty();
 
             if empty {
@@ -174,35 +177,33 @@ impl<T: Copy, const SIZE: usize> Channel<T, SIZE> {
 
                 let state = self.connected_state.load(std::sync::atomic::Ordering::Acquire);
 
-                // There is no old waker, maybe we got notified already and the receiver is drop now
-                if SENDER_GONE == state {
-                    // yes it's dropped, so we must recheck queue
-
-                    if self.queue.is_empty() {
+                // we must recheck queue since if waker was empty, producer could already push something before
+                if self.queue.is_empty() {
+                    if SENDER_GONE == state {
                         //Sender dropped and no items, we are done
                         res = Err(CommonErrors::AlreadyDone);
                         let _ = self.waker_store.take(); // Clear waker.
-                    } else {
-                        // Let us process items still
-                        continue;
                     }
+                } else {
+                    // Let us process items still
+                    continue;
                 }
+
+                // There is no old waker, maybe we got notified already and the receiver is drop now
 
                 break res;
             } else {
                 // There is data already, take a piece, clear a waker if it was set and continue as we don't need to register waker really since Future is completed now
                 let _ = self.waker_store.take();
-                let mut consumer = self.queue.acquire_consumer().unwrap();
                 break Ok(consumer.pop().unwrap());
             }
-        };
-
-        res
+        }
     }
 }
 
 struct ReceiverFuture<'a, T: Copy, const SIZE: usize> {
     parent: &'a Receiver<T, SIZE>,
+    consumer: spsc::queue::Consumer<'a, T, SIZE>, // Since future has an explicit lifetime, we can store consumer
     state: FutureState,
 }
 
@@ -211,7 +212,7 @@ impl<T: Copy, const SIZE: usize> Future for ReceiverFuture<'_, T, SIZE> {
 
     fn poll(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
         let res = match self.state {
-            FutureState::New | FutureState::Polled => self.parent.receive(cx.waker().clone()).map_or_else(
+            FutureState::New | FutureState::Polled => self.parent.receive(&mut self.consumer, cx.waker().clone()).map_or_else(
                 |e| {
                     if e == CommonErrors::NoData {
                         FutureInternalReturn::polled()
@@ -479,6 +480,52 @@ mod tests {
 
             let res = handle.join().unwrap();
 
+            assert_poll_ready(res, input);
+        });
+    }
+
+    #[test]
+    fn test_channel_mt_sender_receiver_single_message() {
+        let mut builder = Builder::new();
+
+        builder.check(|| {
+            let (s, mut r) = create_channel_default::<u32>();
+
+            let input = vec![1];
+
+            let handle = loom::thread::spawn(move || {
+                let mut poller = TestingFuturePoller::new(async move {
+                    let mut v = vec![];
+
+                    // Receive only once, to check races around empty state without need to drop sender which may hide bugs
+                    let r = r.recv().await;
+                    v.push(r.unwrap());
+
+                    v
+                });
+
+                let sched = create_mock_scheduler_sync();
+
+                loop {
+                    let waker = get_dummy_sync_task_waker(sched.clone());
+
+                    let res = poller.poll_with_waker(&waker);
+                    if res.is_ready() {
+                        break res;
+                    }
+
+                    while !sched.wait_for_wake() {
+                        loom::hint::spin_loop();
+                    }
+                }
+            });
+
+            for e in &input {
+                assert!(s.send(e).is_ok());
+            }
+
+            // No drop before joining to not wake-up receiver from drop
+            let res = handle.join().unwrap();
             assert_poll_ready(res, input);
         });
     }
