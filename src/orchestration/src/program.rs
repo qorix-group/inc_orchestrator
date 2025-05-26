@@ -338,7 +338,9 @@ pub mod internal {
                     trace!("Failed to execute action");
                     return Err(ActionExecError::Internal);
                 }
+
                 let result = async_runtime::spawn_from_reusable(future.unwrap()).await;
+
                 if result.is_err() {
                     trace!("Failed to execute action");
                     return Err(ActionExecError::Internal);

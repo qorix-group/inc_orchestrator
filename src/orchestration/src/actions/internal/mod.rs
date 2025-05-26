@@ -16,3 +16,7 @@ pub mod catch;
 pub mod concurrency;
 pub mod invoke;
 pub mod sequence;
+pub mod sync;
+pub mod trigger;
+
+pub mod prelude;

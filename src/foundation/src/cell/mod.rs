@@ -32,3 +32,28 @@ impl<T> UnsafeCell<T> {
         f(self.0.get())
     }
 }
+
+/// Internal bridge to connect normal cell and loom cell
+pub trait UnsafeCellExt<T> {
+    ///
+    ///
+    /// # Safety
+    ///   This method is unsafe because it allows mutable access to the data without borrow checker
+    ///
+    ///
+    unsafe fn get_access(&self) -> *mut T;
+}
+
+#[cfg(not(loom))]
+impl<T> UnsafeCellExt<T> for UnsafeCell<T> {
+    unsafe fn get_access(&self) -> *mut T {
+        &mut *self.0.get()
+    }
+}
+
+#[cfg(loom)]
+impl<T> UnsafeCellExt<T> for UnsafeCell<T> {
+    unsafe fn get_access(&self) -> *mut T {
+        panic!("UnsafeCellExt::get_mut_access is not implemented for loom::cell::UnsafeCell");
+    }
+}
