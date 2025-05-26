@@ -21,6 +21,9 @@
 // needed until we use it in code
 #![allow(dead_code)]
 
+use std::ops::{Deref, DerefMut};
+
+use foundation::cell::UnsafeCellExt;
 use foundation::{
     cell::UnsafeCell,
     prelude::{CommonErrors, FoundationAtomicBool},
@@ -57,7 +60,7 @@ impl<T> OrchTryLock<T> {
     /// Tries to lock the object. If the lock is already held, it returns an error.
     ///
     /// # Errors
-    ///    `CommonErrors::AlreadyTaken` - If the lock is already held, it returns.
+    ///    `CommonErrors::AlreadyDone` - If the lock is already held, it returns.
     ///
     pub(crate) fn try_lock(&self) -> Result<OrchTryLockGuard<'_, T>, CommonErrors> {
         if self
@@ -65,7 +68,7 @@ impl<T> OrchTryLock<T> {
             .compare_exchange(false, true, std::sync::atomic::Ordering::SeqCst, std::sync::atomic::Ordering::SeqCst)
             .is_err()
         {
-            Err(CommonErrors::AlreadyTaken)
+            Err(CommonErrors::AlreadyDone)
         } else {
             Ok(OrchTryLockGuard { fake_mtx: self })
         }
@@ -86,6 +89,20 @@ impl<T> OrchTryLockGuard<'_, T> {
     /// Access the underlying data mutably.
     pub(crate) fn with_mut<R, F: FnOnce(&mut T) -> R>(&self, f: F) -> R {
         self.fake_mtx.data.with_mut(|v| unsafe { f(&mut *v) })
+    }
+}
+
+impl<T> Deref for OrchTryLockGuard<'_, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { &*self.fake_mtx.data.get_access() }
+    }
+}
+
+impl<T> DerefMut for OrchTryLockGuard<'_, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { &mut *self.fake_mtx.data.get_access() }
     }
 }
 

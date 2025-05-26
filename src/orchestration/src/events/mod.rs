@@ -11,15 +11,5 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum CommonErrors {
-    NoData,
-    AlreadyDone,
-    GenericError,
-    OperationAborted,
-    Panicked, // panic! was handled
-    Timeout,
-    NoSpaceLeft,
-    NotFound,
-    WrongArgs,
-}
+pub mod events_provider;
+pub mod local_events;
