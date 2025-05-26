@@ -17,6 +17,9 @@ pub mod core;
 pub mod prelude;
 pub mod program;
 
+#[cfg(test)]
+mod testing;
+
 pub fn sub(left: u64, right: u64) -> u64 {
     left - right
 }
