@@ -23,9 +23,9 @@ use crate::{
 };
 
 pub type ProgramTag = Tag;
-
 pub type DesignTag = Tag;
 
+/// Provides [`DesignConfig`] with is bounded to the `Design` instance.
 pub struct DesignConfigBounded(DesignConfig);
 
 impl Deref for DesignConfigBounded {
@@ -36,14 +36,20 @@ impl Deref for DesignConfigBounded {
     }
 }
 
+///
+/// Design is a container for Application developer to register all it's components (functions, events, conditions, etc.)
+/// and orchestrations (programs) in `config-by-code` approach.  If `config-by-file` is used, user does not need to use
+/// [`Design::add_program`] since it will be loaded from the file. Read more in [`crate::api::Orchestration`].
+///
 pub struct Design {
     id: DesignTag,
     params: DesignConfig, // TODO: probably remove when we store it in ProgramDatabase
-    db: ProgramDatabase,
+    pub(super) db: ProgramDatabase,
     programs: GrowableVec<ProgramData>,
 }
 
 impl Design {
+    /// Creates a new `Design` instance with the given identifier and configuration `parameters`.
     pub fn new(id: DesignTag, params: DesignConfig) -> Self {
         const DEFAULT_PROGRAMS_CNT: usize = 1;
         Design {
@@ -54,10 +60,12 @@ impl Design {
         }
     }
 
+    /// Returns the configuration parameters for this design.
     pub fn get_config(&self) -> DesignConfigBounded {
         DesignConfigBounded(self.params)
     }
 
+    /// Returns the unique identifier for this design.
     pub fn id(&self) -> Tag {
         self.id
     }
@@ -66,10 +74,17 @@ impl Design {
         self.db.register_invoke_fn(tag, action)
     }
 
-    pub fn get_orchestration_tag(&self, tag: Tag) -> Result<OrchestrationTag, CommonErrors> {
-        self.db.get_orchestration_tag(tag).ok_or(CommonErrors::NotFound)
+    /// Registers an event in the design and returns an [`OrchestrationTag`] that can be used to reference this event in programs.
+    pub fn register_event(&self, tag: Tag) -> Result<OrchestrationTag, CommonErrors> {
+        self.db.register_event(tag)
     }
 
+    /// Fetches an [`OrchestrationTag`] for a given tag, which can be used to reference the orchestration in programs.
+    pub fn get_orchestration_tag(&self, tag: Tag) -> Result<OrchestrationTag, CommonErrors> {
+        self.db.get_orchestration_tag(tag)
+    }
+
+    /// Adds a program to the design. The program is created using the provided closure, which receives a mutable reference to the design.
     pub fn add_program<F>(&mut self, id: ProgramTag, program_creator: F)
     where
         F: FnOnce(&mut Self) -> Result<Program, CommonErrors> + 'static,
@@ -77,7 +92,7 @@ impl Design {
         self.programs.push(ProgramData::new(id, Box::new(program_creator)));
     }
 
-    pub fn has_any_programs(&self) -> bool {
+    pub(crate) fn has_any_programs(&self) -> bool {
         !self.programs.is_empty()
     }
 

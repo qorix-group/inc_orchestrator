@@ -15,6 +15,7 @@ pub mod actions;
 pub mod api;
 pub mod common;
 pub mod core;
+pub mod events;
 pub mod prelude;
 pub mod program;
 pub mod program_database;

@@ -56,6 +56,16 @@ impl Tag {
 
         hash
     }
+
+    /// Find Tag in a collection of items where you cannot do Key -> value mapping where Tag would be a key
+    pub fn find_in_collection<T: AsTagTrait, C: Iterator<Item = T>>(&self, mut c: C) -> Option<T> {
+        c.find(|e| e.as_tag() == self)
+    }
+
+    /// Checks if Tag is in a collection of items where you cannot do Key -> value mapping where Tag would be a key
+    pub fn is_in_collection<T: AsTagTrait, C: Iterator<Item = T>>(&self, mut c: C) -> bool {
+        c.any(|e| e.as_tag() == self)
+    }
 }
 
 /// Create Tag from &str.
@@ -98,6 +108,12 @@ impl PartialEq for Tag {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
+}
+
+/// Trait to convert any type that implements `AsTagTrait` to a `Tag`. Helpful when storing custom types in collections that require search by `Tag`.
+pub trait AsTagTrait {
+    /// Convert self to Tag.
+    fn as_tag(&self) -> &Tag;
 }
 
 #[cfg(test)]

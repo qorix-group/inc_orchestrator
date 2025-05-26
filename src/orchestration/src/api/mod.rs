@@ -50,6 +50,7 @@ use std::{marker::PhantomData, path::Path};
 use foundation::prelude::Vec;
 use foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
 
+use crate::events::events_provider::EventsProvider;
 use crate::{
     api::{deployment::Deployment, design::Design},
     program::internal::Program,
@@ -65,6 +66,7 @@ pub type Orchestration<'a> = OrchestrationApi<_EmptyTag>;
 
 pub struct OrchestrationApi<T> {
     designs: GrowableVec<Design>,
+    events: EventsProvider,
     _p: PhantomData<T>,
 }
 
@@ -80,6 +82,7 @@ impl OrchestrationApi<_EmptyTag> {
         OrchestrationApi {
             _p: PhantomData,
             designs: GrowableVec::default(),
+            events: EventsProvider::default(),
         }
     }
 
@@ -115,6 +118,7 @@ impl OrchestrationApi<_EmptyTag> {
         OrchestrationApi {
             _p: PhantomData,
             designs: self.designs,
+            events: self.events,
         }
     }
 }
@@ -164,6 +168,8 @@ impl OrchProgramManager {
 
 // TODO add more tests once new Program skeleton is created
 
+#[doc(hidden)]
 pub struct _EmptyTag {}
 
+#[doc(hidden)]
 pub struct _DesignTag {}

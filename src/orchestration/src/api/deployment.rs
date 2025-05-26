@@ -18,6 +18,7 @@ use crate::{
         design::{Design, DesignTag, ProgramTag},
         OrchestrationApi,
     },
+    common::tag::Tag,
     program::internal::Program,
 };
 
@@ -30,6 +31,45 @@ impl<T> Deployment<'_, T> {
         Deployment { api }
     }
 
+    /// Maps a system events to user events. This means that the specified user events will be treated as global events across all processes.
+    pub fn bind_events_as_global(&mut self, system_event: &str, user_events_to_bind: &[Tag]) -> Result<(), CommonErrors> {
+        let mut ret = Ok(());
+
+        let creator = self.api.events.specify_global_event(system_event)?;
+
+        for d in &mut self.api.designs {
+            let _ = d.db.set_event_type(creator.clone(), user_events_to_bind).or_else(|e| {
+                ret = Err(e);
+                ret
+            });
+        }
+
+        ret
+    }
+
+    /// Binds user events to a local event. This means that the specified user events will be treated as local events within the process boundaries.
+    pub fn bind_events_as_local(&mut self, user_events_to_bind: &[Tag]) -> Result<(), CommonErrors> {
+        let mut ret = Ok(());
+
+        let creator = self.api.events.specify_local_event()?;
+
+        for d in &mut self.api.designs {
+            let _ = d.db.set_event_type(creator.clone(), user_events_to_bind).or_else(|e| {
+                ret = Err(e);
+                ret
+            });
+        }
+
+        ret
+    }
+
+    /// Adds a program to the design. The program is created using the provided closure, which receives a mutable reference to the design.
+    ///
+    /// # Returns
+    /// `Ok(())` if the program was added successfully
+    /// `Err(CommonErrors::AlreadyDone)` if the design already has programs
+    /// `Err(CommonErrors::NotFound)` if the design with the specified tag was not
+    ///
     pub fn add_program<F>(&mut self, design_tag: DesignTag, program: F, tag: ProgramTag) -> Result<(), CommonErrors>
     where
         F: FnOnce(&mut Design) -> Result<Program, CommonErrors> + 'static,
@@ -48,5 +88,3 @@ impl<T> Deployment<'_, T> {
         }
     }
 }
-
-// TODO add more tests once new Program skeleton is created
