@@ -13,7 +13,11 @@
 
 #![allow(dead_code)]
 
-use std::task::{Poll, Waker};
+use std::{
+    future::Future,
+    task::{Poll, Waker},
+    time::Instant,
+};
 
 use crate::actions::internal::action::{ActionResult, ActionTrait, ReusableBoxFutureResult};
 
@@ -146,6 +150,32 @@ impl OrchTestingPoller {
 
     pub fn poll(&mut self) -> Poll<ActionResult> {
         self.poller.poll_with_waker(&self.waker)
+    }
+
+    #[must_use]
+    /// This function is used to block the current thread until the future completes. This do BUSSY SPINNING!
+    /// Returns `Some(T)` if the future completes successfully, or `None` if it times out after 10 seconds.
+    pub fn block_on<F, T>(f: F) -> Option<T>
+    where
+        F: Future<Output = T> + Send + 'static,
+    {
+        let mut poll = TestingFuturePoller::new(f);
+
+        let waker = async_runtime::testing::get_task_based_waker();
+        let now = Instant::now();
+
+        let mut result = None;
+        while Instant::now().duration_since(now).as_secs() < 10 {
+            match poll.poll_with_waker(&waker) {
+                Poll::Ready(r) => {
+                    result = Some(r);
+                    break;
+                }
+                Poll::Pending => continue,
+            }
+        }
+
+        result
     }
 }
 

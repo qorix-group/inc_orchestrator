@@ -23,8 +23,7 @@ use std::rc::Rc;
 /// MapIdentifier is an enum that represents the type of SlotMap the orchestration tag belongs to.
 pub(crate) enum MapIdentifier {
     ClonableInvokeMap,
-    NotClonableInvokeMap,
-    EventMap,
+    Event,
     SimpleConditionMap,
     ComplexConditionMap,
 }
