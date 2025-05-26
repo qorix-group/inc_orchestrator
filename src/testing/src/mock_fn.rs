@@ -12,43 +12,85 @@
 //
 
 use std::collections::VecDeque;
-use std::sync::{atomic::AtomicUsize, atomic::Ordering::Relaxed};
+use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 
 pub trait CallableTrait<OutType> {
     fn call(&mut self) -> OutType;
 }
 
-///
-/// Helper mock object
-///
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct MockFnBuilder<OutType>(MockFn<OutType>);
 
-#[derive(Default)]
+///
+/// A mock object that can be used to monitor the invocation count of its method, i.e. call().
+/// Each invocation returns predefined values configured via will_once() or will_repeatedly().
+///
 pub struct MockFn<OutType> {
     call_count: AtomicUsize,
-    min_count: usize,
+    default_value: OutType,
     expected_count: usize,
     is_times_set: bool,
     is_will_once_set: bool,
     is_will_repeatedly_set: bool,
-    should_ignore_check_at_drop: bool,
-    repeated_value: OutType,
+    min_count: usize,
     returns: VecDeque<OutType>,
+    should_ignore_check_at_drop: bool,
 }
 
-impl<OutType: Default> MockFnBuilder<OutType> {
-    pub fn new() -> MockFnBuilder<OutType> {
-        Self(MockFn {
+impl<OutType: Default> Default for MockFn<OutType> {
+    fn default() -> MockFn<OutType> {
+        Self {
             call_count: AtomicUsize::new(0),
-            min_count: 0,
+            default_value: OutType::default(),
             expected_count: 0,
             is_times_set: false,
             is_will_once_set: false,
             is_will_repeatedly_set: false,
-            should_ignore_check_at_drop: false,
-            repeated_value: OutType::default(),
+            min_count: 0,
             returns: VecDeque::new(),
+            should_ignore_check_at_drop: false,
+        }
+    }
+}
+
+impl<OutType: Clone> Clone for MockFn<OutType> {
+    fn clone(&self) -> Self {
+        MockFn {
+            call_count: AtomicUsize::new(self.call_count.load(Relaxed)),
+            default_value: self.default_value.clone(),
+            expected_count: self.expected_count,
+            is_times_set: self.is_times_set,
+            is_will_once_set: self.is_will_once_set,
+            is_will_repeatedly_set: self.is_will_repeatedly_set,
+            min_count: self.min_count,
+            returns: self.returns.clone(),
+            should_ignore_check_at_drop: self.should_ignore_check_at_drop,
+        }
+    }
+}
+
+impl<OutType: Default> MockFnBuilder<OutType> {
+    pub fn new() -> MockFnBuilder<OutType> {
+        Self(MockFn::default())
+    }
+}
+
+impl<OutType> MockFnBuilder<OutType> {
+    ///
+    /// Create MockFn whose output types do not have automatic default values, i.e. does not
+    /// implement the Default trait, such as ActionResult
+    ///
+    pub fn new_with_default(def_val: OutType) -> MockFnBuilder<OutType> {
+        Self(MockFn {
+            call_count: AtomicUsize::new(0),
+            default_value: def_val,
+            expected_count: 0,
+            is_times_set: false,
+            is_will_once_set: false,
+            is_will_repeatedly_set: false,
+            min_count: 0,
+            returns: VecDeque::new(),
+            should_ignore_check_at_drop: false,
         })
     }
 
@@ -96,7 +138,7 @@ impl<OutType: Default> MockFnBuilder<OutType> {
         }
 
         self.0.is_will_repeatedly_set = true;
-        self.0.repeated_value = ret_val;
+        self.0.default_value = ret_val;
         self.0.min_count += 1;
         self
     }
@@ -110,7 +152,7 @@ impl<OutType: Default> MockFnBuilder<OutType> {
     }
 }
 
-impl<OutType: Default + Clone> CallableTrait<OutType> for MockFn<OutType> {
+impl<OutType: Clone> CallableTrait<OutType> for MockFn<OutType> {
     fn call(&mut self) -> OutType {
         self.call_count.fetch_add(1, Relaxed);
 
@@ -118,12 +160,8 @@ impl<OutType: Default + Clone> CallableTrait<OutType> for MockFn<OutType> {
             // return the ret_val in the order it was inserted (FIFO)
             self.returns.pop_front().unwrap()
         } else {
-            // return the repeated_value if set or default otherwise
-            if self.is_will_repeatedly_set {
-                self.repeated_value.clone()
-            } else {
-                OutType::default()
-            }
+            // return the default_value if set or default otherwise
+            self.default_value.clone()
         }
     }
 }

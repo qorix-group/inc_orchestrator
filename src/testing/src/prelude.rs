@@ -11,6 +11,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-pub use crate::mock::*;
+pub use crate::mock_fn::*;
 pub use crate::poller::*;
 pub use crate::waker::*;
