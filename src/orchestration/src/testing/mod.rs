@@ -19,7 +19,8 @@ use testing::mock_fn::{CallableTrait, MockFn, MockFnBuilder};
 const DEFAULT_POOL_SIZE: usize = 5;
 
 ///
-/// Helper mock object
+/// A mock object that can be used to monitor the invocation count of actions, i.e. try_execute().
+/// Each invocation returns a (reusable) future containing values previously configured via will_once() or will_repeatedly().
 ///
 pub struct MockActionBuilder(MockFnBuilder<ActionResult>);
 
@@ -43,40 +44,49 @@ impl MockActionBuilder {
     /// Set how many times exactly the try_execute() must be invoked
     ///
     pub fn times(mut self, count: usize) -> Self {
-        self.0 = self.0.clone().times(count);
+        self.0 = self.0.times(count);
         self
     }
 
     ///
-    /// Ensure that the call() is invoked at least one more time and the call() returns the ret_val
+    /// Ensure that the try_execute() is invoked at least one more time and the try_execute() returns the ret_val
     ///
     pub fn will_once(mut self, ret_val: ActionResult) -> Self {
-        self.0 = self.0.clone().will_once(ret_val);
+        self.0 = self.0.will_once(ret_val);
         self
     }
 
     ///
-    /// Allow the call() to be invoked multiple times and the call() returns the ret_val
+    /// Allow the try_execute() to be invoked multiple times and the invokation returns the ret_val
     /// If used, will_repeatedly() must be called the last
     ///
     pub fn will_repeatedly(mut self, ret_val: ActionResult) -> Self {
-        self.0 = self.0.clone().will_repeatedly(ret_val);
+        self.0 = self.0.will_repeatedly(ret_val);
         self
     }
 
+    ///
+    /// Create the MockAction instance based on the current configuration and initialize the reusable future pool
+    ///
     pub fn build(self) -> MockAction {
-        let task = self.0.clone().build().call();
+        // The pool needs to know the future layout in advance, so we create a future "template" using another MockFn with identical OutType.
+        // We can not re-use the one from self.0 for this purpose, since invoking build() results in the transient MockFn being inspected for
+        // its call counts at drop(), leading to panics even before polling
+        let dummy_task = MockFnBuilder::<ActionResult>::new_with_default(Ok(())).build().call();
         MockAction {
             mockfn: self.0.build(),
-            pool: ReusableBoxFuturePool::<ActionResult>::new(DEFAULT_POOL_SIZE, async move { task }),
+            pool: ReusableBoxFuturePool::<ActionResult>::new(DEFAULT_POOL_SIZE, async move { dummy_task }),
         }
     }
 }
 
 impl ActionTrait for MockAction {
+    ///
+    /// Return a "fresh" future that returns the current MockFn's call() result
+    ///
     fn try_execute(&mut self) -> ReusableBoxFutureResult {
         let result = self.mockfn.call();
-        self.pool.next(async { result })
+        self.pool.next(async move { result })
     }
 
     fn name(&self) -> &'static str {
