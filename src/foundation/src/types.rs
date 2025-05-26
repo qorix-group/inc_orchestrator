@@ -11,7 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#[derive(PartialEq, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum CommonErrors {
     NoData,
     AlreadyDone,
