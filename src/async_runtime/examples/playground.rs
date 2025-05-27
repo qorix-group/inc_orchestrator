@@ -20,7 +20,7 @@ use async_runtime::{
 };
 
 use foundation::prelude::*;
-use std::{future::Future, thread, time::Duration};
+use std::future::Future;
 
 pub struct X {}
 
@@ -55,18 +55,16 @@ fn main() {
         .with_thread_names(true)
         .init();
 
-    let mut runtime = AsyncRuntimeBuilder::new()
-        .with_engine(
-            ExecutionEngineBuilder::new()
-                .task_queue_size(256)
-                .workers(3)
-                .with_dedicated_worker("dedicated".into())
-                .enable_safety_worker(ThreadParameters::default()),
-        )
-        .build()
-        .unwrap();
+    let (builder, _engine_id) = AsyncRuntimeBuilder::new().with_engine(
+        ExecutionEngineBuilder::new()
+            .task_queue_size(256)
+            .workers(3)
+            .with_dedicated_worker("dedicated".into())
+            .enable_safety_worker(ThreadParameters::default()),
+    );
+    let mut runtime = builder.build().unwrap();
 
-    let _ = runtime.enter_engine(async {
+    let _ = runtime.block_on(async {
         ensure_safety_enabled();
         // TASK
         error!("We do have first enter into runtime ;)");
@@ -110,7 +108,6 @@ fn main() {
 
         x.await;
         error!("After multi waker");
+        Ok(0)
     });
-
-    thread::sleep(Duration::new(20, 0));
 }

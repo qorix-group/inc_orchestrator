@@ -12,8 +12,6 @@
 //
 
 /*
-use std::{thread, time::Duration};
-
 use async_runtime::{runtime::async_runtime::AsyncRuntimeBuilder, scheduler::execution_engine::*};
 use foundation::prelude::*;
 use logging_tracing::{TraceScope, TracingLibraryBuilder};
@@ -66,10 +64,8 @@ fn main() {
     logger.init_log_trace();
 
     // Create runtime
-    let mut runtime = AsyncRuntimeBuilder::new()
-        .with_engine(ExecutionEngineBuilder::new().task_queue_size(256).workers(2))
-        .build()
-        .unwrap();
+    let (builder, _engine_id) = AsyncRuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(256).workers(2));
+    let mut runtime = builder.build().unwrap();
 
     {
         // Start the event handling thread.
@@ -89,13 +85,12 @@ fn main() {
     let mut programs = orch.create_programs().unwrap();
 
     // Put programs into runtime and run them
-    let _ = runtime.enter_engine(async move {
+    let _ = runtime.block_on(async move {
         programs.programs.pop().unwrap().run_n(3).await;
         info!("Program finished running.");
+        Ok(0)
     });
 
-    // wait for some time to allow the engine finishes the last action
-    thread::sleep(Duration::new(50, 0));
     println!("Exit.");
     */
 }
