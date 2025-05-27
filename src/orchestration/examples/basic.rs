@@ -11,7 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #![allow(dead_code)]
-use std::{thread, time::Duration};
+use std::time::Duration;
 
 use async_runtime::{core::types::box_future, runtime::async_runtime::AsyncRuntimeBuilder, scheduler::execution_engine::*};
 use foundation::prelude::*;
@@ -76,10 +76,8 @@ fn main() {
 
     logger.init_log_trace();
 
-    let mut runtime = AsyncRuntimeBuilder::new()
-        .with_engine(ExecutionEngineBuilder::new().task_queue_size(256).workers(2))
-        .build()
-        .unwrap();
+    let (builder, _engine_id) = AsyncRuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(256).workers(2));
+    let mut runtime = builder.build().unwrap();
 
     {
         // Start the event handling thread.
@@ -87,7 +85,7 @@ fn main() {
         Event::get_instance().lock().unwrap().create_polling_thread();
     }
 
-    let _ = runtime.enter_engine(async {
+    let _ = runtime.block_on(async {
         let x = RefCell::new(1);
         let event_name: &str = "Test_Event_1";
         let event_name2: &str = "Test_Event_2";
@@ -145,9 +143,9 @@ fn main() {
 
         let res = program.run().await;
         info!("Done {:?} {}", res, x.borrow());
+
+        Ok(0)
     });
 
-    // wait for some time to allow the engine finishes the last action
-    thread::sleep(Duration::new(50, 0));
     println!("Exit.");
 }

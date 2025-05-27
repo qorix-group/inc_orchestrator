@@ -13,7 +13,6 @@
 
 use async_runtime::{runtime::async_runtime::AsyncRuntimeBuilder, scheduler::execution_engine::*, spawn};
 use foundation::prelude::*;
-use std::{thread, time::Duration};
 
 //
 // This is a test program and the following should happen:
@@ -39,12 +38,10 @@ fn main() {
         .with_max_level(Level::DEBUG)
         .init();
 
-    let mut runtime = AsyncRuntimeBuilder::new()
-        .with_engine(ExecutionEngineBuilder::new().task_queue_size(8).workers(1))
-        .build()
-        .unwrap();
+    let (builder, _engine_id) = AsyncRuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(8).workers(1));
+    let mut runtime = builder.build().unwrap();
 
-    let _ = runtime.enter_engine(async {
+    let _ = runtime.block_on(async {
         info!("We have just entered runtime.");
 
         for i in 0..14 {
@@ -53,7 +50,7 @@ fn main() {
                 i
             });
         }
-    });
 
-    thread::sleep(Duration::new(2, 0));
+        Ok(0)
+    });
 }
