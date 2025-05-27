@@ -19,14 +19,40 @@ use super::workers::dedicated_worker::DedicatedWorker;
 use super::workers::safety_worker::SafetyWorker;
 use super::workers::worker::Worker;
 use super::workers::worker_types::*;
-use crate::core::types::UniqueWorkerId;
-use crate::scheduler::{workers::ThreadParameters, SchedulerType};
+use crate::{
+    box_future,
+    core::types::UniqueWorkerId,
+    runtime::async_runtime::RuntimeErrors,
+    scheduler::{
+        workers::{worker::FIRST_WORKER_ID, ThreadParameters},
+        SchedulerType,
+    },
+    AsyncTask, Future,
+};
 use foundation::containers::growable_vec::GrowableVec;
 use foundation::containers::mpmc_queue::MpmcQueue;
-use foundation::containers::trigger_queue::TriggerQueue;
+use foundation::containers::trigger_queue::{TriggerQueue, TriggerQueueConsumer};
 use foundation::prelude::*;
 use foundation::threading::thread_wait_barrier::ThreadWaitBarrier;
 
+pub struct JoinHandle {
+    recv: Option<TriggerQueueConsumer<Result<u32, RuntimeErrors>>>,
+}
+
+impl JoinHandle {
+    pub fn join(self) -> Result<u32, RuntimeErrors> {
+        self.recv
+            .ok_or(RuntimeErrors::ResultNotThere)?
+            .pop_blocking_with_timeout(Duration::MAX)
+            .unwrap_or(Err(RuntimeErrors::NoResultAvailable))
+    }
+}
+
+/// The central engine for managing and executing asynchronous and dedicated tasks.
+///
+/// `ExecutionEngine` encapsulates worker threads, schedulers, and their associated queues.
+/// It provides methods to start, stop, and monitor tasks within its own runtime context.
+/// Instances are typically created using [`ExecutionEngineBuilder`].
 pub struct ExecutionEngine {
     async_workers: Vec<Worker>,
     async_queues: Vec<TaskStealQueue>,
@@ -37,10 +63,42 @@ pub struct ExecutionEngine {
 
     safety_worker: Option<SafetyWorker>,
     thread_params: ThreadParameters,
+    current_handle: Option<JoinHandle>,
 }
 
 impl ExecutionEngine {
-    pub(crate) fn start(&mut self, entry_task: TaskRef) {
+    /// Runs the given future to completion, blocking the calling thread until it finishes.
+    ///
+    /// Starts the engine, executes the future, and returns its result. The calling thread will
+    /// block until the given future is complete.
+    /// Returns an error if a task is already running or if no result is available.
+    pub(crate) fn block_on<T: Future<Output = Result<u32, RuntimeErrors>> + 'static + Send>(&mut self, future: T) -> Result<u32, RuntimeErrors> {
+        self.run_in_engine(future)?;
+        self.current_handle.take().ok_or(RuntimeErrors::NoTaskRunning)?.join()
+    }
+
+    /// Starts the engine and executes the given future within the runtime context.
+    ///
+    /// Returns an error if a task is already running.
+    /// Execution is asynchronous; the result can be retrieved later using [`wait_for`].
+    pub(crate) fn run_in_engine<T: Future<Output = Result<u32, RuntimeErrors>> + 'static + Send>(&mut self, future: T) -> Result<(), RuntimeErrors> {
+        if self.current_handle.is_some() {
+            return Err(RuntimeErrors::TaskAlreadyRunning);
+        }
+
+        let tq = Arc::new(TriggerQueue::new(1));
+        let recv = tq.clone().get_consumer();
+
+        self.current_handle = Some(JoinHandle { recv });
+        let boxed = box_future(async move {
+            let res = future.await;
+
+            tq.push(res);
+        });
+        let scheduler = self.get_async_scheduler();
+        let task = Arc::new(AsyncTask::new(boxed, FIRST_WORKER_ID, scheduler)); // This is the first initial worker we start on this engine, so we can use a constant worker_id
+        let entry_task = TaskRef::new(task.clone());
+
         {
             //TODO: Total hack, injecting task before we run any async_workers so they will pick it
             let pc = self.async_queues[0].get_local().unwrap();
@@ -95,16 +153,33 @@ impl ExecutionEngine {
                 panic!("Timeout on starting engine, not all workers reported ready, stopping...");
             }
         }
+
+        Ok(())
     }
 
     pub(crate) fn get_async_scheduler(&self) -> Arc<AsyncScheduler> {
         self.async_scheduler.clone()
     }
-}
 
-impl Drop for ExecutionEngine {
-    fn drop(&mut self) {
-        // Stop all workers
+    /// Waits for the result of the currently running entry-/main-task.
+    ///
+    /// It is required to asynchronously start a task with [`run_in_engine`] before using this.
+    /// Returns the result of a finished task or an error if no task is running.
+    pub(crate) fn wait_for(&mut self) -> Result<u32, RuntimeErrors> {
+        if let Some(handle) = self.current_handle.take() {
+            return handle.join();
+        }
+
+        Err(RuntimeErrors::NoTaskRunning)
+    }
+
+    /// Stops all worker threads managed by the engine.
+    ///
+    /// The running tasks are not finished, they are only finishing their currently running
+    /// iteration and are then aborted. That means that running taskes are driven until their
+    /// current poll iteration finishes, regardless of the return value. Even when a task returns
+    /// Poll::Pending, it will be stopped after the current iteration.
+    pub(crate) fn stop(&mut self) {
         for worker in self.async_workers.iter_mut() {
             worker.stop();
         }
@@ -116,6 +191,21 @@ impl Drop for ExecutionEngine {
         if let Some(ref sworker) = self.safety_worker {
             sworker.stop();
         }
+    }
+}
+
+/// Dropping the `ExecutionEngine` will stop all workers and wait for them to finish.
+///
+/// This means that the main task is completed before the engine is destroyed. Main task is the
+/// one,  which was started with [`run_in_engine`].
+/// We try to `wait_for` it here, but ignore the result, because an error returned from `wait_for`
+/// is kind of expected: The user of this `ExecutionEngine` might already have called `stop` or
+/// `wait_for` before and this will result in an error. If he did not, we to do it for him.
+/// After waiting for the main task to finish, we call `stop` to stop all workers.
+impl Drop for ExecutionEngine {
+    fn drop(&mut self) {
+        let _ = self.wait_for();
+        self.stop();
     }
 }
 
@@ -275,6 +365,165 @@ impl ExecutionEngineBuilder {
             dedicated_scheduler,
             safety_worker,
             thread_params: self.thread_params,
+            current_handle: None,
         }
+    }
+}
+
+#[cfg(test)]
+#[cfg(not(loom))]
+// This is because of the disabled miri tests below
+#[allow(unused_imports)]
+mod tests {
+    use super::*;
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+    use std::thread;
+    use std::time::Duration;
+
+    // used from async_runtime.rs unit test
+    impl ExecutionEngine {
+        pub fn worker_count(&self) -> usize {
+            self.async_workers.len()
+        }
+    }
+
+    fn create_engine(workers: usize) -> ExecutionEngine {
+        ExecutionEngineBuilder::new().workers(workers).task_queue_size(8).build()
+    }
+
+    #[test]
+    // miri does not like this test for some reason. Disable it for now. The message is
+    // ```
+    // error: unsupported operation: can't call foreign function `pthread_attr_init` on OS `linux`
+    // ```
+    // See https://github.com/qorix-group/inc_orchestrator_internal/actions/runs/15675294733/job/44154074863?pr=47
+    // for an example CI run.
+    #[cfg(not(miri))]
+    fn test_block_on_returns_result() {
+        let mut engine = create_engine(2);
+        let result = engine.block_on(async { Ok(123u32) });
+        assert_eq!(result, Ok(123));
+    }
+
+    #[test]
+    // miri does not like this test for some reason. Disable it for now. The message is
+    // ```
+    // error: unsupported operation: can't call foreign function `pthread_attr_init` on OS `linux`
+    // ```
+    // See https://github.com/qorix-group/inc_orchestrator_internal/actions/runs/15675294733/job/44154074863?pr=47
+    // for an example CI run.
+    #[cfg(not(miri))]
+    fn test_run_in_engine_and_wait_for() {
+        let mut engine = create_engine(2);
+        let called = Arc::new(AtomicUsize::new(0));
+        let called_clone = called.clone();
+
+        engine
+            .run_in_engine(async move {
+                called_clone.fetch_add(1, Ordering::SeqCst);
+                Ok(42u32)
+            })
+            .unwrap();
+
+        // Wait for the result
+        let result = engine.wait_for();
+        assert_eq!(result, Ok(42));
+        assert_eq!(called.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    // miri does not like this test for some reason. Disable it for now. The message is
+    // ```
+    // error: unsupported operation: can't call foreign function `pthread_attr_init` on OS `linux`
+    // ```
+    // See https://github.com/qorix-group/inc_orchestrator_internal/actions/runs/15675294733/job/44154074863?pr=47
+    // for an example CI run.
+    #[cfg(not(miri))]
+    fn test_run_in_engine_twice_should_fail() {
+        let mut engine = create_engine(1);
+
+        engine.run_in_engine(async { Ok(1u32) }).expect("First run_in_engine should succeed");
+
+        // Second call should fail because a task is already running
+        let err = engine.run_in_engine(async { Ok(2u32) }).unwrap_err();
+        assert_eq!(err, RuntimeErrors::TaskAlreadyRunning);
+
+        // Wait for the first task to finish
+        let res = engine.wait_for();
+        assert_eq!(res, Ok(1));
+    }
+
+    #[test]
+    fn test_wait_for_without_task_should_fail() {
+        let mut engine = create_engine(1);
+        let err = engine.wait_for().unwrap_err();
+        assert_eq!(err, RuntimeErrors::NoTaskRunning);
+    }
+
+    #[test]
+    fn test_stop_is_idempotent() {
+        let mut engine = create_engine(2);
+        engine.stop();
+        engine.stop(); // Should not panic or error
+    }
+
+    #[test]
+    // miri does not like this test for some reason. Disable it for now. The message is
+    // ```
+    // error: unsupported operation: can't call foreign function `pthread_attr_init` on OS `linux`
+    // ```
+    // See https://github.com/qorix-group/inc_orchestrator_internal/actions/runs/15675294733/job/44154074863?pr=47
+    // for an example CI run.
+    #[cfg(not(miri))]
+    fn test_block_on_multiple_engines_parallel() {
+        let mut handles = GrowableVec::new(4);
+        for i in 0..3 {
+            handles.push(thread::spawn(move || {
+                let mut engine = create_engine(1);
+                engine.block_on(async move {
+                    thread::sleep(Duration::from_millis(50));
+                    Ok(i as u32)
+                })
+            }));
+        }
+        let mut results = GrowableVec::new(4);
+        while let Some(handle) = handles.pop() {
+            results.push(handle.join().unwrap());
+        }
+
+        assert!(results.contains(&Ok(0)));
+        assert!(results.contains(&Ok(1)));
+        assert!(results.contains(&Ok(2)));
+    }
+
+    #[test]
+    // miri does not like this test for some reason. Disable it for now. The message is
+    // ```
+    // error: unsupported operation: can't call foreign function `pthread_attr_init` on OS `linux`
+    // ```
+    // See https://github.com/qorix-group/inc_orchestrator_internal/actions/runs/15675294733/job/44154074863?pr=47
+    // for an example CI run.
+    #[cfg(not(miri))]
+    fn test_result_ready_before_wait_for() {
+        let mut engine = create_engine(1);
+
+        let barrier = Arc::new(ThreadWaitBarrier::new(1));
+        let ready_notifier = barrier.get_notifier().unwrap();
+
+        engine
+            .run_in_engine(async move {
+                thread::sleep(Duration::from_millis(50));
+                ready_notifier.ready();
+                Ok(777u32)
+            })
+            .unwrap();
+
+        assert_eq!(Ok(()), barrier.wait_for_all(Duration::from_secs(1)));
+
+        let result = engine.wait_for();
+        assert_eq!(result, Ok(777));
     }
 }

@@ -855,10 +855,8 @@ mod tests {
 
     use loom::model::Builder;
 
-    use crate::{
-        core::types::{box_future, ArcInternal},
-        scheduler::scheduler_mt::SchedulerTrait,
-    };
+    use crate::core::types::{box_future, ArcInternal};
+    use crate::scheduler::scheduler_mt::SchedulerTrait;
 
     async fn dummy() -> u32 {
         0
