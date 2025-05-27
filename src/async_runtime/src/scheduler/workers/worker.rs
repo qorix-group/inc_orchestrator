@@ -29,6 +29,8 @@ use crate::scheduler::{
 
 use super::worker_types::*;
 
+pub const FIRST_WORKER_ID: u8 = 0;
+
 // The facade to represent this in runtime
 pub(crate) struct Worker {
     thread_handle: Option<Thread>,
