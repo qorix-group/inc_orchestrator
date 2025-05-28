@@ -100,6 +100,7 @@ impl ActionTrait for MockAction {
 }
 
 #[cfg(test)]
+#[cfg(not(loom))]
 mod tests {
 
     use crate::actions::internal::action::ActionExecError;
