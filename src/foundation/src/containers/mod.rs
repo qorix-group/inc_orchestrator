@@ -15,5 +15,6 @@ pub mod growable_vec;
 pub mod mpmc_queue;
 mod queue;
 pub mod reusable_objects;
+pub mod reusable_vec_pool;
 pub mod spmc_queue;
 pub mod trigger_queue;
