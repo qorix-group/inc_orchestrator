@@ -102,9 +102,10 @@ impl ActionTrait for MockAction {
 #[cfg(test)]
 mod tests {
 
+    use crate::actions::internal::action::ActionExecError;
+
     use super::*;
 
-    use foundation::prelude::CommonErrors;
     use testing::poller::TestingFuturePoller;
 
     use std::task::Poll;
@@ -119,10 +120,10 @@ mod tests {
 
     #[test]
     fn test_once_err() {
-        let mut mock = MockActionBuilder::new().will_once(Err(CommonErrors::Timeout)).build();
+        let mut mock = MockActionBuilder::new().will_once(Err(ActionExecError::Internal)).build();
 
         let mut poller = TestingFuturePoller::<ActionResult>::new(mock.try_execute().unwrap().into_pin());
-        assert_eq!(poller.poll(), Poll::Ready(Err(CommonErrors::Timeout)));
+        assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::Internal)));
     }
 
     #[test]
@@ -137,21 +138,23 @@ mod tests {
 
     #[test]
     fn test_repeatedly_err() {
-        let mut mock = MockActionBuilder::new().will_repeatedly(Err(CommonErrors::GenericError)).build();
+        let mut mock = MockActionBuilder::new()
+            .will_repeatedly(Err(ActionExecError::NonRecoverableFailure))
+            .build();
 
         for _ in 0..3 {
             let mut poller = TestingFuturePoller::<ActionResult>::new(mock.try_execute().unwrap().into_pin());
-            assert_eq!(poller.poll(), Poll::Ready(Err(CommonErrors::GenericError)));
+            assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::NonRecoverableFailure)));
         }
     }
 
     #[test]
     fn test_with_calls_equals_times_ok() {
-        let mut mock = MockActionBuilder::new().times(3).will_repeatedly(Err(CommonErrors::Panicked)).build();
+        let mut mock = MockActionBuilder::new().times(3).will_repeatedly(Err(ActionExecError::Internal)).build();
 
         for _ in 0..3 {
             let mut poller = TestingFuturePoller::<ActionResult>::new(mock.try_execute().unwrap().into_pin());
-            assert_eq!(poller.poll(), Poll::Ready(Err(CommonErrors::Panicked)));
+            assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::Internal)));
         }
     }
 
@@ -180,15 +183,15 @@ mod tests {
     #[test]
     fn test_with_multiple_once_err() {
         let mut mock = MockActionBuilder::new()
-            .will_once(Err(CommonErrors::AlreadyDone))
-            .will_once(Err(CommonErrors::GenericError))
+            .will_once(Err(ActionExecError::Internal))
+            .will_once(Err(ActionExecError::NonRecoverableFailure))
             .build();
 
         let mut poller = TestingFuturePoller::<ActionResult>::new(mock.try_execute().unwrap().into_pin());
-        assert_eq!(poller.poll(), Poll::Ready(Err(CommonErrors::AlreadyDone)));
+        assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::Internal)));
 
         let mut poller = TestingFuturePoller::<ActionResult>::new(mock.try_execute().unwrap().into_pin());
-        assert_eq!(poller.poll(), Poll::Ready(Err(CommonErrors::GenericError)));
+        assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::NonRecoverableFailure)));
     }
 
     #[test]
@@ -196,19 +199,19 @@ mod tests {
         let mut mock = MockActionBuilder::new()
             .times(5)
             .will_once(Ok(()))
-            .will_once(Err(CommonErrors::OperationAborted))
-            .will_repeatedly(Err(CommonErrors::AlreadyDone))
+            .will_once(Err(ActionExecError::NonRecoverableFailure))
+            .will_repeatedly(Err(ActionExecError::Internal))
             .build();
 
         let mut poller = TestingFuturePoller::<ActionResult>::new(mock.try_execute().unwrap().into_pin());
         assert_eq!(poller.poll(), Poll::Ready(Ok(())));
 
         let mut poller = TestingFuturePoller::<ActionResult>::new(mock.try_execute().unwrap().into_pin());
-        assert_eq!(poller.poll(), Poll::Ready(Err(CommonErrors::OperationAborted)));
+        assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::NonRecoverableFailure)));
 
         for _ in 0..3 {
             let mut poller = TestingFuturePoller::<ActionResult>::new(mock.try_execute().unwrap().into_pin());
-            assert_eq!(poller.poll(), Poll::Ready(Err(CommonErrors::AlreadyDone)));
+            assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::Internal)));
         }
     }
 
@@ -216,8 +219,8 @@ mod tests {
     #[should_panic]
     fn test_with_clause_after_repeated_should_panic() {
         let mut mock = MockActionBuilder::new()
-            .will_repeatedly(Err(CommonErrors::AlreadyDone))
-            .will_once(Err(CommonErrors::OperationAborted))
+            .will_repeatedly(Err(ActionExecError::Internal))
+            .will_once(Err(ActionExecError::NonRecoverableFailure))
             .build();
 
         let _ = TestingFuturePoller::<ActionResult>::new(mock.try_execute().unwrap().into_pin());
