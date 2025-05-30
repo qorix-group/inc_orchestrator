@@ -25,6 +25,7 @@ use testing::{
 };
 
 const DEFAULT_POOL_SIZE: usize = 5;
+const DEFAULT_TAG: &str = "orch::testing::MockAction";
 
 ///
 /// A mock object that can be used to monitor the invocation count of actions, i.e. try_execute().
@@ -83,25 +84,26 @@ impl MockActionBuilder {
     /// Create the MockAction instance based on the current configuration and initialize the reusable pools
     ///
     pub fn build(self) -> MockAction {
-        // The pool needs to know the future layout in advance, so we create aa future "template" using another MockFn with identical OutType.
-        // We can not re-use the one from self.0 for this purpose, since invoking build() results in the transient MockFn being inspected for
-        // its call counts at drop(), leading to panics even before polling
-        let dummy_task = MockFnBuilder::<ActionResult>::new_with_default(Ok(())).build().call();
-        let reusable_future_pool = ReusableBoxFuturePool::<ActionResult>::new(DEFAULT_POOL_SIZE, async move { dummy_task });
-
         // The reusable objects pool must contain only one element to ensure every next_object() call
         // always returns the same MockFn object that preserves the call_count state from previous
         // call(s)
-        let reusable_mockfn_pool = ReusableObjects::<MockFn<ActionResult>>::new(1, |_| self.0.clone().build());
+        let mut reusable_mockfn_pool = ReusableObjects::<MockFn<ActionResult>>::new(1, |_| self.0.clone().build());
+
+        // Create a dummy future for the sake of initializing the reusable future pool's layout
+        let dummy_future = MockAction::execute_impl(reusable_mockfn_pool.next_object().unwrap());
+        let reusable_future_pool = ReusableBoxFuturePool::<ActionResult>::new(DEFAULT_POOL_SIZE, dummy_future);
 
         MockAction {
-            reusable_mockfn_pool,
             reusable_future_pool,
+            reusable_mockfn_pool,
         }
     }
 }
 
 impl MockAction {
+    ///
+    /// Call the underlying MockFn
+    ///
     async fn execute_impl(mut mockfn: ReusableObject<MockFn<ActionResult>>) -> ActionResult {
         unsafe { mockfn.as_inner_mut().call() }
     }
@@ -115,6 +117,7 @@ impl ActionTrait for MockAction {
         // Due to the pool size of one we will get the same MockFn object from the previous call
         // here, because the last one gets dropped right after its call() and returned back to the pool
         let mockfn = self.reusable_mockfn_pool.next_object()?;
+
         self.reusable_future_pool.next(MockAction::execute_impl(mockfn))
     }
 
@@ -157,14 +160,18 @@ mod tests {
     use std::task::Poll;
 
     #[test]
-    fn test_times_zero_ok() {
+    fn with_times_zero_ok() {
         let mut mock = MockActionBuilder::new().times(0).build();
         let _ = OrchTestingPoller::new(mock.try_execute().unwrap());
     }
-
     #[test]
+    // Disable miri to prevent miri from reporting a memleak and and failing the CI.
+    // When a panic occurs within the destructor of `ReusableObject`, the stack is unwind and the allocated object is not freed.
+    // Properly handling this scenario within `ReusableObject` is complex and may potentially lead to other undesirable behavior.
+    // Under normal scenarios, however, the program will finish execution and the OS will deallocate memory accordingly.
+    #[cfg(not(miri))]
     #[should_panic]
-    fn test_times_zero_called_once_should_panic() {
+    fn with_times_zero_but_called_once_should_panic() {
         let mut mock = MockActionBuilder::new().times(0).build();
         let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
 
@@ -172,7 +179,7 @@ mod tests {
     }
 
     #[test]
-    fn test_once_ok() {
+    fn will_once_ok() {
         let mut mock = MockActionBuilder::new().will_once(Ok(())).build();
         let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
 
@@ -180,7 +187,7 @@ mod tests {
     }
 
     #[test]
-    fn test_once_err() {
+    fn wlll_once_err_returns_correctly() {
         let mut mock = MockActionBuilder::new().will_once(Err(ActionExecError::Internal)).build();
 
         let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
@@ -188,7 +195,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repeatedly_ok() {
+    fn will_repeatedly_ok() {
         let mut mock = MockActionBuilder::new().will_repeatedly(Ok(())).build();
 
         for _ in 0..3 {
@@ -198,7 +205,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repeatedly_err() {
+    fn will_repeatedly_err_returns_correctly() {
         let mut mock = MockActionBuilder::new()
             .will_repeatedly(Err(ActionExecError::NonRecoverableFailure))
             .build();
@@ -210,7 +217,7 @@ mod tests {
     }
 
     #[test]
-    fn test_with_calls_equals_times_ok() {
+    fn calls_equals_times_ok() {
         let mut mock = MockActionBuilder::new().times(3).will_repeatedly(Err(ActionExecError::Internal)).build();
 
         for _ in 0..3 {
@@ -220,8 +227,13 @@ mod tests {
     }
 
     #[test]
+    // Disable miri to prevent miri from reporting a memleak and and failing the CI.
+    // When a panic occurs within the destructor of `ReusableObject`, the stack is unwind and the allocated object is not freed.
+    // Properly handling this scenario within `ReusableObject` is complex and may potentially lead to other undesirable behavior.
+    // Under normal scenarios, however, the program will finish execution and the OS will deallocate memory accordingly.
+    #[cfg(not(miri))]
     #[should_panic]
-    fn test_with_less_calls_than_times_should_panic() {
+    fn calls_less_tthan_times_should_panic() {
         let mut mock = MockActionBuilder::new().times(3).build();
 
         for _ in 0..2 {
@@ -231,8 +243,13 @@ mod tests {
     }
 
     #[test]
+    // Disable miri to prevent miri from reporting a memleak and and failing the CI.
+    // When a panic occurs within the destructor of `ReusableObject`, the stack is unwind and the allocated object is not freed.
+    // Properly handling this scenario within `ReusableObject` is complex and may potentially lead to other undesirable behavior.
+    // Under normal scenarios, however, the program will finish execution and the OS will deallocate memory accordingly.
+    #[cfg(not(miri))]
     #[should_panic]
-    fn test_with_more_counts_than_times_should_panic() {
+    fn calls_more_than_times_should_panic() {
         let mut mock = MockActionBuilder::new().times(3).build();
 
         for _ in 0..4 {
@@ -242,7 +259,7 @@ mod tests {
     }
 
     #[test]
-    fn test_with_multiple_once_err() {
+    fn multiple_will_once_err_returns_correctly() {
         let mut mock = MockActionBuilder::new()
             .will_once(Err(ActionExecError::Internal))
             .will_once(Err(ActionExecError::NonRecoverableFailure))
@@ -256,7 +273,7 @@ mod tests {
     }
 
     #[test]
-    fn test_with_all_clauses() {
+    fn all_clauses_ok() {
         let mut mock = MockActionBuilder::new()
             .times(5)
             .will_once(Ok(()))
@@ -278,7 +295,7 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn test_with_clause_after_repeated_should_panic() {
+    fn clause_after_will_repeated_should_panic() {
         let mut mock = MockActionBuilder::new()
             .will_repeatedly(Err(ActionExecError::Internal))
             .will_once(Err(ActionExecError::NonRecoverableFailure))

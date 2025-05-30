@@ -14,3 +14,4 @@
 pub mod action;
 pub mod catch;
 pub mod concurrency;
+pub mod sequence;
