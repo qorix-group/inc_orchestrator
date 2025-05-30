@@ -18,7 +18,7 @@ tracing-subscriber.workspace = true
 testing.workspace = true
 testing_macros.workspace = true
 async_runtime = {workspace = true, features = ["runtime-api-mock"] }
-orchestration = { path = ".", features = ["runtime-api-mock"] }
+orchestration = {workspace = true, features = ["runtime-api-mock"] }
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(orch_tracing)', 'cfg(loom)'] }
