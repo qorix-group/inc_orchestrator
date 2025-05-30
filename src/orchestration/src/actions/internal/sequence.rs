@@ -22,7 +22,6 @@ use foundation::{
 
 const REUSABLE_FUTURE_POOL_SIZE: usize = 2;
 const REUSABLE_VEC_POOL_SIZE: usize = 2;
-const REUSABLE_VEC_SIZE: usize = 10;
 const DEFAULT_TAG: &str = "orch::internal::sequence";
 
 ///
@@ -43,6 +42,7 @@ impl SequenceBuilder {
     /// Construct a `SequenceBuilder`
     ///
     pub fn new() -> SequenceBuilder {
+        const REUSABLE_VEC_SIZE: usize = 4;
         Self {
             actions: GrowableVec::new(REUSABLE_VEC_SIZE),
         }
@@ -67,36 +67,48 @@ impl SequenceBuilder {
     ///
     /// Panics if the `Sequence` does not contain any actions
     ///
-    pub fn build(&mut self) -> Result<Box<Sequence>, CommonErrors> {
+    pub fn build(&mut self) -> Box<Sequence> {
         assert!(!self.actions.is_empty(), "Sequence must contain at least one action!");
 
         // No more actions may be added beyond this point
         self.actions.lock();
 
-        // Create a pool of reusable futures' collection for storing the actions' futures_pool
-        let mut futures_vec_pool = ReusableVecPool::<ReusableBoxFuture<ActionResult>>::new(REUSABLE_VEC_POOL_SIZE, |_| Vec::new(self.actions.len()));
-
-        // Populate the futures' collection to initialize the reusable future pool's layout
-        let reusable_future_pool = ReusableBoxFuturePool::<ActionResult>::new(
-            REUSABLE_FUTURE_POOL_SIZE,
-            Sequence::execute_impl(Tag::from_str_static(DEFAULT_TAG), futures_vec_pool.next_object().unwrap()),
-        );
+        // Create pools
+        let (futures_vec_pool, reusable_future_pool) = SequenceBuilder::create_pools(self.actions.len());
 
         // Move the actions from Builder's GrowableVec to Sequence's fixed-sized Vec
+        // Here we also reverse the order, so that the actions become already in the correct order,
+        // when they are popped out in the execute_impl() later on
         let mut actions = Vec::<Box<dyn ActionTrait>>::new(self.actions.len());
         while let Some(action) = self.actions.pop() {
             actions.push(action);
         }
 
         // Finally, return the `Sequence` action
-        Ok(Box::new(Sequence {
+        Box::new(Sequence {
             actions,
             base: ActionBaseMeta {
                 tag: Tag::from_str_static(DEFAULT_TAG),
                 reusable_future_pool,
             },
             futures_vec_pool,
-        }))
+        })
+    }
+
+    ///
+    /// Create pools of reusable futures vec and reusable future
+    ///
+    fn create_pools(futures_size: usize) -> (ReusableVecPool<ReusableBoxFuture<ActionResult>>, ReusableBoxFuturePool<ActionResult>) {
+        let mut futures_vec_pool = ReusableVecPool::<ReusableBoxFuture<ActionResult>>::new(REUSABLE_VEC_POOL_SIZE, |_| Vec::new(futures_size));
+        let futures_vec = futures_vec_pool.next_object().unwrap();
+
+        // Populate the futures' collection to initialize the reusable future pool's layout
+        let reusable_future_pool = ReusableBoxFuturePool::<ActionResult>::new(
+            REUSABLE_FUTURE_POOL_SIZE,
+            Sequence::execute_impl(Tag::from_str_static(DEFAULT_TAG), futures_vec),
+        );
+
+        (futures_vec_pool, reusable_future_pool)
     }
 }
 
@@ -115,8 +127,6 @@ pub struct Sequence {
 
 impl Sequence {
     async fn execute_impl(tag: Tag, mut futures: ReusableObject<Vec<ReusableBoxFuture<ActionResult>>>) -> ActionResult {
-        trace!(sequence = ?tag, "Before awaiting steps");
-
         // Execute all futures in the collection, but terminates immediately upon error
         // We can directly pop() without reversing the order here, because the reversion already took place
         // during elements transfer from Builder's GrowableVec to Sequence's Vec
@@ -131,7 +141,6 @@ impl Sequence {
             trace!(step = ?tag, "After awaiting step");
         }
 
-        trace!(sequence = ?tag, "After awaiting steps",);
         Ok(())
     }
 }
@@ -139,7 +148,7 @@ impl Sequence {
 impl ActionTrait for Sequence {
     fn try_execute(&mut self) -> ReusableBoxFutureResult {
         // Get a fresh reusable futures collection and re-populate it with actions' futures
-        let mut futures_vec_pool = self.futures_vec_pool.next_object().unwrap();
+        let mut futures_vec_pool = self.futures_vec_pool.next_object()?;
         self.actions.iter_mut().try_for_each(|action| {
             // Return error in (unlikely) case that no more future can be added to the reusable collection
             if !futures_vec_pool.push(action.try_execute()?) {
@@ -180,42 +189,79 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn test_build_on_empty_sequence_should_panic() {
-        let mut seq = SequenceBuilder::new().build().unwrap();
+    fn build_on_empty_sequence_should_panic() {
+        // Create an empty sequence
+        let mut seq = SequenceBuilder::new().build();
 
+        // Execute the sequence
         let mut mock = OrchTestingPoller::new(seq.try_execute().unwrap());
         assert_eq!(Poll::Ready(Ok(())), mock.poll());
     }
 
     #[test]
-    fn test_all_subsequent_steps_are_called() {
+    fn all_subsequent_steps_are_called() {
+        // Create a sequence with no nested branch
         let mock_1 = Box::new(MockActionBuilder::new().times(1).build());
         let mock_2 = Box::new(MockActionBuilder::new().times(1).build());
-        let mut seq = SequenceBuilder::new().with_step(mock_1).with_step(mock_2).build().unwrap();
+        let mut seq = SequenceBuilder::new().with_step(mock_1).with_step(mock_2).build();
 
+        // Execute the sequence
         let mut mock = OrchTestingPoller::new(seq.try_execute().unwrap());
         assert_eq!(Poll::Ready(Ok(())), mock.poll());
     }
 
     #[test]
-    fn test_all_nested_steps_are_called() {
+    fn all_steps_within_nested_steps_seq_are_called() {
+        // Create a sequence with a nested branch
         let mock_1 = Box::new(MockActionBuilder::new().times(1).build());
         let mock_nested_a = Box::new(MockActionBuilder::new().times(1).build());
         let mock_nested_b = Box::new(MockActionBuilder::new().times(1).build());
         let mock_2 = Box::new(MockActionBuilder::new().times(1).build());
         let mut seq = SequenceBuilder::new()
             .with_step(mock_1)
-            .with_step(SequenceBuilder::new().with_step(mock_nested_a).with_step(mock_nested_b).build().unwrap())
+            .with_step(SequenceBuilder::new().with_step(mock_nested_a).with_step(mock_nested_b).build())
             .with_step(mock_2)
-            .build()
-            .unwrap();
+            .build();
 
+        // Execute the sequence
         let mut mock = OrchTestingPoller::new(seq.try_execute().unwrap());
         assert_eq!(Poll::Ready(Ok(())), mock.poll());
     }
 
     #[test]
-    fn test_step_with_err_terminates_immediately() {
+    fn all_steps_within_double_nested_steps_seq_are_called() {
+        // Create a sequence with double nested branches
+        let mock_1 = Box::new(MockActionBuilder::new().times(1).build());
+        let mock_2 = Box::new(MockActionBuilder::new().times(1).build());
+        let mock_nested_2a = Box::new(MockActionBuilder::new().times(1).build());
+        let mock_double_nested_2aa = Box::new(MockActionBuilder::new().times(1).build());
+        let mock_double_nested_2ab = Box::new(MockActionBuilder::new().times(1).build());
+        let mock_nested_2b = Box::new(MockActionBuilder::new().times(1).build());
+        let mut seq = SequenceBuilder::new()
+            .with_step(mock_1)
+            .with_step(mock_2)
+            .with_step(
+                SequenceBuilder::new()
+                    .with_step(mock_nested_2a)
+                    .with_step(
+                        SequenceBuilder::new()
+                            .with_step(mock_double_nested_2aa)
+                            .with_step(mock_double_nested_2ab)
+                            .build(),
+                    )
+                    .with_step(mock_nested_2b)
+                    .build(),
+            )
+            .build();
+
+        // Execute the sequence
+        let mut mock = OrchTestingPoller::new(seq.try_execute().unwrap());
+        assert_eq!(Poll::Ready(Ok(())), mock.poll());
+    }
+
+    #[test]
+    fn step_with_err_terminates_immediately() {
+        // Create a sequence that contains an error
         let mock_ok = Box::new(MockActionBuilder::new().will_once(Ok(())).build());
         let user_err = ActionExecError::UserError(UserErrValue::from(42));
         let mock_err_1 = Box::new(MockActionBuilder::new().will_once(Err(user_err)).build());
@@ -224,10 +270,35 @@ mod tests {
             .with_step(mock_ok)
             .with_step(mock_err_1)
             .with_step(mock_err_2)
-            .build()
-            .unwrap();
+            .build();
 
+        // Execute the sequence
         let mut mock = OrchTestingPoller::new(seq.try_execute().unwrap());
         assert_eq!(Poll::Ready(Err(user_err)), mock.poll());
+    }
+
+    #[test]
+    fn step_with_err_in_nested_branch_terminates_immediately() {
+        // Create a sequence that contains an error step within a nested branch
+        let mock_1 = Box::new(MockActionBuilder::new().times(1).build());
+        let mock_2 = Box::new(MockActionBuilder::new().will_once(Ok(())).build());
+        let mock_nested_2a = Box::new(MockActionBuilder::new().will_once(Ok(())).build());
+        let mock_nested_err = Box::new(MockActionBuilder::new().will_once(Err(ActionExecError::NonRecoverableFailure)).build());
+        let mock_nested_2b = Box::new(MockActionBuilder::new().times(0).build());
+        let mut seq = SequenceBuilder::new()
+            .with_step(mock_1)
+            .with_step(mock_2)
+            .with_step(
+                SequenceBuilder::new()
+                    .with_step(mock_nested_2a)
+                    .with_step(mock_nested_err)
+                    .with_step(mock_nested_2b)
+                    .build(),
+            )
+            .build();
+
+        // Execute the sequence
+        let mut mock = OrchTestingPoller::new(seq.try_execute().unwrap());
+        assert_eq!(Poll::Ready(Err(ActionExecError::NonRecoverableFailure)), mock.poll());
     }
 }
