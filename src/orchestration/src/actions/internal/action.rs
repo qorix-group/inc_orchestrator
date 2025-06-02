@@ -57,6 +57,7 @@ impl Into<ActionExecError> for UserErrValue {
 pub enum ActionExecError {
     UserError(UserErrValue),
     NonRecoverableFailure,
+    Timeout,
     Internal, // TODO add more errors if needed
 }
 
