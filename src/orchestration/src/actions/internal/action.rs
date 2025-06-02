@@ -13,7 +13,7 @@
 
 use crate::common::tag::Tag;
 
-use async_runtime::futures::reusable_box_future::ReusableBoxFuture;
+use async_runtime::futures::reusable_box_future::{ReusableBoxFuture, ReusableBoxFuturePool};
 use foundation::prelude::CommonErrors;
 
 use std::{
@@ -94,9 +94,9 @@ pub trait ActionTrait: Send {
     fn dbg_fmt(&self, nest: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
 }
 
-#[derive(Clone, Copy)]
 pub struct ActionBaseMeta {
     pub tag: Tag,
+    pub reusable_future_pool: ReusableBoxFuturePool<ActionResult>,
 }
 
 impl Debug for ActionBaseMeta {
