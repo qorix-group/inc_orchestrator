@@ -71,6 +71,11 @@ impl<T> ReusableObject<Vec<T>> {
             self.as_inner_mut().fill(value);
         }
     }
+
+    /// Returns an iterator over the elements of the pooled vector.
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, T> {
+        unsafe { self.as_inner_mut().iter_mut() }
+    }
 }
 
 #[cfg(test)]
