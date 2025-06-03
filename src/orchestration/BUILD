@@ -30,12 +30,22 @@ rust_library(
     deps = _COMMON_DEPS,
 )
 
+# manually pick files and deps as we need to run it with different runtime linked
 rust_test(
     name = "tests",
-    crate = ":liborchestration",
-    deps = [
-        "//src/testing:test_utils",
+    srcs = glob(["src/**/*.rs"]),
+    crate_features = ["runtime-api-mock"],
+    proc_macro_deps = [
+        "//src/testing_macros:test_macro_utils",
     ],
+    deps = [
+        "//src/async_runtime:libasync_runtime_mocked",
+        "//src/foundation:libfoundation",
+        "//src/logging_tracing:liblogging_tracing",
+        "//src/testing:test_utils",
+    ] + all_crate_deps(
+        normal = True,
+    ),
 )
 
 rust_binary(
