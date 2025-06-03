@@ -11,10 +11,17 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+#![allow(dead_code)]
+
+use std::task::{Poll, Waker};
+
 use crate::actions::internal::action::{ActionResult, ActionTrait, ReusableBoxFutureResult};
 
-use async_runtime::futures::reusable_box_future::ReusableBoxFuturePool;
-use testing::mock_fn::{CallableTrait, MockFn, MockFnBuilder};
+use async_runtime::futures::reusable_box_future::{ReusableBoxFuture, ReusableBoxFuturePool};
+use testing::{
+    mock_fn::{CallableTrait, MockFn, MockFnBuilder},
+    poller::TestingFuturePoller,
+};
 
 const DEFAULT_POOL_SIZE: usize = 5;
 
@@ -27,6 +34,12 @@ pub struct MockActionBuilder(MockFnBuilder<ActionResult>);
 pub struct MockAction {
     mockfn: MockFn<ActionResult>,
     pool: ReusableBoxFuturePool<ActionResult>,
+}
+
+impl Default for MockAction {
+    fn default() -> Self {
+        MockActionBuilder::default().build()
+    }
 }
 
 impl Default for MockActionBuilder {
@@ -96,6 +109,24 @@ impl ActionTrait for MockAction {
     fn dbg_fmt(&self, nest: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let indent = " ".repeat(nest);
         writeln!(f, "{}|-{}", indent, self.name())
+    }
+}
+
+pub struct OrchTestingPoller {
+    poller: TestingFuturePoller<ActionResult>,
+    waker: Waker,
+}
+
+impl OrchTestingPoller {
+    pub fn new(future: ReusableBoxFuture<ActionResult>) -> Self {
+        Self {
+            poller: TestingFuturePoller::new(future.into_pin()),
+            waker: async_runtime::testing::get_task_based_waker(),
+        }
+    }
+
+    pub fn poll(&mut self) -> Poll<ActionResult> {
+        self.poller.poll_with_waker(&self.waker)
     }
 }
 
