@@ -16,8 +16,9 @@ use crate::actions::action::ActionTrait;
 use crate::program_database::ActionProvider;
 use iceoryx2_bb_container::slotmap::SlotMapKey;
 use std::cell::RefCell;
+use std::rc::Rc;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
 #[allow(clippy::enum_variant_names)]
 /// MapIdentifier is an enum that represents the type of SlotMap the orchestration tag belongs to.
@@ -29,7 +30,7 @@ pub(crate) enum MapIdentifier {
     ComplexConditionMap,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 /// OrchTagId is a struct that contains the tag ID, a key for SlotMap, and a SlotMap identifier.
 pub(crate) struct OrchTagId {
     tag: Tag,
@@ -40,16 +41,16 @@ pub(crate) struct OrchTagId {
 /// OrchestrationTag is a wrapper around OrchTagId that provides a convenient way to create and manage orchestration tags.
 /// It contains tag ID, a key for SlotMap, and a SlotMap identifier.
 /// The tag ID is used to uniquely identify the orchestration tag.
-#[derive(Debug)]
-pub struct OrchestrationTag<'a> {
+#[derive(Debug, Clone)]
+pub struct OrchestrationTag {
     id: OrchTagId,
-    action_provider: &'a RefCell<ActionProvider>,
+    action_provider: Rc<RefCell<ActionProvider>>,
 }
 
 #[allow(dead_code)]
-impl<'a> OrchestrationTag<'a> {
+impl OrchestrationTag {
     /// Create a new orchestration tag with the given Tag, SlotMapKey, and MapIdentifier.
-    pub(crate) fn new(tag: Tag, key: SlotMapKey, map_identifier: MapIdentifier, action_provider: &'a RefCell<ActionProvider>) -> Self {
+    pub(crate) fn new(tag: Tag, key: SlotMapKey, map_identifier: MapIdentifier, action_provider: Rc<RefCell<ActionProvider>>) -> Self {
         Self {
             id: OrchTagId { tag, key, map_identifier },
             action_provider,
@@ -76,14 +77,14 @@ impl<'a> OrchestrationTag<'a> {
 
     #[inline]
     pub(crate) fn action_provider(&self) -> &RefCell<ActionProvider> {
-        self.action_provider
+        self.action_provider.as_ref()
     }
 }
 
-pub struct OrchestrationTagNotClonable<'a>(pub(crate) OrchestrationTag<'a>, pub(crate) Option<Box<dyn ActionTrait>>);
+pub struct OrchestrationTagNotClonable(OrchestrationTag, Option<Box<dyn ActionTrait>>);
 
-impl<'a> OrchestrationTagNotClonable<'a> {
-    pub(crate) fn new(orch_tag: OrchestrationTag<'a>, action: Box<dyn ActionTrait>) -> Self {
+impl OrchestrationTagNotClonable {
+    pub(crate) fn new(orch_tag: OrchestrationTag, action: Box<dyn ActionTrait>) -> Self {
         Self(orch_tag, Some(action))
     }
 
@@ -92,9 +93,11 @@ impl<'a> OrchestrationTagNotClonable<'a> {
     }
 }
 
-impl Drop for OrchestrationTagNotClonable<'_> {
+impl Drop for OrchestrationTagNotClonable {
     fn drop(&mut self) {
-        self.0.action_provider.borrow_mut().return_not_clonable_data(self);
+        if let Some(action) = self.1.take() {
+            self.0.action_provider.borrow_mut().return_not_clonable_data(self.0.clone(), action);
+        }
     }
 }
 
@@ -102,15 +105,17 @@ impl Drop for OrchestrationTagNotClonable<'_> {
 mod tests {
     use super::*;
     use iceoryx2_bb_container::slotmap::SlotMapKey;
+    use std::cell::RefCell;
+    use std::rc::Rc;
 
     #[test]
-    fn test_orchestration_tag_creation() {
-        let ap = RefCell::new(ActionProvider::new(4, 4));
+    fn orchestration_tag_creation() {
+        let ap = Rc::new(RefCell::new(ActionProvider::new(4, 4)));
         let tag = OrchestrationTag::new(
             Tag::from_str_static("test_tag"),
             SlotMapKey::new(1),
             MapIdentifier::ClonableInvokeMap,
-            &ap,
+            ap.clone(),
         );
         assert_eq!(*tag.tag(), Tag::from_str_static("test_tag"));
         assert_eq!(*tag.key(), SlotMapKey::new(1));

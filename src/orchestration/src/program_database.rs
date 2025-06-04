@@ -14,8 +14,10 @@
 use crate::actions::*;
 use crate::common::orch_tag::{MapIdentifier, OrchestrationTag, OrchestrationTagNotClonable};
 use crate::common::tag::Tag;
+use crate::prelude::ActionTrait;
 use foundation::{not_recoverable_error, prelude::*};
 use iceoryx2_bb_container::slotmap::{SlotMap, SlotMapKey};
+use std::rc::Rc;
 use std::{
     boxed::Box,
     cell::RefCell,
@@ -43,25 +45,21 @@ impl ActionProvider {
         }
     }
 
-    pub(crate) fn return_not_clonable_data(&mut self, orch_tag_not_clonable: &mut OrchestrationTagNotClonable) {
-        let orch_tag = &orch_tag_not_clonable.0;
-
-        if let Some(data) = orch_tag_not_clonable.1.take() {
-            match orch_tag.map_identifier() {
-                MapIdentifier::NotClonableInvokeMap => {
-                    if !self.not_clonable_invokes.insert_at(
-                        *orch_tag.key(),
-                        TaggedSlotMapEntry {
-                            tag: *orch_tag.tag(),
-                            data: Some(data),
-                        },
-                    ) {
-                        not_recoverable_error!("Failed to return a not clonable invoke action from an OrchestrationTagNotClonable.");
-                    }
+    pub(crate) fn return_not_clonable_data(&mut self, orch_tag: OrchestrationTag, returned_action: Box<dyn ActionTrait>) {
+        match orch_tag.map_identifier() {
+            MapIdentifier::NotClonableInvokeMap => {
+                if !self.not_clonable_invokes.insert_at(
+                    *orch_tag.key(),
+                    TaggedSlotMapEntry {
+                        tag: *orch_tag.tag(),
+                        data: Some(returned_action),
+                    },
+                ) {
+                    not_recoverable_error!("Failed to return a not clonable invoke action from an OrchestrationTagNotClonable.");
                 }
-                _ => not_recoverable_error!("Tried to drop an OrchestrationTagNotClonable with an unsupported map_identifier."),
-            };
-        }
+            }
+            _ => not_recoverable_error!("Tried to drop an OrchestrationTagNotClonable with an unsupported map_identifier."),
+        };
     }
 
     pub(crate) fn provide_invoke(&mut self, key: SlotMapKey) -> Option<Box<dyn action::ActionTrait>> {
@@ -105,17 +103,17 @@ impl Default for ProgramDatabaseParams {
 }
 
 pub struct ProgramDatabase {
-    action_provider: RefCell<ActionProvider>,
+    action_provider: Rc<RefCell<ActionProvider>>,
 }
 
 impl ProgramDatabase {
     /// Creates a new instance of `ProgramDatabase`.
     pub fn new(params: ProgramDatabaseParams) -> Self {
         Self {
-            action_provider: RefCell::new(ActionProvider::new(
+            action_provider: Rc::new(RefCell::new(ActionProvider::new(
                 params.clonable_invokes_capacity,
                 params.not_clonable_invokes_capacity,
-            )),
+            ))),
         }
     }
 
@@ -128,7 +126,12 @@ impl ProgramDatabase {
                 tag,
                 data: invoke::Invoke::from_fn(action),
             }) {
-                Ok(OrchestrationTag::new(tag, key, MapIdentifier::ClonableInvokeMap, &self.action_provider))
+                Ok(OrchestrationTag::new(
+                    tag,
+                    key,
+                    MapIdentifier::ClonableInvokeMap,
+                    Rc::clone(&self.action_provider),
+                ))
             } else {
                 Err(CommonErrors::NoSpaceLeft)
             }
@@ -148,7 +151,7 @@ impl ProgramDatabase {
         if ap.is_tag_unique(&tag) {
             if let Some(key) = ap.not_clonable_invokes.insert(TaggedSlotMapEntry { tag, data: None }) {
                 Ok(OrchestrationTagNotClonable::new(
-                    OrchestrationTag::new(tag, key, MapIdentifier::NotClonableInvokeMap, &self.action_provider),
+                    OrchestrationTag::new(tag, key, MapIdentifier::NotClonableInvokeMap, Rc::clone(&self.action_provider)),
                     invoke::Invoke::from_async(action),
                 ))
             } else {
@@ -172,7 +175,12 @@ impl ProgramDatabase {
                 tag,
                 data: invoke::Invoke::from_async_clonable(action),
             }) {
-                Ok(OrchestrationTag::new(tag, key, MapIdentifier::ClonableInvokeMap, &self.action_provider))
+                Ok(OrchestrationTag::new(
+                    tag,
+                    key,
+                    MapIdentifier::ClonableInvokeMap,
+                    Rc::clone(&self.action_provider),
+                ))
             } else {
                 Err(CommonErrors::NoSpaceLeft)
             }
@@ -195,7 +203,12 @@ impl ProgramDatabase {
                 tag,
                 data: invoke::Invoke::from_arc(obj, method),
             }) {
-                Ok(OrchestrationTag::new(tag, key, MapIdentifier::ClonableInvokeMap, &self.action_provider))
+                Ok(OrchestrationTag::new(
+                    tag,
+                    key,
+                    MapIdentifier::ClonableInvokeMap,
+                    Rc::clone(&self.action_provider),
+                ))
             } else {
                 Err(CommonErrors::NoSpaceLeft)
             }
@@ -220,7 +233,7 @@ impl ProgramDatabase {
         if ap.is_tag_unique(&tag) {
             if let Some(key) = ap.not_clonable_invokes.insert(TaggedSlotMapEntry { tag, data: None }) {
                 Ok(OrchestrationTagNotClonable::new(
-                    OrchestrationTag::new(tag, key, MapIdentifier::NotClonableInvokeMap, &self.action_provider),
+                    OrchestrationTag::new(tag, key, MapIdentifier::NotClonableInvokeMap, Rc::clone(&self.action_provider)),
                     invoke::Invoke::from_arc_mtx(obj, method),
                 ))
             } else {
@@ -249,7 +262,12 @@ impl ProgramDatabase {
                 tag,
                 data: invoke::Invoke::from_arc_mtx_clonable(obj, method),
             }) {
-                Ok(OrchestrationTag::new(tag, key, MapIdentifier::ClonableInvokeMap, &self.action_provider))
+                Ok(OrchestrationTag::new(
+                    tag,
+                    key,
+                    MapIdentifier::ClonableInvokeMap,
+                    Rc::clone(&self.action_provider),
+                ))
             } else {
                 Err(CommonErrors::NoSpaceLeft)
             }
@@ -265,7 +283,7 @@ impl ProgramDatabase {
                 entry.tag,
                 key,
                 MapIdentifier::ClonableInvokeMap,
-                &self.action_provider,
+                Rc::clone(&self.action_provider),
             ))
         } else {
             None
@@ -281,7 +299,7 @@ impl ProgramDatabase {
             if let Some(entry) = map.get_mut(key) {
                 if let Some(data) = entry.data.take() {
                     return Some(OrchestrationTagNotClonable::new(
-                        OrchestrationTag::new(entry.tag, key, MapIdentifier::NotClonableInvokeMap, &self.action_provider),
+                        OrchestrationTag::new(entry.tag, key, MapIdentifier::NotClonableInvokeMap, Rc::clone(&self.action_provider)),
                         data,
                     ));
                 }
