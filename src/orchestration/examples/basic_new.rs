@@ -11,6 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+/*
 use std::{thread, time::Duration};
 
 use async_runtime::{runtime::async_runtime::AsyncRuntimeBuilder, scheduler::execution_engine::*};
@@ -51,8 +52,10 @@ fn example_component_design() -> Result<Design, CommonErrors> {
 
     Ok(design)
 }
+*/
 
 fn main() {
+    /*
     // Setup any logging framework you want to use.
     let mut logger = TracingLibraryBuilder::new()
         .global_log_level(Level::INFO)
@@ -94,4 +97,5 @@ fn main() {
     // wait for some time to allow the engine finishes the last action
     thread::sleep(Duration::new(50, 0));
     println!("Exit.");
+    */
 }

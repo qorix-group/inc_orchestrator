@@ -13,7 +13,7 @@
 
 #![allow(dead_code)]
 
-use crate::core::types::{box_future, FutureBox};
+use crate::core::types::{box_future, FutureBox, UniqueWorkerId};
 use crate::scheduler::waker::create_waker;
 
 use std::cell::RefCell;
@@ -24,7 +24,7 @@ use std::task::Context;
 
 use crate::futures::reusable_box_future::ReusableBoxFuture;
 
-use crate::scheduler::{join_handle::JoinHandle, task::async_task::TaskRef, workers::worker_types::UniqueWorkerId};
+use crate::scheduler::{join_handle::JoinHandle, task::async_task::TaskRef};
 use std::collections::VecDeque;
 
 use crate::{testing::*, AsyncTask};
@@ -201,7 +201,7 @@ pub mod safety {
     use crate::{
         core::types::{box_future, FutureBox},
         futures::reusable_box_future::ReusableBoxFuture,
-        scheduler::{join_handle::JoinHandle, workers::worker_types::UniqueWorkerId},
+        scheduler::join_handle::JoinHandle,
     };
 
     use crate::safety::SafetyResult;

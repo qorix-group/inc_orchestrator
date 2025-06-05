@@ -44,14 +44,13 @@
 use core::types::{box_future, FutureBox};
 use std::future::Future;
 
-use foundation::not_recoverable_error;
-use foundation::prelude::*;
+use crate::core::types::UniqueWorkerId;
+use foundation::{not_recoverable_error, prelude::*};
 use futures::reusable_box_future::ReusableBoxFuture;
 use scheduler::{
     context::ctx_get_handler,
     join_handle::JoinHandle,
     task::async_task::{AsyncTask, TaskRef},
-    workers::worker_types::UniqueWorkerId,
 };
 
 pub mod channels;

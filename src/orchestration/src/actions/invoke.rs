@@ -12,7 +12,6 @@
 //
 
 use super::action::{ActionResult, ActionTrait, ClonableActionTrait};
-use crate::common::orch_tag::{OrchestrationTag, OrchestrationTagNotClonable};
 use crate::core::runtime_seq_acc::RuntimeSequentialAccess;
 use async_runtime::core::types::box_future;
 use std::{
@@ -112,14 +111,6 @@ impl Invoke {
             object: Arc::new(RuntimeSequentialAccess::new(obj)),
             method: FnType::Mut(method),
         })
-    }
-
-    pub fn from_tag(tag: &OrchestrationTag) -> Box<dyn ActionTrait> {
-        (*tag.action_provider()).borrow_mut().provide_invoke(*tag.key()).unwrap()
-    }
-
-    pub fn from_tag_not_clonable(tag: OrchestrationTagNotClonable) -> Box<dyn ActionTrait> {
-        tag.into_action()
     }
 }
 

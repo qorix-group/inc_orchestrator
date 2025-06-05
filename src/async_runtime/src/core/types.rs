@@ -54,3 +54,19 @@ impl TaskId {
         (self.0 & 0xFF_u32) as u8
     }
 }
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct UniqueWorkerId(u64);
+
+#[allow(clippy::from_over_into)]
+impl Into<UniqueWorkerId> for &str {
+    fn into(self) -> UniqueWorkerId {
+        // TODO: for now use DJB2 hash
+        let mut hash: u64 = 5381;
+        for byte in self.bytes() {
+            hash = (hash.wrapping_shl(5)).wrapping_add(hash).wrapping_add(byte as u64);
+        }
+
+        UniqueWorkerId(hash)
+    }
+}
