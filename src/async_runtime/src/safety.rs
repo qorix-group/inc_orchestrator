@@ -11,17 +11,15 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use foundation::prelude::*;
-use std::future::Future;
-
-use foundation::not_recoverable_error;
-
 use crate::{
-    core::types::{box_future, FutureBox},
+    core::types::{box_future, FutureBox, UniqueWorkerId},
     ctx_get_handler,
     futures::reusable_box_future::ReusableBoxFuture,
-    scheduler::{context::ctx_get_worker_id, join_handle::JoinHandle, workers::worker_types::UniqueWorkerId},
+    scheduler::{context::ctx_get_worker_id, join_handle::JoinHandle},
 };
+use foundation::not_recoverable_error;
+use foundation::prelude::*;
+use std::future::Future;
 
 pub type SafetyResult<T, E> = Result<T, E>;
 

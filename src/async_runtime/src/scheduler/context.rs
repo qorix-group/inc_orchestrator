@@ -30,9 +30,9 @@ use crate::JoinHandle;
 use super::scheduler_mt::DedicatedScheduler;
 use super::scheduler_mt::DedicatedSchedulerLocal;
 
-use super::workers::worker_types::UniqueWorkerId;
 use super::workers::worker_types::WorkerId;
 use super::{scheduler_mt::AsyncScheduler, task::async_task::TaskRef};
+use crate::core::types::UniqueWorkerId;
 
 enum HandlerImpl {
     Async(AsyncInnerHandler),
