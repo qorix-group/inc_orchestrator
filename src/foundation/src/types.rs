@@ -21,4 +21,5 @@ pub enum CommonErrors {
     Panicked, // panic! was handled
     Timeout,
     NoSpaceLeft,
+    NotFound,
 }

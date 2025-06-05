@@ -196,7 +196,7 @@ impl<T: Send> SpmcStealQueue<T> {
     ///
     /// Created `LocalProducerConsumer` if there is any existing, otherwise None
     ///
-    pub fn get_local(&self) -> Option<LocalProducerConsumer<T>> {
+    pub fn get_local(&self) -> Option<LocalProducerConsumer<'_, T>> {
         // *Synchronization* : SeqCst only to provide strongest guarantee while obtaining producer
         if self
             .has_producer
