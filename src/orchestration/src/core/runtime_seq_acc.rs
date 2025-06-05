@@ -38,7 +38,7 @@ impl<T> RuntimeSequentialAccess<T> {
         self.is_used.load(std::sync::atomic::Ordering::SeqCst)
     }
 
-    pub fn lock(&self) -> RuntimeSequentialAccessGuard<T> {
+    pub fn lock(&self) -> RuntimeSequentialAccessGuard<'_, T> {
         if self
             .is_used
             .compare_exchange(false, true, std::sync::atomic::Ordering::SeqCst, std::sync::atomic::Ordering::SeqCst)

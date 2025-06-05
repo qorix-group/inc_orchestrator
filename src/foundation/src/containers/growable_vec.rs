@@ -32,6 +32,12 @@ pub struct GrowableVec<T> {
     is_locked: bool,
 }
 
+impl<T> Default for GrowableVec<T> {
+    fn default() -> Self {
+        Self::new(1)
+    }
+}
+
 impl<T> GrowableVec<T> {
     pub fn new(init_size: usize) -> Self {
         assert_eq!(Layout::new::<T>(), Layout::new::<MaybeUninit<T>>());

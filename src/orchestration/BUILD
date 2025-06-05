@@ -52,7 +52,18 @@ rust_binary(
     name = "basic",
     srcs = [
         "examples/basic.rs",
+    ] + glob(["examples/common/**/*.rs"]),
+    visibility = ["//visibility:public"],
+    deps = _COMMON_DEPS + [
+        ":liborchestration",
     ],
+)
+
+rust_binary(
+    name = "basic_new",
+    srcs = [
+        "examples/basic_new.rs",
+    ] + glob(["examples/common/**/*.rs"]),
     visibility = ["//visibility:public"],
     deps = _COMMON_DEPS + [
         ":liborchestration",

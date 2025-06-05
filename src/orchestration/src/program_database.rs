@@ -14,6 +14,7 @@
 use crate::actions::*;
 use crate::common::orch_tag::{MapIdentifier, OrchestrationTag, OrchestrationTagNotClonable};
 use crate::common::tag::Tag;
+use crate::common::DesignConfig;
 use crate::prelude::ActionTrait;
 use foundation::{not_recoverable_error, prelude::*};
 use iceoryx2_bb_container::slotmap::{SlotMap, SlotMapKey};
@@ -87,32 +88,18 @@ impl Debug for ActionProvider {
     }
 }
 
-#[derive(Clone, Copy)]
-pub struct ProgramDatabaseParams {
-    pub clonable_invokes_capacity: usize,
-    pub not_clonable_invokes_capacity: usize,
-}
-
-impl Default for ProgramDatabaseParams {
-    fn default() -> Self {
-        Self {
-            clonable_invokes_capacity: 256,
-            not_clonable_invokes_capacity: 256,
-        }
-    }
-}
-
 pub struct ProgramDatabase {
     action_provider: Rc<RefCell<ActionProvider>>,
 }
 
 impl ProgramDatabase {
     /// Creates a new instance of `ProgramDatabase`.
-    pub fn new(params: ProgramDatabaseParams) -> Self {
+    pub fn new(params: DesignConfig) -> Self {
+        // TODO: Provider needs to keep DesignConfig probably so tags can have info from it
         Self {
             action_provider: Rc::new(RefCell::new(ActionProvider::new(
-                params.clonable_invokes_capacity,
-                params.not_clonable_invokes_capacity,
+                params.db_params.clonable_invokes_capacity,
+                params.db_params.not_clonable_invokes_capacity,
             ))),
         }
     }
@@ -312,7 +299,7 @@ impl ProgramDatabase {
 
 impl Default for ProgramDatabase {
     fn default() -> Self {
-        Self::new(ProgramDatabaseParams::default())
+        Self::new(DesignConfig::default())
     }
 }
 

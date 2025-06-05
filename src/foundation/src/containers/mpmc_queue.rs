@@ -99,7 +99,7 @@ impl<T: Send> MpmcQueue<T> {
     /// for copying out the items behind the pointer while holding the lock. If you do not copy
     /// the items out, you are most likely leaking resources.
     ///
-    pub fn iter(&self) -> QueuePtrIterator<T> {
+    pub fn iter(&self) -> QueuePtrIterator<'_, T> {
         QueuePtrIterator { guard: self.lock() }
     }
 }

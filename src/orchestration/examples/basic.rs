@@ -10,10 +10,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
-
+#![allow(dead_code)]
 use std::{thread, time::Duration};
 
-use async_runtime::{core::types::box_future, futures::yield_now, runtime::async_runtime::AsyncRuntimeBuilder, scheduler::execution_engine::*};
+use async_runtime::{core::types::box_future, runtime::async_runtime::AsyncRuntimeBuilder, scheduler::execution_engine::*};
 use foundation::prelude::*;
 use logging_tracing::{TraceScope, TracingLibraryBuilder};
 use orchestration::{
@@ -22,6 +22,9 @@ use orchestration::{
     program::ProgramBuilder,
 };
 use std::cell::RefCell;
+
+mod common;
+use common::*;
 
 pub struct SomeAction {}
 
@@ -63,70 +66,6 @@ async fn testasync() -> ActionResult {
     Ok(())
 }
 
-/// emulate some sleep as workaround until sleep is supported in runtime
-fn busy_sleep() -> ActionResult {
-    info!("Start sleeping");
-    let mut ctr = 1000000;
-    while ctr > 0 {
-        ctr -= 1;
-    }
-    info!("End sleeping");
-    Ok(())
-}
-
-async fn wait_ends() -> ActionResult {
-    info!("Test_Event_1 triggered");
-    Ok(())
-}
-
-async fn wait_ends2() -> ActionResult {
-    info!("Test_Event_2 triggered");
-    Ok(())
-}
-
-async fn wait_ends3() -> ActionResult {
-    info!("Test_Event_3 triggered");
-    Ok(())
-}
-
-async fn test1_func() -> ActionResult {
-    info!("Start of 'test1' function.");
-    info!("'test1' function yielding....");
-    // yield for other tasks to run.
-    yield_now::yield_now().await;
-    info!("'test1' function resuming....");
-    let rv = busy_sleep();
-    info!("End of 'test1' function.");
-    return rv;
-}
-
-async fn test2_func() -> ActionResult {
-    info!("Start of 'test2' function.");
-    let rv = busy_sleep();
-    info!("End of 'test2' function.");
-    return rv;
-}
-
-async fn test3_func() -> ActionResult {
-    info!("Start of 'test3' function.");
-    info!("'test3' function yielding....");
-    // yield for other tasks to run.
-    yield_now::yield_now().await;
-    info!("'test3' function resuming....");
-    let rv = busy_sleep();
-    info!("End of 'test3' function.");
-    return rv;
-}
-
-async fn test4_func() -> ActionResult {
-    info!("Start of 'test4' function.");
-    let rv = busy_sleep();
-    info!("End of 'test4' function.");
-    return rv;
-}
-
-pub struct X1 {}
-
 // playground for testing
 fn main() {
     let mut logger = TracingLibraryBuilder::new()
@@ -160,8 +99,8 @@ fn main() {
                         Concurrency::new_with_id(NamedId::new_static("concurrency1 in sequence1"))
                             .with_branch(Invoke::from_async(test1_func))
                             .with_branch(Invoke::from_async(test2_func))
-                            .with_branch(Invoke::from_async(test3_func))
-                            .with_branch(Invoke::from_async(test4_func)),
+                            .with_branch(Invoke::from_async(test1_func))
+                            .with_branch(Invoke::from_async(test1_func)),
                     )
                     .with_step(
                         Concurrency::new_with_id(NamedId::new_static("some_tracking_string"))

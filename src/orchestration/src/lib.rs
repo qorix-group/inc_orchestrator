@@ -12,6 +12,7 @@
 //
 
 pub mod actions;
+pub mod api;
 pub mod common;
 pub mod core;
 pub mod prelude;
