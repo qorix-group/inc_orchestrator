@@ -12,7 +12,6 @@
 //
 
 use super::tag::Tag;
-use crate::actions::action::ActionTrait;
 use crate::program_database::ActionProvider;
 use iceoryx2_bb_container::slotmap::SlotMapKey;
 use std::cell::RefCell;
@@ -81,36 +80,15 @@ impl OrchestrationTag {
     }
 }
 
-pub struct OrchestrationTagNotClonable(OrchestrationTag, Option<Box<dyn ActionTrait>>);
-
-impl OrchestrationTagNotClonable {
-    pub(crate) fn new(orch_tag: OrchestrationTag, action: Box<dyn ActionTrait>) -> Self {
-        Self(orch_tag, Some(action))
-    }
-
-    pub(crate) fn into_action(mut self) -> Box<dyn ActionTrait> {
-        self.1.take().unwrap()
-    }
-}
-
-impl Drop for OrchestrationTagNotClonable {
-    fn drop(&mut self) {
-        if let Some(action) = self.1.take() {
-            self.0.action_provider.borrow_mut().return_not_clonable_data(self.0.clone(), action);
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use iceoryx2_bb_container::slotmap::SlotMapKey;
     use std::cell::RefCell;
-    use std::rc::Rc;
 
     #[test]
     fn orchestration_tag_creation() {
-        let ap = Rc::new(RefCell::new(ActionProvider::new(4, 4)));
+        let ap = Rc::new(RefCell::new(ActionProvider::new(4)));
         let tag = OrchestrationTag::new(
             Tag::from_str_static("test_tag"),
             SlotMapKey::new(1),
