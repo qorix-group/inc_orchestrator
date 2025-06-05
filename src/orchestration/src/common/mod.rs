@@ -17,14 +17,12 @@ pub mod tag;
 #[derive(Clone, Debug, Copy, PartialEq)]
 pub struct ProgramDatabaseParams {
     pub clonable_invokes_capacity: usize,
-    pub not_clonable_invokes_capacity: usize,
 }
 
 impl Default for ProgramDatabaseParams {
     fn default() -> Self {
         Self {
             clonable_invokes_capacity: 256,
-            not_clonable_invokes_capacity: 256,
         }
     }
 }

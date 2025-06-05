@@ -16,7 +16,7 @@ use std::ops::Deref;
 use foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
 
 use crate::{
-    actions::invoke,
+    actions::internal::invoke,
     common::{orch_tag::OrchestrationTag, tag::Tag, DesignConfig},
     program::Program,
     program_database::ProgramDatabase,
@@ -62,7 +62,7 @@ impl Design {
         self.id
     }
 
-    pub fn register_invoke_fn(&self, tag: Tag, action: invoke::FunctionType) -> Result<OrchestrationTag, CommonErrors> {
+    pub fn register_invoke_fn(&self, tag: Tag, action: invoke::InvokeFunctionType) -> Result<OrchestrationTag, CommonErrors> {
         self.db.register_invoke_fn(tag, action)
     }
 
@@ -105,6 +105,8 @@ impl ProgramData {
 #[cfg(test)]
 mod tests {
 
+    use crate::actions::internal::action::UserErrValue;
+
     use super::*;
 
     #[test]
@@ -118,7 +120,7 @@ mod tests {
         assert_eq!(*design.get_config(), params);
     }
 
-    fn action() -> Result<(), CommonErrors> {
+    fn action() -> Result<(), UserErrValue> {
         Ok(())
     }
 

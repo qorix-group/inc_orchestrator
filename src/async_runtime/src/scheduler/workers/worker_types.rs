@@ -11,13 +11,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::ops::Deref;
-use std::sync::{atomic::Ordering, Arc};
-
+use crate::core::types::UniqueWorkerId;
+use crate::scheduler::task::async_task::TaskRef;
 use foundation::containers::spmc_queue::*;
 use foundation::prelude::*;
-
-use crate::scheduler::task::async_task::TaskRef;
+use std::ops::Deref;
+use std::sync::{atomic::Ordering, Arc};
 
 pub type TaskStealQueue = Arc<SpmcStealQueue<TaskRef>>;
 pub type StealHandle = TaskStealQueue;
@@ -30,22 +29,6 @@ pub(super) const WORKER_STATE_SLEEPING_CV: u8 = 0b00000000;
 pub(super) const WORKER_STATE_NOTIFIED: u8 = 0b00000001; // Was asked to wake-up
 pub(super) const WORKER_STATE_EXECUTING: u8 = 0b00000011;
 pub(super) const WORKER_STATE_SHUTTINGDOWN: u8 = 0b00000100;
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct UniqueWorkerId(u64);
-
-#[allow(clippy::from_over_into)]
-impl Into<UniqueWorkerId> for &str {
-    fn into(self) -> UniqueWorkerId {
-        // TODO: for now use DJB2 hash
-        let mut hash: u64 = 5381;
-        for byte in self.bytes() {
-            hash = (hash.wrapping_shl(5)).wrapping_add(hash).wrapping_add(byte as u64);
-        }
-
-        UniqueWorkerId(hash)
-    }
-}
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct WorkerId {

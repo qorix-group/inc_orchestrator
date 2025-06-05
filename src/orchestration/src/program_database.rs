@@ -11,74 +11,52 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use crate::actions::*;
-use crate::common::orch_tag::{MapIdentifier, OrchestrationTag, OrchestrationTagNotClonable};
+use crate::actions::internal::{
+    action::ActionTrait,
+    invoke::{Invoke, InvokeFunctionType, InvokeResult},
+};
+use crate::common::orch_tag::{MapIdentifier, OrchestrationTag};
 use crate::common::tag::Tag;
 use crate::common::DesignConfig;
-use crate::prelude::ActionTrait;
-use foundation::{not_recoverable_error, prelude::*};
+use async_runtime::core::types::UniqueWorkerId;
+use foundation::prelude::*;
 use iceoryx2_bb_container::slotmap::{SlotMap, SlotMapKey};
-use std::rc::Rc;
 use std::{
     boxed::Box,
     cell::RefCell,
     fmt::Debug,
     future::Future,
+    rc::Rc,
     sync::{Arc, Mutex},
 };
 
-struct TaggedSlotMapEntry<D> {
+struct ActionData {
     tag: Tag,
-    data: D,
+    worker_id: Option<UniqueWorkerId>,
+    generator: Box<dyn Fn(Tag, Option<UniqueWorkerId>) -> Box<dyn ActionTrait>>,
 }
 
 pub(crate) struct ActionProvider {
-    clonable_invokes: SlotMap<TaggedSlotMapEntry<Box<dyn action::ClonableActionTrait>>>,
-    // This map holds an option, because there's currently no API in the SlotMap to move a value out of the map.
-    not_clonable_invokes: SlotMap<TaggedSlotMapEntry<Option<Box<dyn action::ActionTrait>>>>,
+    clonable_invokes: SlotMap<ActionData>,
 }
 
 impl ActionProvider {
-    pub(crate) fn new(clonable_invokes_capacity: usize, not_clonable_invokes_capacity: usize) -> Self {
+    pub(crate) fn new(clonable_invokes_capacity: usize) -> Self {
         Self {
             clonable_invokes: SlotMap::new(clonable_invokes_capacity),
-            not_clonable_invokes: SlotMap::new(not_clonable_invokes_capacity),
         }
     }
 
-    pub(crate) fn return_not_clonable_data(&mut self, orch_tag: OrchestrationTag, returned_action: Box<dyn ActionTrait>) {
-        match orch_tag.map_identifier() {
-            MapIdentifier::NotClonableInvokeMap => {
-                if !self.not_clonable_invokes.insert_at(
-                    *orch_tag.key(),
-                    TaggedSlotMapEntry {
-                        tag: *orch_tag.tag(),
-                        data: Some(returned_action),
-                    },
-                ) {
-                    not_recoverable_error!("Failed to return a not clonable invoke action from an OrchestrationTagNotClonable.");
-                }
-            }
-            _ => not_recoverable_error!("Tried to drop an OrchestrationTagNotClonable with an unsupported map_identifier."),
-        };
-    }
-
-    pub(crate) fn provide_invoke(&mut self, key: SlotMapKey) -> Option<Box<dyn action::ActionTrait>> {
-        if let Some(entry) = self.clonable_invokes.get(key) {
-            Some(entry.data.clone_boxed().into_boxed_action())
-        } else if let Some(optional_entry) = self.not_clonable_invokes.get_mut(key) {
-            optional_entry.data.take()
+    pub(crate) fn provide_invoke(&mut self, key: SlotMapKey) -> Option<Box<dyn ActionTrait>> {
+        if let Some(data) = self.clonable_invokes.get(key) {
+            Some((data.generator)(data.tag, data.worker_id))
         } else {
             None
         }
     }
 
     fn is_tag_unique(&self, tag: &Tag) -> bool {
-        fn is_tag_in_map<T>(map: &SlotMap<TaggedSlotMapEntry<T>>, tag: &Tag) -> bool {
-            map.iter().any(|(_, entry)| entry.tag == *tag)
-        }
-
-        !(is_tag_in_map(&self.clonable_invokes, tag) || is_tag_in_map(&self.not_clonable_invokes, tag))
+        !self.clonable_invokes.iter().any(|(_, data)| data.tag == *tag)
     }
 }
 
@@ -97,49 +75,25 @@ impl ProgramDatabase {
     pub fn new(params: DesignConfig) -> Self {
         // TODO: Provider needs to keep DesignConfig probably so tags can have info from it
         Self {
-            action_provider: Rc::new(RefCell::new(ActionProvider::new(
-                params.db_params.clonable_invokes_capacity,
-                params.db_params.not_clonable_invokes_capacity,
-            ))),
+            action_provider: Rc::new(RefCell::new(ActionProvider::new(params.db_params.clonable_invokes_capacity))),
         }
     }
 
     /// Registers a function as an invoke action that can be created multiple times.
-    pub fn register_invoke_fn(&self, tag: Tag, action: invoke::FunctionType) -> Result<OrchestrationTag, CommonErrors> {
+    pub fn register_invoke_fn(&self, tag: Tag, action: InvokeFunctionType) -> Result<OrchestrationTag, CommonErrors> {
         let mut ap = self.action_provider.borrow_mut();
 
         if ap.is_tag_unique(&tag) {
-            if let Some(key) = ap.clonable_invokes.insert(TaggedSlotMapEntry {
+            if let Some(key) = ap.clonable_invokes.insert(ActionData {
                 tag,
-                data: invoke::Invoke::from_fn(action),
+                worker_id: None,
+                generator: Box::new(move |tag: Tag, worker_id: Option<UniqueWorkerId>| Invoke::from_fn(tag, action, worker_id)),
             }) {
                 Ok(OrchestrationTag::new(
                     tag,
                     key,
                     MapIdentifier::ClonableInvokeMap,
                     Rc::clone(&self.action_provider),
-                ))
-            } else {
-                Err(CommonErrors::NoSpaceLeft)
-            }
-        } else {
-            Err(CommonErrors::AlreadyDone)
-        }
-    }
-
-    /// Registers an async function as an invoke action that only be created once.
-    pub fn register_invoke_async<A, F>(&self, tag: Tag, action: A) -> Result<OrchestrationTagNotClonable, CommonErrors>
-    where
-        A: FnMut() -> F + 'static + Send,
-        F: Future<Output = action::ActionResult> + 'static + Send,
-    {
-        let mut ap = self.action_provider.borrow_mut();
-
-        if ap.is_tag_unique(&tag) {
-            if let Some(key) = ap.not_clonable_invokes.insert(TaggedSlotMapEntry { tag, data: None }) {
-                Ok(OrchestrationTagNotClonable::new(
-                    OrchestrationTag::new(tag, key, MapIdentifier::NotClonableInvokeMap, Rc::clone(&self.action_provider)),
-                    invoke::Invoke::from_async(action),
                 ))
             } else {
                 Err(CommonErrors::NoSpaceLeft)
@@ -150,17 +104,18 @@ impl ProgramDatabase {
     }
 
     /// Registers an async function as an invoke action that can be created multiple times.
-    pub fn register_invoke_async_clonable<A, F>(&self, tag: Tag, action: A) -> Result<OrchestrationTag, CommonErrors>
+    pub fn register_invoke_async<A, F>(&self, tag: Tag, action: A) -> Result<OrchestrationTag, CommonErrors>
     where
-        A: FnMut() -> F + 'static + Send + Clone,
-        F: Future<Output = action::ActionResult> + 'static + Send + Clone,
+        A: Fn() -> F + 'static + Send + Clone,
+        F: Future<Output = InvokeResult> + 'static + Send,
     {
         let mut ap = self.action_provider.borrow_mut();
 
         if ap.is_tag_unique(&tag) {
-            if let Some(key) = ap.clonable_invokes.insert(TaggedSlotMapEntry {
+            if let Some(key) = ap.clonable_invokes.insert(ActionData {
                 tag,
-                data: invoke::Invoke::from_async_clonable(action),
+                worker_id: None,
+                generator: Box::new(move |tag: Tag, worker_id: Option<UniqueWorkerId>| Invoke::from_async(tag, action.clone(), worker_id)),
             }) {
                 Ok(OrchestrationTag::new(
                     tag,
@@ -176,19 +131,22 @@ impl ProgramDatabase {
         }
     }
 
-    /// Registers a method on an object as an invoke action that can only be created once.
+    /// Registers a method on an object as an invoke action.
     pub fn register_invoke_method<T: 'static + Send>(
         &self,
         tag: Tag,
-        obj: Arc<Mutex<T>>,
-        method: fn(&mut T) -> action::ActionResult,
+        object: Arc<Mutex<T>>,
+        method: fn(&mut T) -> InvokeResult,
     ) -> Result<OrchestrationTag, CommonErrors> {
         let mut ap = self.action_provider.borrow_mut();
 
         if ap.is_tag_unique(&tag) {
-            if let Some(key) = ap.clonable_invokes.insert(TaggedSlotMapEntry {
+            if let Some(key) = ap.clonable_invokes.insert(ActionData {
                 tag,
-                data: invoke::Invoke::from_arc(obj, method),
+                worker_id: None,
+                generator: Box::new(move |tag: Tag, worker_id: Option<UniqueWorkerId>| {
+                    Invoke::from_method(tag, Arc::clone(&object), method, worker_id)
+                }),
             }) {
                 Ok(OrchestrationTag::new(
                     tag,
@@ -204,50 +162,22 @@ impl ProgramDatabase {
         }
     }
 
-    /// Registers a method on a shared object as an invoke action that can only be created once.
-    pub fn register_invoke_method_async<T: 'static + Send, F, Fut>(
-        &self,
-        tag: Tag,
-        obj: Arc<Mutex<T>>,
-        method: F,
-    ) -> Result<OrchestrationTagNotClonable, CommonErrors>
+    /// Registers an async method on an object as an invoke action.
+    pub fn register_invoke_method_async<T, M, F>(&self, tag: Tag, object: Arc<Mutex<T>>, method: M) -> Result<OrchestrationTag, CommonErrors>
     where
-        F: FnMut(Arc<Mutex<T>>) -> Fut + 'static + Send,
-        Fut: Future<Output = action::ActionResult> + 'static + Send,
+        T: 'static + Send,
+        M: Fn(Arc<Mutex<T>>) -> F + 'static + Send + Clone,
+        F: Future<Output = InvokeResult> + 'static + Send,
     {
         let mut ap = self.action_provider.borrow_mut();
 
         if ap.is_tag_unique(&tag) {
-            if let Some(key) = ap.not_clonable_invokes.insert(TaggedSlotMapEntry { tag, data: None }) {
-                Ok(OrchestrationTagNotClonable::new(
-                    OrchestrationTag::new(tag, key, MapIdentifier::NotClonableInvokeMap, Rc::clone(&self.action_provider)),
-                    invoke::Invoke::from_arc_mtx(obj, method),
-                ))
-            } else {
-                Err(CommonErrors::NoSpaceLeft)
-            }
-        } else {
-            Err(CommonErrors::AlreadyDone)
-        }
-    }
-
-    /// Registers a method on a shared object as an invoke action that can only be created once.
-    pub fn register_invoke_method_async_clonable<T: 'static + Send, F, Fut>(
-        &self,
-        tag: Tag,
-        obj: Arc<Mutex<T>>,
-        method: F,
-    ) -> Result<OrchestrationTag, CommonErrors>
-    where
-        F: FnMut(Arc<Mutex<T>>) -> Fut + 'static + Send + Clone,
-        Fut: Future<Output = action::ActionResult> + 'static + Send + Clone,
-    {
-        let mut ap = self.action_provider.borrow_mut();
-
-        if ap.is_tag_unique(&tag) {
-            if let Some(key) = ap.clonable_invokes.insert(TaggedSlotMapEntry {
+            if let Some(key) = ap.clonable_invokes.insert(ActionData {
                 tag,
-                data: invoke::Invoke::from_arc_mtx_clonable(obj, method),
+                worker_id: None,
+                generator: Box::new(move |tag: Tag, worker_id: Option<UniqueWorkerId>| {
+                    Invoke::from_method_async(tag, Arc::clone(&object), method.clone(), worker_id)
+                }),
             }) {
                 Ok(OrchestrationTag::new(
                     tag,
@@ -261,6 +191,27 @@ impl ProgramDatabase {
         } else {
             Err(CommonErrors::AlreadyDone)
         }
+    }
+
+    /// Associates an invoke action with a tag with the given worker id.
+    pub fn set_invoke_worker_id(&mut self, tag: Tag, worker_id: UniqueWorkerId) -> Result<(), CommonErrors> {
+        let ap = &mut self.action_provider.borrow_mut();
+        let map = &mut ap.clonable_invokes;
+
+        if let Some((key, _)) = map.iter().find(|(_, data)| data.tag == tag) {
+            // A mutable borrow is needed to take the data out of the entry, but iter_mut is not implemented for SlotMap.
+            if let Some(data) = map.get_mut(key) {
+                if data.worker_id.is_some() {
+                    return Err(CommonErrors::AlreadyDone);
+                }
+
+                data.worker_id = Some(worker_id);
+
+                return Ok(());
+            }
+        }
+
+        Err(CommonErrors::NoData)
     }
 
     /// Returns an `OrchestrationTag` for an action previously registered with the given tag.
@@ -276,25 +227,6 @@ impl ProgramDatabase {
             None
         }
     }
-
-    /// Returns an `OrchestrationTagNotClonable` for an action previously registered with the given tag if the tag was not already used.
-    pub fn get_orchestration_tag_not_clonable(&self, tag: Tag) -> Option<OrchestrationTagNotClonable> {
-        let map = &mut self.action_provider.borrow_mut().not_clonable_invokes;
-
-        if let Some((key, _)) = map.iter().find(|(_, entry)| entry.tag == tag) {
-            // A mutable borrow is needed to take the data out of the entry, but iter_mut is not implemented for SlotMap.
-            if let Some(entry) = map.get_mut(key) {
-                if let Some(data) = entry.data.take() {
-                    return Some(OrchestrationTagNotClonable::new(
-                        OrchestrationTag::new(entry.tag, key, MapIdentifier::NotClonableInvokeMap, Rc::clone(&self.action_provider)),
-                        data,
-                    ));
-                }
-            }
-        }
-
-        None
-    }
 }
 
 impl Default for ProgramDatabase {
@@ -304,175 +236,249 @@ impl Default for ProgramDatabase {
 }
 
 #[cfg(test)]
+#[cfg(not(loom))]
 mod tests {
-    use super::action::ActionResult;
     use super::*;
-    use foundation::prelude::CommonErrors;
-    use std::task;
+    use crate::{actions::internal::action::ActionExecError, testing::OrchTestingPoller};
+    use std::task::Poll;
+    use testing_macros::ensure_clear_mock_runtime;
 
     #[test]
-    fn create_invoke_fn_action() {
+    fn test_register_invoke_fn() {
         let pd = ProgramDatabase::default();
 
-        fn test_invoke() -> ActionResult {
-            Err(CommonErrors::GenericError)
+        fn test1() -> InvokeResult {
+            Err(0xcafe_u64.into())
         }
 
-        let tag = pd.register_invoke_fn(Tag::from_str_static("tag1"), test_invoke).unwrap();
-        let mut invoke = invoke::Invoke::from_tag(&tag);
-        let mut future = invoke.execute();
-        let mut context = task::Context::from_waker(task::Waker::noop());
-
-        assert_eq!(future.as_mut().poll(&mut context), task::Poll::Ready(Err(CommonErrors::GenericError)));
-    }
-
-    #[test]
-    fn create_invoke_fn_action_after_get() {
-        let pd = ProgramDatabase::default();
-
-        fn test_invoke() -> ActionResult {
-            Err(CommonErrors::GenericError)
+        fn test2() -> InvokeResult {
+            Err(0xbeef_u64.into())
         }
 
-        let tag = Tag::from_str_static("tag1");
-        assert!(pd.register_invoke_fn(tag, test_invoke).is_ok());
-        let orch_tag = pd.get_orchestration_tag(tag).unwrap();
+        let tag = pd.register_invoke_fn("tag1".into(), test1).unwrap();
+        assert!(pd.register_invoke_fn("tag1".into(), test1).is_err());
+        assert!(pd.register_invoke_fn("tag2".into(), test2).is_ok());
 
-        let mut invoke = invoke::Invoke::from_tag(&orch_tag);
-        let mut future = invoke.execute();
-        let mut context = task::Context::from_waker(task::Waker::noop());
+        let mut invoke = Invoke::from_tag(&tag);
+        let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
+        assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xcafe_u64.into()))));
 
-        assert_eq!(future.as_mut().poll(&mut context), task::Poll::Ready(Err(CommonErrors::GenericError)));
+        let tag = pd.get_orchestration_tag("tag2".into()).unwrap();
+        let mut invoke = Invoke::from_tag(&tag);
+        let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
+        assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xbeef_u64.into()))));
     }
 
     #[test]
-    fn try_to_register_the_same_tag_twice() {
+    fn test_register_invoke_async() {
         let pd = ProgramDatabase::default();
 
-        fn test_invoke() -> ActionResult {
-            Err(CommonErrors::GenericError)
+        async fn test1() -> InvokeResult {
+            Err(0xcafe_u64.into())
         }
 
-        let tag = Tag::from_str_static("tag1");
-
-        let orch_tag = pd.register_invoke_fn(tag, test_invoke).unwrap();
-        let mut invoke = invoke::Invoke::from_tag(&orch_tag);
-        let mut future = invoke.execute();
-        let mut context = task::Context::from_waker(task::Waker::noop());
-
-        assert_eq!(future.as_mut().poll(&mut context), task::Poll::Ready(Err(CommonErrors::GenericError)));
-        assert_eq!(pd.register_invoke_fn(tag, test_invoke).err(), Some(CommonErrors::AlreadyDone));
-    }
-
-    #[test]
-    fn create_multiple_invoke_fn_actions() {
-        let pd = ProgramDatabase::default();
-
-        fn test_invoke1() -> ActionResult {
-            Err(CommonErrors::GenericError)
+        async fn test2() -> InvokeResult {
+            Err(0xbeef_u64.into())
         }
 
-        let tag1 = pd.register_invoke_fn(Tag::from_str_static("tag1"), test_invoke1).unwrap();
+        let tag = pd.register_invoke_async("tag1".into(), test1).unwrap();
+        assert!(pd.register_invoke_async("tag1".into(), test1).is_err());
+        assert!(pd.register_invoke_async("tag2".into(), test2).is_ok());
 
-        let mut invoke = invoke::Invoke::from_tag(&tag1);
-        let mut future = invoke.execute();
-        let mut context = task::Context::from_waker(task::Waker::noop());
-        assert_eq!(future.as_mut().poll(&mut context), task::Poll::Ready(Err(CommonErrors::GenericError)));
+        let mut invoke = Invoke::from_tag(&tag);
+        let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
+        assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xcafe_u64.into()))));
 
-        let mut invoke = invoke::Invoke::from_tag(&tag1);
-        let mut future = invoke.execute();
-        let mut context = task::Context::from_waker(task::Waker::noop());
-        assert_eq!(future.as_mut().poll(&mut context), task::Poll::Ready(Err(CommonErrors::GenericError)));
+        let tag = pd.get_orchestration_tag("tag2".into()).unwrap();
+        let mut invoke = Invoke::from_tag(&tag);
+        let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
+        assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xbeef_u64.into()))));
     }
 
     #[test]
-    fn create_different_invoke_fn_actions() {
+    fn test_register_invoke_method() {
         let pd = ProgramDatabase::default();
 
-        fn test_invoke1() -> ActionResult {
-            Err(CommonErrors::GenericError)
+        struct Test1 {}
+
+        impl Test1 {
+            fn test1(&mut self) -> InvokeResult {
+                Err(0xcafe_u64.into())
+            }
         }
 
-        fn test_invoke2() -> ActionResult {
-            Err(CommonErrors::Timeout)
+        struct Test2 {}
+
+        impl Test2 {
+            fn test2(&mut self) -> InvokeResult {
+                Err(0xbeef_u64.into())
+            }
         }
 
-        let tag1 = pd.register_invoke_fn(Tag::from_str_static("tag1"), test_invoke1).unwrap();
-        let tag2 = pd.register_invoke_fn(Tag::from_str_static("tag2"), test_invoke2).unwrap();
+        let obj1 = Arc::new(Mutex::new(Test1 {}));
+        let obj2 = Arc::new(Mutex::new(Test2 {}));
 
-        let mut invoke = invoke::Invoke::from_tag(&tag1);
-        let mut future = invoke.execute();
-        let mut context = task::Context::from_waker(task::Waker::noop());
-        assert_eq!(future.as_mut().poll(&mut context), task::Poll::Ready(Err(CommonErrors::GenericError)));
+        let tag = pd.register_invoke_method("tag1".into(), Arc::clone(&obj1), Test1::test1).unwrap();
+        assert!(pd.register_invoke_method("tag1".into(), Arc::clone(&obj1), Test1::test1).is_err());
+        assert!(pd.register_invoke_method("tag2".into(), Arc::clone(&obj2), Test2::test2).is_ok());
 
-        let mut invoke = invoke::Invoke::from_tag(&tag2);
-        let mut future = invoke.execute();
-        let mut context = task::Context::from_waker(task::Waker::noop());
-        assert_eq!(future.as_mut().poll(&mut context), task::Poll::Ready(Err(CommonErrors::Timeout)));
+        let mut invoke = Invoke::from_tag(&tag);
+        let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
+        assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xcafe_u64.into()))));
+
+        let tag = pd.get_orchestration_tag("tag2".into()).unwrap();
+        let mut invoke = Invoke::from_tag(&tag);
+        let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
+        assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xbeef_u64.into()))));
     }
 
     #[test]
-    fn multiple_provide_for_invoke_async_action() {
+    fn test_register_invoke_method_async() {
         let pd = ProgramDatabase::default();
-        let t = Tag::from_str_static("tag1");
 
-        let ot = pd.register_invoke_async(t, async || Err(CommonErrors::GenericError)).unwrap();
+        struct Test1 {}
 
-        assert!(pd.get_orchestration_tag(t).is_none());
-        assert!(pd.get_orchestration_tag_not_clonable(t).is_none());
+        async fn test1(object: Arc<Mutex<Test1>>) -> InvokeResult {
+            let _guard = object.lock().unwrap();
+            Err(0xcafe_u64.into())
+        }
 
-        let mut invoke = invoke::Invoke::from_tag_not_clonable(ot);
-        let mut f = invoke.execute();
-        let mut c = task::Context::from_waker(task::Waker::noop());
+        struct Test2 {}
 
-        assert_eq!(f.as_mut().poll(&mut c), task::Poll::Ready(Err(CommonErrors::GenericError)));
+        async fn test2(object: Arc<Mutex<Test2>>) -> InvokeResult {
+            let _guard = object.lock().unwrap();
+            Err(0xbeef_u64.into())
+        }
+
+        let obj1 = Arc::new(Mutex::new(Test1 {}));
+        let obj2 = Arc::new(Mutex::new(Test2 {}));
+
+        let tag = pd.register_invoke_method_async("tag1".into(), Arc::clone(&obj1), test1).unwrap();
+        assert!(pd.register_invoke_method_async("tag1".into(), Arc::clone(&obj1), test1).is_err());
+        assert!(pd.register_invoke_method_async("tag2".into(), Arc::clone(&obj2), test2).is_ok());
+
+        let mut invoke = Invoke::from_tag(&tag);
+        let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
+        assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xcafe_u64.into()))));
+
+        let tag = pd.get_orchestration_tag("tag2".into()).unwrap();
+        let mut invoke = Invoke::from_tag(&tag);
+        let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
+        assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xbeef_u64.into()))));
     }
 
     #[test]
-    fn not_clonable_orchestration_tag_returns_action_on_drop() {
-        let pd = ProgramDatabase::default();
-        let t = Tag::from_str_static("tag1");
+    #[ensure_clear_mock_runtime]
+    fn test_invoke_fn_with_worker_id() {
+        let mut pd = ProgramDatabase::default();
 
-        let ot = pd.register_invoke_async(t, async || Err(CommonErrors::GenericError)).unwrap();
-        assert!(pd.get_orchestration_tag(t).is_none());
-        assert!(pd.get_orchestration_tag_not_clonable(t).is_none());
-        drop(ot);
+        fn test1() -> InvokeResult {
+            Err(0xcafe_u64.into())
+        }
 
-        let ot = pd.get_orchestration_tag_not_clonable(t).unwrap();
-        assert!(pd.get_orchestration_tag(t).is_none());
-        assert!(pd.get_orchestration_tag_not_clonable(t).is_none());
+        let tag = pd.register_invoke_fn("tag1".into(), test1).unwrap();
+        assert_eq!(pd.set_invoke_worker_id("tag1".into(), "worker_id".into()), Ok(()));
+        let mut invoke = Invoke::from_tag(&tag);
+        let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
 
-        let mut invoke = invoke::Invoke::from_tag_not_clonable(ot);
-        let mut f = invoke.execute();
-        let mut c = task::Context::from_waker(task::Waker::noop());
-
-        assert_eq!(f.as_mut().poll(&mut c), task::Poll::Ready(Err(CommonErrors::GenericError)));
+        // Wait for invoke to schedule the action.
+        let _ = poller.poll();
+        // Run the action.
+        let _ = async_runtime::testing::mock::runtime_instance(|runtime| {
+            assert!(runtime.remaining_tasks() > 0);
+            runtime.advance_tasks();
+            assert_eq!(runtime.remaining_tasks(), 0);
+        });
+        // Check the result.
+        assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xcafe_u64.into()))));
     }
 
     #[test]
-    fn create_multiple_invoke_method_actions() {
-        let pd = ProgramDatabase::default();
+    #[ensure_clear_mock_runtime]
+    fn test_invoke_async_with_worker_id() {
+        let mut pd = ProgramDatabase::default();
 
-        struct TestObject {}
+        async fn test1() -> InvokeResult {
+            Err(0xcafe_u64.into())
+        }
 
-        impl TestObject {
-            fn test_method(&mut self) -> ActionResult {
-                Err(CommonErrors::GenericError)
+        let tag = pd.register_invoke_async("tag1".into(), test1).unwrap();
+        assert_eq!(pd.set_invoke_worker_id("tag1".into(), "worker_id".into()), Ok(()));
+        let mut invoke = Invoke::from_tag(&tag);
+        let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
+
+        // Wait for invoke to schedule the action.
+        let _ = poller.poll();
+        // Run the action.
+        let _ = async_runtime::testing::mock::runtime_instance(|runtime| {
+            assert!(runtime.remaining_tasks() > 0);
+            runtime.advance_tasks();
+            assert_eq!(runtime.remaining_tasks(), 0);
+        });
+        // Check the result.
+        assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xcafe_u64.into()))));
+    }
+
+    #[test]
+    #[ensure_clear_mock_runtime]
+    fn test_invoke_method_with_worker_id() {
+        let mut pd = ProgramDatabase::default();
+
+        struct Test1 {}
+
+        impl Test1 {
+            fn test1(&mut self) -> InvokeResult {
+                Err(0xcafe_u64.into())
             }
         }
 
         let tag = pd
-            .register_invoke_method(Tag::from_str_static("tag1"), Arc::new(Mutex::new(TestObject {})), TestObject::test_method)
+            .register_invoke_method("tag1".into(), Arc::new(Mutex::new(Test1 {})), Test1::test1)
             .unwrap();
+        assert_eq!(pd.set_invoke_worker_id("tag1".into(), "worker_id".into()), Ok(()));
+        let mut invoke = Invoke::from_tag(&tag);
+        let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
 
-        let mut invoke = invoke::Invoke::from_tag(&tag);
-        let mut future = invoke.execute();
-        let mut context = task::Context::from_waker(task::Waker::noop());
-        assert_eq!(future.as_mut().poll(&mut context), task::Poll::Ready(Err(CommonErrors::GenericError)));
+        // Wait for invoke to schedule the action.
+        let _ = poller.poll();
+        // Run the action.
+        let _ = async_runtime::testing::mock::runtime_instance(|runtime| {
+            assert!(runtime.remaining_tasks() > 0);
+            runtime.advance_tasks();
+            assert_eq!(runtime.remaining_tasks(), 0);
+        });
+        // Check the result.
+        assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xcafe_u64.into()))));
+    }
 
-        let mut invoke = invoke::Invoke::from_tag(&tag);
-        let mut future = invoke.execute();
-        let mut context = task::Context::from_waker(task::Waker::noop());
-        assert_eq!(future.as_mut().poll(&mut context), task::Poll::Ready(Err(CommonErrors::GenericError)));
+    #[test]
+    #[ensure_clear_mock_runtime]
+    fn test_invoke_method_async_with_worker_id() {
+        let mut pd = ProgramDatabase::default();
+
+        struct Test1 {}
+
+        async fn test1(object: Arc<Mutex<Test1>>) -> InvokeResult {
+            let _guard = object.lock().unwrap();
+            Err(0xcafe_u64.into())
+        }
+
+        let tag = pd
+            .register_invoke_method_async("tag1".into(), Arc::new(Mutex::new(Test1 {})), test1)
+            .unwrap();
+        assert_eq!(pd.set_invoke_worker_id("tag1".into(), "worker_id".into()), Ok(()));
+        let mut invoke = Invoke::from_tag(&tag);
+        let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
+
+        // Wait for invoke to schedule the action.
+        let _ = poller.poll();
+        // Run the action.
+        let _ = async_runtime::testing::mock::runtime_instance(|runtime| {
+            assert!(runtime.remaining_tasks() > 0);
+            runtime.advance_tasks();
+            assert_eq!(runtime.remaining_tasks(), 0);
+        });
+        // Check the result.
+        assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xcafe_u64.into()))));
     }
 }
