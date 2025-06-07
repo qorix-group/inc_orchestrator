@@ -18,6 +18,7 @@ use std::task::{Poll, Waker};
 use crate::actions::internal::action::{ActionResult, ActionTrait, ReusableBoxFutureResult};
 
 use async_runtime::futures::reusable_box_future::{ReusableBoxFuture, ReusableBoxFuturePool};
+use foundation::containers::{reusable_objects::ReusableObject, reusable_objects::ReusableObjects};
 use testing::{
     mock_fn::{CallableTrait, MockFn, MockFnBuilder},
     poller::TestingFuturePoller,
@@ -32,8 +33,8 @@ const DEFAULT_POOL_SIZE: usize = 5;
 pub struct MockActionBuilder(MockFnBuilder<ActionResult>);
 
 pub struct MockAction {
-    mockfn: MockFn<ActionResult>,
-    pool: ReusableBoxFuturePool<ActionResult>,
+    reusable_future_pool: ReusableBoxFuturePool<ActionResult>,
+    reusable_mockfn_pool: ReusableObjects<MockFn<ActionResult>>,
 }
 
 impl Default for MockAction {
@@ -79,17 +80,30 @@ impl MockActionBuilder {
     }
 
     ///
-    /// Create the MockAction instance based on the current configuration and initialize the reusable future pool
+    /// Create the MockAction instance based on the current configuration and initialize the reusable pools
     ///
     pub fn build(self) -> MockAction {
-        // The pool needs to know the future layout in advance, so we create a future "template" using another MockFn with identical OutType.
+        // The pool needs to know the future layout in advance, so we create aa future "template" using another MockFn with identical OutType.
         // We can not re-use the one from self.0 for this purpose, since invoking build() results in the transient MockFn being inspected for
         // its call counts at drop(), leading to panics even before polling
         let dummy_task = MockFnBuilder::<ActionResult>::new_with_default(Ok(())).build().call();
+        let reusable_future_pool = ReusableBoxFuturePool::<ActionResult>::new(DEFAULT_POOL_SIZE, async move { dummy_task });
+
+        // The reusable objects pool must contain only one element to ensure every next_object() call
+        // always returns the same MockFn object that preserves the call_count state from previous
+        // call(s)
+        let reusable_mockfn_pool = ReusableObjects::<MockFn<ActionResult>>::new(1, |_| self.0.clone().build());
+
         MockAction {
-            mockfn: self.0.build(),
-            pool: ReusableBoxFuturePool::<ActionResult>::new(DEFAULT_POOL_SIZE, async move { dummy_task }),
+            reusable_mockfn_pool,
+            reusable_future_pool,
         }
+    }
+}
+
+impl MockAction {
+    async fn execute_impl(mut mockfn: ReusableObject<MockFn<ActionResult>>) -> ActionResult {
+        unsafe { mockfn.as_inner_mut().call() }
     }
 }
 
@@ -98,8 +112,10 @@ impl ActionTrait for MockAction {
     /// Return a "fresh" future that returns the current MockFn's call() result
     ///
     fn try_execute(&mut self) -> ReusableBoxFutureResult {
-        let result = self.mockfn.call();
-        self.pool.next(async move { result })
+        // Due to the pool size of one we will get the same MockFn object from the previous call
+        // here, because the last one gets dropped right after its call() and returned back to the pool
+        let mockfn = self.reusable_mockfn_pool.next_object()?;
+        self.reusable_future_pool.next(MockAction::execute_impl(mockfn))
     }
 
     fn name(&self) -> &'static str {
@@ -132,21 +148,34 @@ impl OrchTestingPoller {
 
 #[cfg(test)]
 #[cfg(not(loom))]
+
 mod tests {
 
-    use crate::actions::internal::action::ActionExecError;
-
     use super::*;
-
-    use testing::poller::TestingFuturePoller;
+    use crate::actions::internal::action::ActionExecError;
 
     use std::task::Poll;
 
     #[test]
+    fn test_times_zero_ok() {
+        let mut mock = MockActionBuilder::new().times(0).build();
+        let _ = OrchTestingPoller::new(mock.try_execute().unwrap());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_times_zero_called_once_should_panic() {
+        let mut mock = MockActionBuilder::new().times(0).build();
+        let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
+
+        assert_eq!(poller.poll(), Poll::Ready(Ok(())));
+    }
+
+    #[test]
     fn test_once_ok() {
         let mut mock = MockActionBuilder::new().will_once(Ok(())).build();
+        let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
 
-        let mut poller = TestingFuturePoller::<ActionResult>::new(mock.try_execute().unwrap().into_pin());
         assert_eq!(poller.poll(), Poll::Ready(Ok(())));
     }
 
@@ -154,7 +183,7 @@ mod tests {
     fn test_once_err() {
         let mut mock = MockActionBuilder::new().will_once(Err(ActionExecError::Internal)).build();
 
-        let mut poller = TestingFuturePoller::<ActionResult>::new(mock.try_execute().unwrap().into_pin());
+        let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
         assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::Internal)));
     }
 
@@ -163,7 +192,7 @@ mod tests {
         let mut mock = MockActionBuilder::new().will_repeatedly(Ok(())).build();
 
         for _ in 0..3 {
-            let mut poller = TestingFuturePoller::<ActionResult>::new(mock.try_execute().unwrap().into_pin());
+            let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
             assert_eq!(poller.poll(), Poll::Ready(Ok(())));
         }
     }
@@ -175,7 +204,7 @@ mod tests {
             .build();
 
         for _ in 0..3 {
-            let mut poller = TestingFuturePoller::<ActionResult>::new(mock.try_execute().unwrap().into_pin());
+            let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
             assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::NonRecoverableFailure)));
         }
     }
@@ -185,7 +214,7 @@ mod tests {
         let mut mock = MockActionBuilder::new().times(3).will_repeatedly(Err(ActionExecError::Internal)).build();
 
         for _ in 0..3 {
-            let mut poller = TestingFuturePoller::<ActionResult>::new(mock.try_execute().unwrap().into_pin());
+            let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
             assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::Internal)));
         }
     }
@@ -196,7 +225,7 @@ mod tests {
         let mut mock = MockActionBuilder::new().times(3).build();
 
         for _ in 0..2 {
-            let mut poller = TestingFuturePoller::<ActionResult>::new(mock.try_execute().unwrap().into_pin());
+            let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
             assert_eq!(poller.poll(), Poll::Ready(Ok(())));
         }
     }
@@ -207,7 +236,7 @@ mod tests {
         let mut mock = MockActionBuilder::new().times(3).build();
 
         for _ in 0..4 {
-            let mut poller = TestingFuturePoller::<ActionResult>::new(mock.try_execute().unwrap().into_pin());
+            let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
             assert_eq!(poller.poll(), Poll::Ready(Ok(())));
         }
     }
@@ -219,10 +248,10 @@ mod tests {
             .will_once(Err(ActionExecError::NonRecoverableFailure))
             .build();
 
-        let mut poller = TestingFuturePoller::<ActionResult>::new(mock.try_execute().unwrap().into_pin());
+        let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
         assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::Internal)));
 
-        let mut poller = TestingFuturePoller::<ActionResult>::new(mock.try_execute().unwrap().into_pin());
+        let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
         assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::NonRecoverableFailure)));
     }
 
@@ -235,14 +264,14 @@ mod tests {
             .will_repeatedly(Err(ActionExecError::Internal))
             .build();
 
-        let mut poller = TestingFuturePoller::<ActionResult>::new(mock.try_execute().unwrap().into_pin());
+        let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
         assert_eq!(poller.poll(), Poll::Ready(Ok(())));
 
-        let mut poller = TestingFuturePoller::<ActionResult>::new(mock.try_execute().unwrap().into_pin());
+        let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
         assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::NonRecoverableFailure)));
 
         for _ in 0..3 {
-            let mut poller = TestingFuturePoller::<ActionResult>::new(mock.try_execute().unwrap().into_pin());
+            let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
             assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::Internal)));
         }
     }
@@ -255,6 +284,6 @@ mod tests {
             .will_once(Err(ActionExecError::NonRecoverableFailure))
             .build();
 
-        let _ = TestingFuturePoller::<ActionResult>::new(mock.try_execute().unwrap().into_pin());
+        let _ = OrchTestingPoller::new(mock.try_execute().unwrap());
     }
 }
