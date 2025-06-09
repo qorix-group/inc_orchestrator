@@ -27,20 +27,25 @@ use foundation::containers::growable_vec::GrowableVec;
 use foundation::containers::reusable_objects::ReusableObject;
 use foundation::containers::reusable_vec_pool::ReusableVecPool;
 use foundation::not_recoverable_error;
-use iceoryx2_bb_container::vec::Vec;
-use logging_tracing::prelude::*;
+use foundation::prelude::*;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// Builder for constructing a concurrency group of actions to be executed in parallel.
+/// Builder for constructing a concurrency group of actions to be executed concurrently.
 /// Allows adding multiple branches (actions) and finalizing into a [`Concurrency`] object.
+/// Requires at least one branch to be added before building.
 pub struct ConcurrencyBuilder {
     actions: GrowableVec<Box<dyn ActionTrait>>,
 }
 
 /// Final concurrency object, ready for execution.
+/// The concurrency object is reusable and can be executed multiple times.
 /// Holds the actions to be executed concurrently and manages their execution and result collection.
+/// All actions are spawned as tasks and their results are awaited concurrently.
+/// The result of the concurrency execution is either `Ok(())` if all branches succeed,
+/// or an `ActionExecError` if any branch fails. The error returned is the last failing branch's error.
+/// If any branch fails, the other branches are still awaited to completion (without aborting them).
 pub struct Concurrency {
     base: ActionBaseMeta,
     actions: Vec<Box<dyn ActionTrait>>,
@@ -92,7 +97,7 @@ impl Default for ConcurrencyBuilder {
 impl Concurrency {
     /// Internal async execution logic for concurrent actions.
     ///
-    /// Spawns all actions as tasks, waits for all to complete, and returns the first error if any branch fails.
+    /// Spawns all actions as tasks, waits for all to complete.
     async fn execute_impl(meta: Tag, mut futures_vec: ReusableObject<Vec<ActionMeta>>) -> ActionResult {
         for fut in futures_vec.iter_mut() {
             if let Some(future) = fut.take_future() {
@@ -168,22 +173,14 @@ impl ActionMeta {
             }
         }
     }
-
-    /// Returns a mutable reference to the handle if present.
-    fn handle(&mut self) -> Option<&mut JoinHandle<ActionResult>> {
-        match self {
-            ActionMeta::Handle(handle) => Some(handle),
-            _ => None,
-        }
-    }
 }
 
 /// Future that waits for multiple [`JoinHandle`]s to complete.
-/// Returns `Ready` once all are done, or cancels all remaining handles if any branch fails.
-/// Uses FutureState to track polling state.
+/// Returns `Ready` once all are done. Uses FutureState to track polling state.
 struct ConcurrencyJoin {
     handles: ReusableObject<Vec<ActionMeta>>,
     state: FutureState,
+    action_execution_result: ActionResult,
 }
 
 impl ConcurrencyJoin {
@@ -192,54 +189,57 @@ impl ConcurrencyJoin {
         Self {
             handles,
             state: FutureState::New,
+            action_execution_result: ActionResult::Ok(()),
         }
     }
 
-    /// Handles polling all join handles, aborts on first error.
-    /// Returns Ready if all are done or any branch fails, Pending otherwise.
+    /// Handles polling all join handles. Returns Ready if all are done, Pending otherwise.
+    /// Returns the error of last failing branch in case of any failure,
+    /// or `Ok(())` if all branches succeed.
     fn join_result(&mut self, cx: &mut Context<'_>) -> Poll<ActionResult> {
-        let result: FutureInternalReturn<ActionResult> = match self.state {
+        let result = match self.state {
             FutureState::New | FutureState::Polled => {
                 // Poll all handles and collect results.
                 let mut is_done = true;
-                let mut action_execution_result = ActionResult::Ok(());
 
                 for hnd in self.handles.iter_mut() {
-                    if let Some(handle) = hnd.handle() {
-                        let res = Pin::new(handle).poll(cx);
-                        match res {
-                            Poll::Ready(action_result) => {
-                                *hnd = ActionMeta::Empty;
-                                match action_result {
-                                    Ok(result) if result.is_err() => {
-                                        action_execution_result = result;
+                    match hnd {
+                        ActionMeta::Handle(handle) => {
+                            let res = Pin::new(handle).poll(cx);
+                            match res {
+                                Poll::Ready(action_result) => {
+                                    *hnd = ActionMeta::Empty; // Clear the hanlde after polling
+                                    self.action_execution_result = match action_result {
+                                        Ok(Ok(_)) => continue,
+                                        Ok(Err(err)) => Err(err),
+
+                                        // This a JoinResult error, not the future error
+                                        Err(_) => Err(ActionExecError::Internal),
+                                    };
+                                }
+                                Poll::Pending => {
+                                    is_done = false; // At least one handle is still pending
+                                    if self.state == FutureState::Polled {
+                                        // Exit loop, no need to poll others now since aborting is not required
                                         break;
                                     }
-                                    Err(_) => {
-                                        action_execution_result = Err(ActionExecError::Internal);
-                                        break;
-                                    }
-                                    _ => {}
                                 }
                             }
-                            Poll::Pending => {
-                                is_done = false;
+                        }
+                        ActionMeta::Future(_) => {
+                            not_recoverable_error!("Join handle not available for the spawned future!");
+                        }
+                        ActionMeta::Empty => {
+                            if self.state == FutureState::Polled {
+                                continue; // Already polled.
                             }
+                            not_recoverable_error!("Join handle not available for the spawned future!");
                         }
                     }
                 }
 
-                // If any branch failed, abort the remaining handles.
-                if action_execution_result.is_err() {
-                    for hnd in self.handles.iter_mut() {
-                        if let Some(handle) = hnd.handle() {
-                            handle.abort();
-                        }
-                    }
-                    FutureInternalReturn::ready(action_execution_result)
-                } else if is_done {
-                    // All handles are done and no errors, return Ok(())
-                    FutureInternalReturn::ready(Ok(()))
+                if is_done {
+                    FutureInternalReturn::ready(self.action_execution_result)
                 } else {
                     FutureInternalReturn::polled()
                 }
@@ -271,39 +271,39 @@ mod tests {
     use std::task::Poll;
     use testing_macros::ensure_clear_mock_runtime;
 
-    /// Test creating a concurrency object and adding branches.
     #[test]
-    fn test_concurrency_builder() {
+    fn concurrency_builder_using_new() {
         let mock1 = MockActionBuilder::new().build();
         let mock2 = MockActionBuilder::new().build();
         // Create a concurrency builder using new() and add two branches.
-        let mut concurrency_builder1 = ConcurrencyBuilder::new();
-        concurrency_builder1.with_branch(Box::new(mock1)).with_branch(Box::new(mock2));
-        let concurrency1 = concurrency_builder1.build();
-        assert_eq!(concurrency1.actions.len(), 2);
-
-        // Create a concurrency builder using default() and add a branch.
-        let mock3 = MockActionBuilder::new().build();
-        let mut concurrency_builder2 = ConcurrencyBuilder::default();
-        concurrency_builder2.with_branch(Box::new(mock3));
-        let concurrency2 = concurrency_builder2.build();
-        assert_eq!(concurrency2.actions.len(), 1);
-
-        assert_eq!(concurrency2.name(), "Concurrency");
+        let mut concurrency_builder = ConcurrencyBuilder::new();
+        concurrency_builder.with_branch(Box::new(mock1)).with_branch(Box::new(mock2));
+        let concurrency = concurrency_builder.build();
+        assert_eq!(concurrency.actions.len(), 2);
+        assert_eq!(concurrency.name(), "Concurrency");
     }
 
-    /// Test that building without any branch panics.
+    #[test]
+    fn concurrency_builder_using_default() {
+        let mock1 = MockActionBuilder::new().build();
+        // Create a concurrency builder using default() and add one branch.
+        let mut concurrency_builder = ConcurrencyBuilder::default();
+        concurrency_builder.with_branch(Box::new(mock1));
+        let concurrency = concurrency_builder.build();
+        assert_eq!(concurrency.actions.len(), 1);
+        assert_eq!(concurrency.name(), "Concurrency");
+    }
+
     #[test]
     #[should_panic(expected = "Concurrency requires at least one branch.")]
-    fn test_concurrency_builder_panics_with_no_branch() {
+    fn concurrency_builder_panics_with_no_branch() {
         let concurrency_builder = ConcurrencyBuilder::new();
         let _ = concurrency_builder.build();
     }
 
-    /// Test concurrent execution where all actions succeed.
     #[test]
     #[ensure_clear_mock_runtime]
-    fn test_concurrency_execute_ok_actions() {
+    fn concurrency_execute_ok_actions() {
         let mock1 = MockActionBuilder::new().will_once(Ok(())).build();
         let mock2 = MockActionBuilder::new().will_once(Ok(())).build();
 
@@ -314,17 +314,7 @@ mod tests {
         let mut poller = OrchTestingPoller::new(concurrency.try_execute().unwrap());
         // Call the poll function to spawn all the actions to execute concurrently and wait for them to complete.
         // The mock runtime will handle the execution of these actions.
-        let mut result = poller.poll();
-
-        // Start a thread to further call the poll function till,
-        // - all the spawned actions are executed by the mock runtime
-        // - Or abort if any action fails
-        let handle = std::thread::spawn(move || {
-            while result.is_pending() {
-                result = poller.poll();
-            }
-            result
-        });
+        let _ = poller.poll();
 
         // Use the mock runtime to execute all spawned concurrent actions.
         let _x = async_runtime::testing::mock::runtime_instance(|runtime| {
@@ -335,14 +325,13 @@ mod tests {
         });
 
         // Get the result
-        let result = handle.join().unwrap();
-        assert!(matches!(result, Poll::Ready(Ok(()))));
+        let result = poller.poll();
+        assert_eq!(result, Poll::Ready(Ok(())));
     }
 
-    /// Test concurrent execution where one action fails.
     #[test]
     #[ensure_clear_mock_runtime]
-    fn test_concurrency_execute_err_action() {
+    fn concurrency_execute_err_action() {
         let mock1 = MockActionBuilder::new().will_once(Err(ActionExecError::NonRecoverableFailure)).build();
 
         let mut concurrency_builder = ConcurrencyBuilder::new();
@@ -352,17 +341,7 @@ mod tests {
         let mut poller = OrchTestingPoller::new(concurrency.try_execute().unwrap());
         // Call the poll function to spawn all the actions to execute concurrently and wait for them to complete.
         // The mock runtime will handle the execution of these actions.
-        let mut result = poller.poll();
-
-        // Start a thread to further call the poll function till,
-        // - all the spawned actions are executed by the mock runtime
-        // - Or abort if any action fails
-        let handle = std::thread::spawn(move || {
-            while result.is_pending() {
-                result = poller.poll();
-            }
-            result
-        });
+        let _ = poller.poll();
 
         // Use the mock runtime to execute all spawned concurrent actions.
         let _x = async_runtime::testing::mock::runtime_instance(|runtime| {
@@ -373,18 +352,17 @@ mod tests {
         });
 
         // Get the result
-        let result = handle.join().unwrap();
-        assert!(matches!(result, Poll::Ready(Err(ActionExecError::NonRecoverableFailure))));
+        let result = poller.poll();
+        assert_eq!(result, Poll::Ready(Err(ActionExecError::NonRecoverableFailure)));
     }
 
-    /// Test that pending actions are aborted if any branch fails.
     #[test]
     #[ensure_clear_mock_runtime]
-    fn test_concurrency_abort_pending_actions() {
+    fn concurrency_execute_ok_and_err_actions() {
         let mock1 = MockActionBuilder::new().will_once(Ok(())).build();
         let mock2 = MockActionBuilder::new().will_once(Err(ActionExecError::Internal)).build();
         let mock3 = MockActionBuilder::new().will_once(Ok(())).build();
-        let mock4 = MockActionBuilder::new().will_once(Ok(())).build();
+        let mock4 = MockActionBuilder::new().will_once(Err(ActionExecError::NonRecoverableFailure)).build();
         let mock5 = MockActionBuilder::new().will_once(Ok(())).build();
 
         let mut concurrency_builder = ConcurrencyBuilder::new();
@@ -399,17 +377,7 @@ mod tests {
         let mut poller = OrchTestingPoller::new(concurrency.try_execute().unwrap());
         // Call the poll function to spawn all the actions to execute concurrently and wait for them to complete.
         // The mock runtime will handle the execution of these actions.
-        let mut result = poller.poll();
-
-        // Start a thread to further call the poll function till,
-        // - all the spawned actions are executed by the mock runtime
-        // - Or abort if any action fails
-        let handle = std::thread::spawn(move || {
-            while result.is_pending() {
-                result = poller.poll();
-            }
-            result
-        });
+        let _ = poller.poll();
 
         // Use the mock runtime to execute all spawned concurrent actions.
         let _x = async_runtime::testing::mock::runtime_instance(|runtime| {
@@ -420,14 +388,76 @@ mod tests {
         });
 
         // Get the result
-        let result = handle.join().unwrap();
-        assert!(matches!(result, Poll::Ready(Err(ActionExecError::Internal))));
+        let result = poller.poll();
+        assert_eq!(result, Poll::Ready(Err(ActionExecError::NonRecoverableFailure)));
     }
 
-    /// Test that a concurrency object can be executed multiple times.
     #[test]
     #[ensure_clear_mock_runtime]
-    fn test_concurrency_executed_twice() {
+    fn concurrency_polled_multiple_times_before_runtime_advances() {
+        let mock1 = MockActionBuilder::new().will_once(Ok(())).build();
+        let mock2 = MockActionBuilder::new().will_once(Ok(())).build();
+
+        let mut concurrency_builder = ConcurrencyBuilder::new();
+        concurrency_builder.with_branch(Box::new(mock1)).with_branch(Box::new(mock2));
+        let mut concurrency = concurrency_builder.build();
+
+        let mut poller = OrchTestingPoller::new(concurrency.try_execute().unwrap());
+        // Call the poll function to spawn all the actions to execute concurrently and wait for them to complete.
+        // The mock runtime will handle the execution of these actions.
+        let _ = poller.poll();
+
+        // Use the mock runtime to execute all spawned concurrent actions.
+        let _x = async_runtime::testing::mock::runtime_instance(|runtime| {
+            assert!(runtime.remaining_tasks() > 0);
+            let _ = poller.poll(); // Poll again before advancing tasks
+            let result = poller.poll();
+            assert_eq!(result, Poll::Pending); // Should still be pending since tasks are not advanced yet
+            runtime.advance_tasks();
+
+            assert_eq!(runtime.remaining_tasks(), 0);
+        });
+
+        // Get the result
+        let result = poller.poll();
+        assert_eq!(result, Poll::Ready(Ok(())));
+    }
+
+    #[test]
+    #[ensure_clear_mock_runtime]
+    #[should_panic]
+    fn concurrency_panics_if_polled_after_future_reported_ready() {
+        let mock1 = MockActionBuilder::new().will_once(Ok(())).build();
+        let mock2 = MockActionBuilder::new().will_once(Ok(())).build();
+
+        let mut concurrency_builder = ConcurrencyBuilder::new();
+        concurrency_builder.with_branch(Box::new(mock1)).with_branch(Box::new(mock2));
+        let mut concurrency = concurrency_builder.build();
+
+        let mut poller = OrchTestingPoller::new(concurrency.try_execute().unwrap());
+        // Call the poll function to spawn all the actions to execute concurrently and wait for them to complete.
+        // The mock runtime will handle the execution of these actions.
+        let _ = poller.poll();
+
+        // Use the mock runtime to execute all spawned concurrent actions.
+        let _x = async_runtime::testing::mock::runtime_instance(|runtime| {
+            assert!(runtime.remaining_tasks() > 0);
+            runtime.advance_tasks();
+
+            assert_eq!(runtime.remaining_tasks(), 0);
+        });
+
+        // Get the result
+        let result = poller.poll();
+        assert_eq!(result, Poll::Ready(Ok(())));
+
+        // Poll again after the future has reported ready, this causes a panic.
+        let _ = poller.poll();
+    }
+
+    #[test]
+    #[ensure_clear_mock_runtime]
+    fn concurrency_executed_twice() {
         let mock1 = MockActionBuilder::new().times(2).build();
         let mock2 = MockActionBuilder::new().times(2).build();
 
@@ -441,17 +471,7 @@ mod tests {
             let mut poller = OrchTestingPoller::new(concurrency.try_execute().unwrap());
             // Call the poll function to spawn all the actions to execute concurrently and wait for them to complete.
             // The mock runtime will handle the execution of these actions.
-            let mut result = poller.poll();
-
-            // Start a thread to further call the poll function till,
-            // - all the spawned actions are executed by the mock runtime
-            // - Or abort if any action fails
-            let handle = std::thread::spawn(move || {
-                while result.is_pending() {
-                    result = poller.poll();
-                }
-                result
-            });
+            let _ = poller.poll();
 
             // Use the mock runtime to execute all spawned concurrent actions.
             let _x = async_runtime::testing::mock::runtime_instance(|runtime| {
@@ -462,8 +482,49 @@ mod tests {
             });
 
             // Get the result
-            let result = handle.join().unwrap();
-            assert!(matches!(result, Poll::Ready(Ok(()))));
+            let result = poller.poll();
+            assert_eq!(result, Poll::Ready(Ok(())));
+        }
+    }
+
+    #[test]
+    #[ensure_clear_mock_runtime]
+    fn concurrency_fails_first_time_and_succeeds_second_time() {
+        let mock1 = MockActionBuilder::new().times(2).build();
+        let mock2 = MockActionBuilder::new()
+            .will_once(Err(ActionExecError::Internal))
+            .will_once(Ok(()))
+            .build();
+
+        let mut concurrency_builder = ConcurrencyBuilder::new();
+        concurrency_builder.with_branch(Box::new(mock1)).with_branch(Box::new(mock2));
+        let mut concurrency = concurrency_builder.build();
+
+        // Execute the concurrency twice to ensure it can handle multiple executions correctly.
+        // This is to test that the futures are reset and can be reused.
+        for count in 0..2 {
+            let mut poller = OrchTestingPoller::new(concurrency.try_execute().unwrap());
+            // Call the poll function to spawn all the actions to execute concurrently and wait for them to complete.
+            // The mock runtime will handle the execution of these actions.
+            let _ = poller.poll();
+
+            // Use the mock runtime to execute all spawned concurrent actions.
+            let _x = async_runtime::testing::mock::runtime_instance(|runtime| {
+                assert!(runtime.remaining_tasks() > 0);
+                runtime.advance_tasks();
+
+                assert_eq!(runtime.remaining_tasks(), 0);
+            });
+
+            // Get the result
+            let result = poller.poll();
+            if count == 0 {
+                // First execution should fail since mock2 returns Err on the first call
+                assert_eq!(result, Poll::Ready(Err(ActionExecError::Internal)));
+            } else {
+                // Second execution should succeed since mock2 returns Ok on the second call
+                assert_eq!(result, Poll::Ready(Ok(())));
+            }
         }
     }
 }
