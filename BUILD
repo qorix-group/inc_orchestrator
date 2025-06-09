@@ -41,13 +41,21 @@ copyright_checker(
     visibility = ["//visibility:public"],
 )
 
-## Add the cargo lock file once it is available
-#dash_license_checker(
-#    src = "//examples:cargo_lock",
-#    file_type = "",  # let it auto-detect based on project_config
-#    project_config = PROJECT_CONFIG,
-#    visibility = ["//visibility:public"],
-#)
+# Needed for Dash tool to check python dependency licenses.
+filegroup(
+    name = "cargo_lock",
+    srcs = [
+        "Cargo.lock",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+dash_license_checker(
+    src = ":cargo_lock",
+    file_type = "",  # let it auto-detect based on project_config
+    project_config = PROJECT_CONFIG,
+    visibility = ["//visibility:public"],
+)
 
 # Add target for formatting checks
 use_format_targets()
