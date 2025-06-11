@@ -18,3 +18,5 @@ pub use iceoryx2_bb_lock_free::*;
 pub use crate::types::*;
 pub use tracing::{debug, error, info, span, trace, warn, Level};
 pub use tracing_subscriber;
+
+pub use iceoryx2_bb_memory::pool_allocator::*;
