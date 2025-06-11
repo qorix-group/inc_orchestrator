@@ -39,6 +39,12 @@ pub struct MockFn<OutType> {
     returns: VecDeque<OutType>,
 }
 
+impl<T> MockFn<T> {
+    pub fn times(&self) -> usize {
+        self.call_count.load(Relaxed)
+    }
+}
+
 impl<OutType: Default> Default for MockFn<OutType> {
     fn default() -> MockFn<OutType> {
         Self {

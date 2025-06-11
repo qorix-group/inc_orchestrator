@@ -22,4 +22,5 @@ pub enum CommonErrors {
     Timeout,
     NoSpaceLeft,
     NotFound,
+    WrongArgs,
 }
