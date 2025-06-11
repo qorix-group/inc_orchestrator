@@ -60,6 +60,7 @@ pub mod prelude;
 pub mod runtime;
 pub mod safety;
 pub mod scheduler;
+pub mod time;
 
 #[cfg(any(test, feature = "runtime-api-mock"))]
 pub mod testing;

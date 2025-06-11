@@ -1,0 +1,61 @@
+{
+    "type": "object",
+    "oneOf": [
+        {
+            "$ref": "#/$defs/sequence"
+        },
+        {
+            "$ref": "#/$defs/concurrency"
+        }
+    ],
+    "$defs": {
+        "action": {
+            "oneOf": [
+                {
+                    "$ref": "#/$defs/sequence"
+                },
+                {
+                    "$ref": "#/$defs/concurrency"
+                }
+            ]
+        },
+        "sequence": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "const": "sequence"
+                },
+                "actions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/action"
+                    }
+                }
+            },
+            "required": [
+                "type",
+                "actions"
+            ],
+            "additionalProperties": false
+        },
+        "concurrency": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "const": "concurrency"
+                },
+                "actions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/action"
+                    }
+                }
+            },
+            "required": [
+                "type",
+                "actions"
+            ],
+            "additionalProperties": false
+        }
+    }
+}
