@@ -32,7 +32,7 @@ jobs:
 
       # ---------- TARPAULIN(TEST + COVERAGE) ----------
       - name: Run tests under coverage
-        run: cargo tarpaulin --skip-clean --out Html
+        run: cargo +nightly tarpaulin --skip-clean --out Html --verbose --no-dead-code --engine llvm
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
