@@ -83,6 +83,8 @@ fn main() {
             .unwrap()
             .is_err();
 
+            let x = "dedicated".into();
+
             error!("I RUN FROM SAFETY FROM NOW ON !!!");
 
             spawn_on_dedicated(
@@ -93,7 +95,7 @@ fn main() {
                     error!("I AM DEDICATED RESTORED  ;)");
                     1
                 },
-                "dedicated".into(),
+                x,
             )
             .await
             .unwrap();
