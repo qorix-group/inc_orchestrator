@@ -803,6 +803,7 @@ dependencies = [
  "iceoryx2-bb-container",
  "libc",
  "logging_tracing",
+ "loom",
  "orchestration",
  "testing",
  "testing_macros",
