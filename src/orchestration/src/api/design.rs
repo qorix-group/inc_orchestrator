@@ -18,7 +18,7 @@ use foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
 use crate::{
     actions::internal::invoke,
     common::{orch_tag::OrchestrationTag, tag::Tag, DesignConfig},
-    program::Program,
+    program::internal::Program,
     program_database::ProgramDatabase,
 };
 

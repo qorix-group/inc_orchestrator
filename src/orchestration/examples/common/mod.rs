@@ -16,6 +16,8 @@ use async_runtime::futures::yield_now;
 use foundation::prelude::*;
 use orchestration::prelude::ActionResult;
 
+use orchestration::actions::internal::invoke::InvokeResult;
+
 /// emulate some sleep as workaround until sleep is supported in runtime
 pub fn busy_sleep() -> ActionResult {
     info!("Start sleeping");
@@ -78,23 +80,23 @@ pub async fn test4_func() -> ActionResult {
     return rv;
 }
 
-pub fn test1_sync_func() -> ActionResult {
+pub fn test1_sync_func() -> InvokeResult {
     info!("Start of 'test1_sync_func' function.");
-    let rv = busy_sleep();
+    let _ = busy_sleep();
     info!("End of 'test1_sync_func' function.");
-    return rv;
+    Ok(())
 }
 
-pub fn test2_sync_func() -> ActionResult {
+pub fn test2_sync_func() -> InvokeResult {
     info!("Start of 'test2_sync_func' function.");
-    let rv = busy_sleep();
+    let _ = busy_sleep();
     info!("End of 'test2_sync_func' function.");
-    return rv;
+    Ok(())
 }
 
-pub fn test3_sync_func() -> ActionResult {
+pub fn test3_sync_func() -> InvokeResult {
     info!("Start of 'test3_sync_func' function.");
-    let rv = busy_sleep();
+    let _ = busy_sleep();
     info!("End of 'test3_sync_func' function.");
-    return rv;
+    Ok(())
 }

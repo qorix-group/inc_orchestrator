@@ -52,7 +52,7 @@ use foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
 
 use crate::{
     api::{deployment::Deployment, design::Design},
-    program::Program,
+    program::internal::Program,
 };
 
 pub mod deployment;
