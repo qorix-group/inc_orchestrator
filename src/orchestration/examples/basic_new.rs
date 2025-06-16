@@ -11,15 +11,14 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-/*
 use async_runtime::{runtime::async_runtime::AsyncRuntimeBuilder, scheduler::execution_engine::*};
 use foundation::prelude::*;
 use logging_tracing::{TraceScope, TracingLibraryBuilder};
 use orchestration::{
+    actions::internal::{invoke::Invoke, sequence::SequenceBuilder},
     api::{design::Design, Orchestration},
     common::DesignConfig,
-    prelude::*,
-    program::ProgramBuilder,
+    program::internal::ProgramBuilder,
 };
 
 mod common;
@@ -39,21 +38,19 @@ fn example_component_design() -> Result<Design, CommonErrors> {
 
         Ok(ProgramBuilder::new("ProgramName")
             .with_body(
-                Sequence::new()
+                SequenceBuilder::new()
                     .with_step(Invoke::from_tag(&t1_tag))
                     .with_step(Invoke::from_tag(&t2_tag))
-                    .with_step(Invoke::from_tag(&t3_tag)),
+                    .with_step(Invoke::from_tag(&t3_tag))
+                    .build(),
             )
-            .with_shutdown_notification(Sync::new("somename"))
             .build())
     });
 
     Ok(design)
 }
-*/
 
 fn main() {
-    /*
     // Setup any logging framework you want to use.
     let mut logger = TracingLibraryBuilder::new()
         .global_log_level(Level::INFO)
@@ -70,7 +67,7 @@ fn main() {
     {
         // Start the event handling thread.
         // TODO: Will be removed soon
-        Event::get_instance().lock().unwrap().create_polling_thread();
+        // Event::get_instance().lock().unwrap().create_polling_thread();
     }
 
     // Build Orchestration
@@ -86,11 +83,10 @@ fn main() {
 
     // Put programs into runtime and run them
     let _ = runtime.block_on(async move {
-        programs.programs.pop().unwrap().run_n(3).await;
+        let _ = programs.programs.pop().unwrap().run_n(3).await;
         info!("Program finished running.");
         Ok(0)
     });
 
     println!("Exit.");
-    */
 }
