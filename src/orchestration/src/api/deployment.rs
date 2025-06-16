@@ -18,7 +18,7 @@ use crate::{
         design::{Design, DesignTag, ProgramTag},
         OrchestrationApi,
     },
-    program::Program,
+    program::internal::Program,
 };
 
 pub struct Deployment<'a, T> {
