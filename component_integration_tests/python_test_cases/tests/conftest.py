@@ -1,3 +1,5 @@
+import json
+
 import pytest
 import testing_tools as tt
 
@@ -14,16 +16,35 @@ def pytest_addoption(parser):
 # Fixtures
 @pytest.fixture(scope="class")
 def execute_rust(test_config, test_case_name):
+    """
+    Returns list of raw json messages from the test binary execution.
+    """
     return tt.execute_and_parse(test_config, test_case_name, expect_hang=False)
 
 
 @pytest.fixture(scope="class")
 def execute_rust_expect_hang(test_config, test_case_name):
+    """
+    Returns list of raw json messages from the test binary execution and expects the binary to hang.
+    """
     return tt.execute_and_parse(test_config, test_case_name, expect_hang=True)
 
 
 @pytest.fixture(scope="class")
+def unfiltered_test_results(execute_rust):
+    """
+    Returns LogContainer with all messages from the test binary execution.
+    """
+    messages = execute_rust
+    logs = [tt.ResultEntry(msg) for msg in messages]
+    return tt.LogContainer.from_entries(logs)
+
+
+@pytest.fixture(scope="class")
 def targeted_test_results(unfiltered_test_results):
+    """
+    Returns LogContainer messages that are generated strictly by the tested code.
+    """
     [*results] = unfiltered_test_results.get_logs_by_field(
         field="target", pattern="rust_test_scenarios.*"
     )
@@ -32,6 +53,9 @@ def targeted_test_results(unfiltered_test_results):
 
 @pytest.fixture(scope="class")
 def test_results(targeted_test_results):
+    """
+    Returns LogContainer messages with just INFO level.
+    """
     [*results] = targeted_test_results.get_logs_by_field(field="level", pattern="INFO")
     return tt.LogContainer.from_entries(results)
 
@@ -67,7 +91,7 @@ def pytest_html_results_table_row(report, cells):
     cells.insert(2, f"<td><pre>{report.description}</pre></td>")
     cells.insert(
         1,
-        f'<td><pre style="white-space:pre-wrap;word-wrap:break-word">{report.input}</pre></td>',
+        f'<td><pre style="white-space:pre-wrap;word-wrap:break-word">{json.dumps(report.input)}</pre></td>',
     )
 
 
