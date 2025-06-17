@@ -29,6 +29,7 @@ impl TestCase for SingleSequenceTest {
             Ok(0)
         });
 
+        std::thread::sleep(std::time::Duration::from_millis(100));
         Ok(())
     }
 }
@@ -63,6 +64,7 @@ impl TestCase for NestedSequenceTest {
             Ok(0)
         });
 
+        std::thread::sleep(std::time::Duration::from_millis(100));
         Ok(())
     }
 }
@@ -109,6 +111,7 @@ impl TestCase for AwaitSequenceTest {
             Ok(0)
         });
 
+        std::thread::sleep(std::time::Duration::from_millis(100));
         Ok(())
     }
 }
