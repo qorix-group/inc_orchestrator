@@ -1,4 +1,3 @@
-use crate::internals::helpers::execution_barrier::ExecutionBarrier;
 use crate::internals::helpers::runtime_helper::Runtime;
 use crate::internals::test_case::TestCase;
 
@@ -15,10 +14,7 @@ impl TestCase for SingleSequenceTest {
     fn run(&self, input: Option<String>) -> Result<(), String> {
         let mut rt = Runtime::new(&input).build();
 
-        let barrier = ExecutionBarrier::new();
-        let notifier = barrier.get_notifier();
-
-        let _ = rt.enter_engine(async move {
+        let _ = rt.block_on(async move {
             let mut program = ProgramBuilder::new(file!())
                 .with_body(
                     Sequence::new_with_id(NamedId::new_static("Sequence1"))
@@ -30,10 +26,10 @@ impl TestCase for SingleSequenceTest {
                 .build();
 
             program.run_n(1).await;
-            notifier.notify();
+            Ok(0)
         });
 
-        barrier.wait_for_notification(std::time::Duration::from_secs(5))
+        Ok(())
     }
 }
 
@@ -48,10 +44,7 @@ impl TestCase for NestedSequenceTest {
     fn run(&self, input: Option<String>) -> Result<(), String> {
         let mut rt = Runtime::new(&input).build();
 
-        let barrier = ExecutionBarrier::new();
-        let notifier = barrier.get_notifier();
-
-        let _ = rt.enter_engine(async move {
+        let _ = rt.block_on(async move {
             let mut program = ProgramBuilder::new(file!())
                 .with_body(
                     Sequence::new_with_id(NamedId::new_static("OuterSequence"))
@@ -67,10 +60,10 @@ impl TestCase for NestedSequenceTest {
                 .build();
 
             program.run_n(1).await;
-            notifier.notify();
+            Ok(0)
         });
 
-        barrier.wait_for_notification(std::time::Duration::from_secs(5))
+        Ok(())
     }
 }
 
@@ -85,10 +78,7 @@ impl TestCase for AwaitSequenceTest {
     fn run(&self, input: Option<String>) -> Result<(), String> {
         let mut rt = Runtime::new(&input).build();
 
-        let barrier = ExecutionBarrier::new();
-        let notifier = barrier.get_notifier();
-
-        let _ = rt.enter_engine(async move {
+        let _ = rt.block_on(async move {
             let event_name: &str = "Test_Event_1";
 
             let mut program = ProgramBuilder::new(file!())
@@ -116,9 +106,9 @@ impl TestCase for AwaitSequenceTest {
                 .build();
 
             program.run_n(1).await;
-            notifier.notify();
+            Ok(0)
         });
 
-        barrier.wait_for_notification(std::time::Duration::from_secs(5))
+        Ok(())
     }
 }
