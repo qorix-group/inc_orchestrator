@@ -32,11 +32,7 @@ impl ActionTrait for JustLogAction {
     fn dbg_fmt(&self, _nest: usize, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Ok(())
     }
-    fn fill_runtime_info(
-        &mut self,
-        _p: &mut orchestration::actions::action::ActionRuntimeInfoProvider,
-    ) {
-    }
+    fn fill_runtime_info(&mut self, _p: &mut orchestration::actions::action::ActionRuntimeInfoProvider) {}
 }
 
 /// emulate some sleep as workaround until sleep is supported in runtime
@@ -60,8 +56,6 @@ async fn generic_test_func(name: &'static str) -> ActionResult {
     rv
 }
 
-fn factory_test_func(
-    name: &'static str,
-) -> impl Fn() -> Pin<Box<dyn Future<Output = ActionResult> + Send>> + Clone {
+fn factory_test_func(name: &'static str) -> impl Fn() -> Pin<Box<dyn Future<Output = ActionResult> + Send>> + Clone {
     move || Box::pin(generic_test_func(name))
 }
