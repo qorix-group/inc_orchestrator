@@ -322,7 +322,7 @@ impl ExecutionEngineBuilder {
         let async_scheduler = Arc::new(AsyncScheduler {
             worker_access: unsafe { worker_interactors.assume_init() },
             num_of_searching_workers: FoundationAtomicU8::new(0),
-            parked_workers_indexes: Mutex::new(vec![]),
+            parked_workers_indexes: Mutex::new(Vec::new(self.async_workers_cnt)),
             global_queue,
             safety_worker_queue,
         });
