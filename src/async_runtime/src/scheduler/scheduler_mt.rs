@@ -19,7 +19,7 @@ use crate::{scheduler::context::ctx_get_worker_id, TaskRef};
 use foundation::containers::trigger_queue::TriggerQueue;
 use foundation::not_recoverable_error;
 use foundation::{
-    containers::{mpmc_queue::MpmcQueue, spmc_queue::BoundProducerConsumer},
+    containers::{mpmc_queue::MpmcQueue, spmc_queue::BoundProducerConsumer, vector_extension::VectorExtension},
     prelude::*,
 };
 use std::ops::Deref;
@@ -45,7 +45,7 @@ pub(crate) struct AsyncScheduler {
     // Hot path for figuring out if we shall wake-up someone, or we shall go to sleep from worker
     pub(super) num_of_searching_workers: FoundationAtomicU8,
 
-    pub(super) parked_workers_indexes: std::sync::Mutex<std::vec::Vec<usize>>,
+    pub(super) parked_workers_indexes: std::sync::Mutex<Vec<usize>>,
 
     pub(super) global_queue: MpmcQueue<TaskRef>,
 
@@ -139,8 +139,10 @@ impl AsyncScheduler {
 
     pub(super) fn transition_from_parked(&self, index: usize) {
         let mut guard = self.parked_workers_indexes.lock().unwrap();
-
-        guard.retain(|&x| x != index);
+        // Find and remove the worker from the list. The order of the parked workers is not important after removal.
+        if let Some(pos) = guard.iter().position(|x| *x == index) {
+            guard.swap_remove(pos);
+        }
     }
 
     //
@@ -268,7 +270,7 @@ pub(crate) fn scheduler_new(workers_cnt: usize, local_queue_size: usize) -> Asyn
     AsyncScheduler {
         worker_access: unsafe { worker_interactors.assume_init() },
         num_of_searching_workers: FoundationAtomicU8::new(0),
-        parked_workers_indexes: std::sync::Mutex::new(vec![]),
+        parked_workers_indexes: std::sync::Mutex::new(Vec::new(workers_cnt)),
         global_queue,
         safety_worker_queue,
     }
