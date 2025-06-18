@@ -34,7 +34,6 @@ impl TestCase for SingleConcurrencyTest {
             Ok(0)
         });
 
-        std::thread::sleep(std::time::Duration::from_millis(100));
         Ok(())
     }
 }
@@ -76,7 +75,6 @@ impl TestCase for MultipleConcurrencyTest {
             Ok(0)
         });
 
-        std::thread::sleep(std::time::Duration::from_millis(100));
         Ok(())
     }
 }
@@ -115,7 +113,6 @@ impl TestCase for NestedConcurrencyTest {
             Ok(0)
         });
 
-        std::thread::sleep(std::time::Duration::from_millis(100));
         Ok(())
     }
 }

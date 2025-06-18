@@ -51,7 +51,6 @@ impl TestCase for BasicWorkerTest {
             Ok(joiner.wait_for_all().await)
         });
 
-        std::thread::sleep(std::time::Duration::from_millis(100));
         Ok(())
     }
 }
