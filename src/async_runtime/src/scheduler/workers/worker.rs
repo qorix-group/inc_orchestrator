@@ -126,8 +126,10 @@ impl Worker {
 
     pub(crate) fn stop(&mut self) {
         if let Some(scheduler) = &self.scheduler {
+            let id = self.id.worker_id() as usize;
+            let _guard = scheduler.worker_access[id].mtx.lock().unwrap();
             // Set the state to shutting down
-            scheduler.worker_access[self.id.worker_id() as usize]
+            scheduler.worker_access[id]
                 .state
                 .0
                 .store(WORKER_STATE_SHUTTINGDOWN, std::sync::atomic::Ordering::SeqCst);
