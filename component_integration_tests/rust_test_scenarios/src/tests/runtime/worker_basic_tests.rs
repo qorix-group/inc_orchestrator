@@ -1,3 +1,4 @@
+use crate::internals::helpers::execution_barrier::RuntimeJoiner;
 use crate::internals::helpers::runtime_helper::Runtime;
 use crate::internals::test_case::TestCase;
 
@@ -41,15 +42,14 @@ impl TestCase for BasicWorkerTest {
         let logic = TestInput::new(&input);
         let mut rt = Runtime::new(&input).build();
 
-        let _ = rt
-            .block_on(async move {
-                for name in logic.tasks.as_slice() {
-                    spawn(simple_task(name.to_string()));
-                }
+        let mut joiner = RuntimeJoiner::new();
+        let _ = rt.block_on(async move {
+            for name in logic.tasks.as_slice() {
+                joiner.add_handle(spawn(simple_task(name.to_string())));
+            }
 
-                Ok(0)
-            })
-            .unwrap();
+            Ok(joiner.wait_for_all().await)
+        });
 
         std::thread::sleep(std::time::Duration::from_millis(100));
         Ok(())

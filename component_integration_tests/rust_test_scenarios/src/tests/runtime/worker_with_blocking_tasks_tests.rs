@@ -1,4 +1,4 @@
-use crate::internals::helpers::execution_barrier::MultiExecutionBarrier;
+use crate::internals::helpers::execution_barrier::{MultiExecutionBarrier, RuntimeJoiner};
 use crate::internals::helpers::runtime_helper::Runtime;
 use crate::internals::test_case::TestCase;
 
@@ -64,25 +64,27 @@ impl TestCase for WorkerWithBlockingTasksTest {
         let mut rt = Runtime::new(&input).build();
 
         let _ = rt.block_on(async move {
+            let mut joiner = RuntimeJoiner::new();
             let mid_barrier = MultiExecutionBarrier::new(logic.blocking_tasks.len());
             let mut mid_notifiers = mid_barrier.get_notifiers();
 
             let counter = Arc::new(AtomicUsize::new(0));
             let all_tasks_count: usize = logic.blocking_tasks.len() + logic.non_blocking_tasks.len();
             for name in logic.blocking_tasks.as_slice() {
-                spawn(blocking_task(
+                joiner.add_handle(spawn(blocking_task(
                     name.to_string(),
                     counter.clone(),
                     all_tasks_count,
                     mid_notifiers.pop().unwrap(),
-                ));
+                )));
             }
             mid_barrier.wait_for_notification(Duration::from_secs(5)).unwrap();
 
             for name in logic.non_blocking_tasks.as_slice() {
-                spawn(non_blocking_task(name.to_string(), counter.clone()));
+                joiner.add_handle(spawn(non_blocking_task(name.to_string(), counter.clone())));
             }
-            Ok(0)
+
+            Ok(joiner.wait_for_all().await)
         });
 
         std::thread::sleep(std::time::Duration::from_millis(100));
