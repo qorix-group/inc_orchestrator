@@ -18,7 +18,6 @@ use orchestration::{
     actions::internal::prelude::*,
     api::{design::Design, Orchestration},
     common::{tag::Tag, DesignConfig},
-    program::internal::ProgramBuilder,
 };
 
 mod common;
@@ -35,22 +34,22 @@ fn example_component_design() -> Result<Design, CommonErrors> {
     let evt2 = design.register_event(Tag::from_str_static("Event2"))?;
     // Create a program with some actions
 
-    design.add_program("ExampleDesignProgram".into(), move |design_instance| {
+    design.add_program("ExampleDesignProgram", move |design_instance, builder| {
         let t3_tag = design_instance.get_orchestration_tag("test3".into())?;
 
-        Ok(ProgramBuilder::new("ProgramName")
-            .with_body(
-                SequenceBuilder::new()
-                    .with_step(TriggerBuilder::from_design("Event1", &design_instance))
-                    .with_step(Invoke::from_tag(&t1_tag))
-                    .with_step(Invoke::from_tag(&t2_tag))
-                    .with_step(Invoke::from_tag(&t2_tag))
-                    .with_step(SyncBuilder::from_tag(&evt1))
-                    .with_step(SyncBuilder::from_tag(&evt2))
-                    .with_step(Invoke::from_tag(&t3_tag))
-                    .build(),
-            )
-            .build())
+        builder.with_body(
+            SequenceBuilder::new()
+                .with_step(TriggerBuilder::from_design("Event1", &design_instance))
+                .with_step(Invoke::from_tag(&t1_tag))
+                .with_step(Invoke::from_tag(&t2_tag))
+                .with_step(Invoke::from_tag(&t2_tag))
+                .with_step(SyncBuilder::from_tag(&evt1))
+                .with_step(SyncBuilder::from_tag(&evt2))
+                .with_step(Invoke::from_tag(&t3_tag))
+                .build(),
+        );
+
+        Ok(())
     });
 
     Ok(design)

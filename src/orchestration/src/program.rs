@@ -286,7 +286,7 @@ pub mod internal {
             })
         }
 
-        pub fn with_body(mut self, action: Box<dyn ActionTrait>) -> Self {
+        pub fn with_body(&mut self, action: Box<dyn ActionTrait>) -> &mut Self {
             self.0.action = Some(action);
             self
         }

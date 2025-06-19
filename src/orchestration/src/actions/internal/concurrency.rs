@@ -36,7 +36,7 @@ use std::task::{Context, Poll};
 /// Allows adding multiple branches (actions) and finalizing into a [`Concurrency`] object.
 /// Requires at least one branch to be added before building.
 pub struct ConcurrencyBuilder {
-    actions: GrowableVec<Box<dyn ActionTrait>>,
+    actions: Option<GrowableVec<Box<dyn ActionTrait>>>,
 }
 
 /// Final concurrency object, ready for execution.
@@ -55,16 +55,13 @@ pub struct Concurrency {
 impl ConcurrencyBuilder {
     /// Create a new concurrency builder.
     pub fn new() -> Self {
-        Self {
-            // Initialize with a growable vector for actions with a minimum capacity of 2.
-            actions: GrowableVec::new(2),
-        }
+        Self { actions: None }
     }
 
     /// Add a new branch (concurrent action).
     /// Returns a mutable reference to self for chaining.
     pub fn with_branch(&mut self, action: Box<dyn ActionTrait>) -> &mut Self {
-        self.actions.push(action);
+        self.actions.get_or_insert(GrowableVec::new(2)).push(action);
         self
     }
 
@@ -72,17 +69,19 @@ impl ConcurrencyBuilder {
     ///
     /// # Panics
     /// Panics if no branch is added.
-    pub fn build(mut self) -> Box<Concurrency> {
+    pub fn build(&mut self) -> Box<Concurrency> {
         const REUSABLE_OBJECT_POOL_SIZE: usize = 1;
-        self.actions.lock();
-        let length = self.actions.len();
-        assert!(length >= 1, "Concurrency requires at least one branch.");
+
+        let mut actions = self.actions.take().expect("Concurrency requires at least one branch.");
+        actions.lock();
+        let length = actions.len();
+
         Box::new(Concurrency {
             base: ActionBaseMeta {
                 tag: "orch::internal::concurrency".into(),
                 reusable_future_pool: Concurrency::create_reusable_future_pool(REUSABLE_OBJECT_POOL_SIZE),
             },
-            actions: self.actions.into(),
+            actions: actions.into(),
             futures_vec_pool: ReusableVecPool::<ActionMeta>::new(REUSABLE_OBJECT_POOL_SIZE, |_| Vec::new(length)),
         })
     }
@@ -297,7 +296,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "Concurrency requires at least one branch.")]
     fn concurrency_builder_panics_with_no_branch() {
-        let concurrency_builder = ConcurrencyBuilder::new();
+        let mut concurrency_builder = ConcurrencyBuilder::new();
         let _ = concurrency_builder.build();
     }
 
