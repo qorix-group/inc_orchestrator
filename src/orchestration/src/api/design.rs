@@ -18,7 +18,7 @@ use foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
 use crate::{
     actions::internal::invoke,
     common::{orch_tag::OrchestrationTag, tag::Tag, DesignConfig},
-    program::internal::Program,
+    program::internal::{self, Program},
     program_database::ProgramDatabase,
 };
 
@@ -85,11 +85,11 @@ impl Design {
     }
 
     /// Adds a program to the design. The program is created using the provided closure, which receives a mutable reference to the design.
-    pub fn add_program<F>(&mut self, id: ProgramTag, program_creator: F)
+    pub fn add_program<F>(&mut self, name: &'static str, program_creator: F)
     where
-        F: FnOnce(&mut Self) -> Result<Program, CommonErrors> + 'static,
+        F: FnOnce(&mut Self, &mut internal::ProgramBuilder) -> Result<(), CommonErrors> + 'static,
     {
-        self.programs.push(ProgramData::new(id, Box::new(program_creator)));
+        self.programs.push(ProgramData::new(name, Box::new(program_creator)));
     }
 
     pub(crate) fn has_any_programs(&self) -> bool {
@@ -98,22 +98,23 @@ impl Design {
 
     pub(super) fn get_programs(mut self, mut container: GrowableVec<Program>) -> Result<GrowableVec<Program>, CommonErrors> {
         while let Some(program_data) = self.programs.pop() {
-            let program = (program_data.1)(&mut self)?;
-            container.push(program);
+            let mut builder = internal::ProgramBuilder::new(program_data.0);
+            (program_data.1)(&mut self, &mut builder)?;
+            container.push(builder.build());
         }
 
         Ok(container)
     }
 }
 
-type ProgramBuilderFn = Box<dyn FnOnce(&mut Design) -> Result<Program, CommonErrors>>;
+type ProgramBuilderFn = Box<dyn FnOnce(&mut Design, &mut internal::ProgramBuilder) -> Result<(), CommonErrors>>;
 
 #[allow(dead_code)]
-pub(super) struct ProgramData(ProgramTag, ProgramBuilderFn);
+pub(super) struct ProgramData(&'static str, ProgramBuilderFn);
 
 impl ProgramData {
-    pub(super) fn new(id: ProgramTag, program: ProgramBuilderFn) -> Self {
-        Self(id, program)
+    pub(super) fn new(name: &'static str, program: ProgramBuilderFn) -> Self {
+        Self(name, program)
     }
 }
 

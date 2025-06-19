@@ -179,7 +179,7 @@ mod tests {
             {
                 let lock_res = lock_l.try_lock();
 
-                let local = match lock_res {
+                match lock_res {
                     Ok(guard) => {
                         guard.with_mut(|v| *v = 44);
                         true
@@ -188,7 +188,7 @@ mod tests {
                 };
             }
 
-            let res = handle.join().unwrap();
+            let _ = handle.join().unwrap();
 
             // We dont assert anything, we are fine with running it by loom and breaking when concurrent access to UnsafeCell happens
         });
