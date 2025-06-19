@@ -12,7 +12,10 @@
 //
 
 use super::action::{ActionBaseMeta, ActionExecError, ActionResult, ActionTrait, ReusableBoxFutureResult, UserErrValue};
-use crate::common::{orch_tag::OrchestrationTag, tag::Tag};
+use crate::{
+    api::design::Design,
+    common::{orch_tag::OrchestrationTag, tag::Tag},
+};
 use async_runtime::{
     core::types::UniqueWorkerId, futures::reusable_box_future::ReusableBoxFuture, futures::reusable_box_future::ReusableBoxFuturePool,
 };
@@ -37,6 +40,18 @@ impl Invoke {
     /// Create an invoke action out of an orchestration tag.
     pub fn from_tag(tag: &OrchestrationTag) -> Box<dyn ActionTrait> {
         (*tag.action_provider()).borrow_mut().provide_invoke(*tag.key()).unwrap()
+    }
+
+    pub fn from_design(name: &str, design: &Design) -> Box<dyn ActionTrait> {
+        let tag = design.get_orchestration_tag(name.into());
+        assert!(
+            tag.is_ok(),
+            "Failed to create invoke with name '{}', design/deployment errors where not handled properly before or You passing wrong name. ({:?})",
+            name,
+            tag
+        );
+
+        Self::from_tag(&tag.unwrap())
     }
 
     pub(crate) fn from_fn(tag: Tag, action: InvokeFunctionType, worker_id: Option<UniqueWorkerId>) -> Box<dyn ActionTrait> {

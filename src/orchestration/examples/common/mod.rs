@@ -12,8 +12,12 @@
 //
 #![allow(dead_code)]
 
+use std::sync::atomic::{AtomicU32, Ordering};
+
 use async_runtime::futures::yield_now;
 use foundation::prelude::*;
+use orchestration::actions::internal::action::UserErrValue;
+use orchestration::api::design::Design;
 use orchestration::prelude::ActionResult;
 
 use orchestration::actions::internal::invoke::InvokeResult;
@@ -82,21 +86,63 @@ pub async fn test4_func() -> ActionResult {
 
 pub fn test1_sync_func() -> InvokeResult {
     info!("Start of 'test1_sync_func' function.");
-    let _ = busy_sleep();
+
     info!("End of 'test1_sync_func' function.");
     Ok(())
 }
 
 pub fn test2_sync_func() -> InvokeResult {
     info!("Start of 'test2_sync_func' function.");
-    let _ = busy_sleep();
+
     info!("End of 'test2_sync_func' function.");
     Ok(())
 }
 
 pub fn test3_sync_func() -> InvokeResult {
     info!("Start of 'test3_sync_func' function.");
-    let _ = busy_sleep();
+
     info!("End of 'test3_sync_func' function.");
+    Ok(())
+}
+
+pub fn test4_sync_func() -> InvokeResult {
+    info!("Start of 'test4_sync_func' function.");
+
+    info!("End of 'test4_sync_func' function.");
+    Ok(())
+}
+
+pub fn always_produce_error() -> InvokeResult {
+    error!("Executed 'always_produce_error' function.");
+    UserErrValue::from(123).into()
+}
+
+pub fn error_after_third_run() -> InvokeResult {
+    static CALL_COUNT: AtomicU32 = AtomicU32::new(0);
+
+    let count = CALL_COUNT.fetch_add(1, Ordering::Relaxed) + 1;
+
+    if count > 3 {
+        error!("Executed 'error_after_third_run' function  with count {}", count);
+        UserErrValue::from(3456).into()
+    } else {
+        info!("Executed 'error_after_third_run' function with count {}", count);
+        Ok(())
+    }
+}
+
+pub fn register_all_common_into_design(design: &mut Design) -> Result<(), CommonErrors> {
+    design.register_invoke_fn("test1_sync_func".into(), test1_sync_func)?;
+    design.register_invoke_fn("test2_sync_func".into(), test2_sync_func)?;
+    design.register_invoke_fn("test3_sync_func".into(), test3_sync_func)?;
+    design.register_invoke_fn("test4_sync_func".into(), test4_sync_func)?;
+    design.register_invoke_fn("always_produce_error".into(), always_produce_error)?;
+    design.register_invoke_fn("error_after_third_run".into(), error_after_third_run)?;
+
+    design.register_event("Event1".into())?;
+    design.register_event("Event2".into())?;
+    design.register_event("Event3".into())?;
+    design.register_event("Event4".into())?;
+
     Ok(())
 }
