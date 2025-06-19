@@ -5,6 +5,8 @@ on:
     branches: [main, development]
     types: [opened, ready_for_review, reopened, synchronize]
 
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 jobs:
   lint-fmt-clippy:
     timeout-minutes: 6 # 6 minutes is the maximum allowed for a cold run
@@ -16,6 +18,8 @@ jobs:
 
       - name: Install protoc
         uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache Cargo registry, git deps & target
         uses: actions/cache@v3

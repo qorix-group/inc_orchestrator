@@ -1,6 +1,12 @@
 name: 'Setup Rust Build Environment'
 description: 'Checks out code, installs protoc, and caches cargo dependencies'
 
+inputs:
+  repo-token:
+    description: 'GitHub token for protoc downloads'
+    required: true
+
+
 runs:
   using: "composite"
   steps:
@@ -9,6 +15,8 @@ runs:
 
     - name: Install protoc
       uses: arduino/setup-protoc@v3
+      with:
+        repo-token: ${{ inputs.repo-token }}
 
     - name: Cache cargo & target
       uses: actions/cache@v3
