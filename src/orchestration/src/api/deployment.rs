@@ -15,11 +15,11 @@ use foundation::prelude::CommonErrors;
 
 use crate::{
     api::{
-        design::{Design, DesignTag, ProgramTag},
+        design::{Design, DesignTag},
         OrchestrationApi,
     },
     common::tag::Tag,
-    program::internal::Program,
+    program::internal::{self},
 };
 
 pub struct Deployment<'a, T> {
@@ -70,9 +70,9 @@ impl<T> Deployment<'_, T> {
     /// `Err(CommonErrors::AlreadyDone)` if the design already has programs
     /// `Err(CommonErrors::NotFound)` if the design with the specified tag was not
     ///
-    pub fn add_program<F>(&mut self, design_tag: DesignTag, program: F, tag: ProgramTag) -> Result<(), CommonErrors>
+    pub fn add_program<F>(&mut self, design_tag: DesignTag, program: F, name: &'static str) -> Result<(), CommonErrors>
     where
-        F: FnOnce(&mut Design) -> Result<Program, CommonErrors> + 'static,
+        F: FnOnce(&mut Design, &mut internal::ProgramBuilder) -> Result<(), CommonErrors> + 'static,
     {
         let p = &mut self.api.designs.iter_mut().find(|d| d.id() == design_tag);
 
@@ -80,7 +80,7 @@ impl<T> Deployment<'_, T> {
             if design.has_any_programs() {
                 Err(CommonErrors::AlreadyDone)
             } else {
-                design.add_program(tag, Box::new(program));
+                design.add_program(name, Box::new(program));
                 Ok(())
             }
         } else {

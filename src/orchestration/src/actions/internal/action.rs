@@ -11,7 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use crate::common::tag::Tag;
+use crate::{actions::internal::invoke::InvokeResult, common::tag::Tag};
 
 use async_runtime::futures::reusable_box_future::{ReusableBoxFuture, ReusableBoxFuturePool};
 use foundation::prelude::CommonErrors;
@@ -37,6 +37,12 @@ impl Deref for UserErrValue {
 impl From<u64> for UserErrValue {
     fn from(value: u64) -> Self {
         UserErrValue(value)
+    }
+}
+
+impl From<UserErrValue> for InvokeResult {
+    fn from(value: UserErrValue) -> Self {
+        Err(value)
     }
 }
 

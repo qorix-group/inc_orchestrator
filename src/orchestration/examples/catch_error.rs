@@ -1,0 +1,119 @@
+//
+// Copyright (c) 2025 Contributors to the Eclipse Foundation
+//
+// See the NOTICE file(s) distributed with this work for additional
+// information regarding copyright ownership.
+//
+// This program and the accompanying materials are made available under the
+// terms of the Apache License Version 2.0 which is available at
+// <https://www.apache.org/licenses/LICENSE-2.0>
+//
+// SPDX-License-Identifier: Apache-2.0
+//
+#![allow(unused_imports)]
+use async_runtime::{runtime::async_runtime::AsyncRuntimeBuilder, scheduler::execution_engine::*};
+use foundation::prelude::*;
+use logging_tracing::TracingLibraryBuilder;
+use orchestration::{
+    actions::internal::{
+        catch::ErrorFilter,
+        invoke::Invoke,
+        prelude::{CatchBuilder, ConcurrencyBuilder},
+        sequence::SequenceBuilder,
+    },
+    api::{design::Design, Orchestration},
+    common::DesignConfig,
+    program::internal::ProgramBuilder,
+};
+
+mod common;
+use common::register_all_common_into_design;
+
+fn catch_error_component_design() -> Result<Design, CommonErrors> {
+    let mut design = Design::new("CatchErrorDesign".into(), DesignConfig::default());
+
+    register_all_common_into_design(&mut design)?; // Register our common functions, events, etc
+
+    // Create a program describing task chain
+    design.add_program("CatchErrorProgramDesign".into(), move |design_instance, builder| {
+        builder.with_body(
+            SequenceBuilder::new()
+                .with_step(
+                    CatchBuilder::new(
+                        ErrorFilter::UserErrors.into(),
+                        ConcurrencyBuilder::new()
+                            .with_branch(
+                                SequenceBuilder::new()
+                                    .with_step(Invoke::from_design("test2_sync_func", &design_instance))
+                                    .with_step(Invoke::from_design("test3_sync_func", &design_instance))
+                                    .build(),
+                            )
+                            .with_branch(
+                                SequenceBuilder::new()
+                                    .with_step(Invoke::from_design("test1_sync_func", &design_instance))
+                                    .with_step(Invoke::from_design("error_after_third_run", &design_instance))
+                                    .build(),
+                            )
+                            .build(),
+                    )
+                    .catch(|e| {
+                        // Handle the error, e.g., log it or take some action
+                        error!("Caught error: {:?}. This is not recoverable and we will stop execution", e);
+                    })
+                    .build(),
+                )
+                .with_step(Invoke::from_design("test4_sync_func", &design_instance))
+                .with_step(
+                    CatchBuilder::new(
+                        ErrorFilter::UserErrors.into(),
+                        Invoke::from_design("always_produce_error", &design_instance),
+                    )
+                    .catch_recoverable(|e| {
+                        // Handle the error, e.g., log it or take some action
+                        info!("Caught error: {:?}. This is catched and we continue executing", e);
+                        true
+                    })
+                    .build(),
+                )
+                .build(),
+        );
+        Ok(())
+    });
+
+    Ok(design)
+}
+
+fn main() {
+    // Examples are treated as tests, so we need to allow routing over mock runtime which we use during testing.
+    unsafe {
+        async_runtime::testing::mock::allow_routing_over_mock();
+    }
+
+    // Setup any logging framework you want to use.
+    let mut logger = TracingLibraryBuilder::new()
+        .global_log_level(Level::DEBUG)
+        // .enable_tracing(TraceScope::AppScope)
+        .enable_logging(true)
+        .build();
+
+    logger.init_log_trace();
+
+    // Create runtime
+    let (builder, _engine_id) = AsyncRuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(256).workers(2));
+    let mut runtime = builder.build().unwrap();
+
+    // Build Orchestration
+    let orch = Orchestration::new()
+        .add_design(catch_error_component_design().expect("Failed to create design"))
+        .design_done();
+
+    // Create programs
+    let mut programs = orch.create_programs().unwrap();
+
+    // Put programs into runtime and run them
+    let _ = runtime.block_on(async move {
+        let res = programs.programs.pop().unwrap().run().await;
+        info!("Program finished running with {:?}.", res);
+        Ok(0)
+    });
+}
