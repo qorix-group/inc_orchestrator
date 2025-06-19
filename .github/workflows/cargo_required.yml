@@ -9,6 +9,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   cargo-checks:
@@ -25,6 +26,8 @@ jobs:
 
       - name: Setup Rust Build Environment
         uses: ./.github/actions/setup-rust-build
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       # ---------- BUILD ----------
       - name: Cargo build
