@@ -115,6 +115,14 @@ impl OrchestrationApi<_EmptyTag> {
     /// Returns an `OrchestrationApi` instance with a `_DesignTag` marker, indicating that the design phase is complete.
     ///
     pub fn design_done(self) -> OrchestrationApi<_DesignTag> {
+        //TODO: This is temporary and will be removed once iceoryx IPC integration is modified.
+        #[cfg(feature = "iceoryx-ipc")]
+        {
+            use crate::events::iceoryx::event::Event;
+            // Start the event handling thread for Iceoryx IPC
+            Event::get_instance().lock().unwrap().create_polling_thread();
+        }
+
         OrchestrationApi {
             _p: PhantomData,
             designs: self.designs,
