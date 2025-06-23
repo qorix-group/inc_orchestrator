@@ -11,5 +11,15 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+pub mod event_traits;
 pub mod events_provider;
+#[cfg(feature = "iceoryx-ipc")]
+pub(crate) mod iceoryx;
 pub mod local_events;
+#[cfg(not(feature = "iceoryx-ipc"))]
+pub(crate) mod stub_global_events;
+
+#[cfg(feature = "iceoryx-ipc")]
+pub type GlobalEventProvider = super::events::iceoryx::global_events::GlobalEvents;
+#[cfg(not(feature = "iceoryx-ipc"))]
+pub type GlobalEventProvider = super::events::stub_global_events::StubGlobalEvents;

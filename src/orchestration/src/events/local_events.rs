@@ -16,6 +16,7 @@ use std::{future::Future, sync::Arc};
 
 use async_runtime::channels::spmc_broadcast::*;
 
+use crate::events::event_traits::{ListenerTrait, NotifierTrait};
 use crate::{
     actions::internal::action::{ActionExecError, ActionResult},
     core::orch_locks::OrchTryLock,
@@ -23,14 +24,6 @@ use crate::{
 use foundation::prelude::*;
 
 const MAX_NUM_OF_EVENTS: usize = 8;
-
-pub trait NotifierTrait {
-    fn notify(&self, value: u32) -> impl Future<Output = ActionResult> + Send + 'static;
-}
-
-pub trait ListenerTrait {
-    fn next(&mut self) -> impl Future<Output = ActionResult> + Send + 'static;
-}
 
 pub struct LocalEvent {
     sender: Option<Sender<u32, MAX_NUM_OF_EVENTS>>,

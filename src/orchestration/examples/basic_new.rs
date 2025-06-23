@@ -70,12 +70,6 @@ fn main() {
     let (builder, _engine_id) = AsyncRuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(256).workers(2));
     let mut runtime = builder.build().unwrap();
 
-    {
-        // Start the event handling thread.
-        // TODO: Will be removed soon
-        // Event::get_instance().lock().unwrap().create_polling_thread();
-    }
-
     // Build Orchestration
 
     let mut orch = Orchestration::new()

@@ -16,7 +16,7 @@ use crate::{
 };
 
 use super::action::{ActionBaseMeta, ReusableBoxFutureResult};
-use crate::{common::tag::Tag, events::local_events::ListenerTrait};
+use crate::{common::tag::Tag, events::event_traits::ListenerTrait};
 
 use async_runtime::futures::reusable_box_future::*;
 
