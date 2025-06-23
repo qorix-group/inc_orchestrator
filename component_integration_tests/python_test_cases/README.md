@@ -23,3 +23,9 @@
  ```sh
  TEST_BINARY_PATH=../rust_test_scenarios/target/debug/rust_test_scenarios python -m pytest -vv --self-contained-html --html=report.html
  ```
+
+Alternatively, test scenarios can be built directly before test execution with extra pytest argument:
+```sh
+python -m pytest -vv --self-contained-html --html=report.html --build-scenarios
+```
+This will set TEST_BINARY_PATH automatically.
