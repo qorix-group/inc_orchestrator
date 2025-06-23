@@ -15,7 +15,7 @@ use crate::{
     actions::internal::action::ActionTrait,
     api::design::Design,
     common::orch_tag::OrchestrationTag,
-    events::{events_provider::EventActionType, local_events::NotifierTrait},
+    events::{event_traits::NotifierTrait, events_provider::EventActionType},
 };
 
 use super::action::{ActionBaseMeta, ReusableBoxFutureResult};
