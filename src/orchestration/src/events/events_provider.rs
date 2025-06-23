@@ -13,6 +13,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::events::event_traits::IpcProvider;
+use crate::events::GlobalEventProvider;
 use crate::{
     actions::internal::{sync::Sync, trigger::Trigger},
     common::tag::AsTagTrait,
@@ -36,22 +38,27 @@ enum EventType {
 ///
 /// Provides real events into design and allows to specify which design events should map to it.
 ///
-pub struct EventsProvider {
+pub struct EventsProvider<GlobalProvider = GlobalEventProvider>
+where
+    GlobalProvider: IpcProvider,
+{
     events: Vec<DeploymentEventInfo>,
     local_event_next_id: u64,
+    ipc: Rc<RefCell<GlobalProvider>>,
 }
 
-impl Default for EventsProvider {
+impl<GlobalProvider: IpcProvider + 'static> Default for EventsProvider<GlobalProvider> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl EventsProvider {
+impl<GlobalProvider: IpcProvider + 'static> EventsProvider<GlobalProvider> {
     pub fn new() -> Self {
         Self {
             events: Vec::new(DEFAULT_EVENTS_CAPACITY),
             local_event_next_id: 0,
+            ipc: Rc::new(RefCell::new(GlobalProvider::new())),
         }
     }
 
@@ -75,7 +82,7 @@ impl EventsProvider {
             return Err(CommonErrors::AlreadyDone);
         }
 
-        let creator = Self::choose_creator(typ, &system_event_tag, system_event);
+        let creator = self.choose_creator(typ, &system_event_tag, system_event);
 
         self.events.push(DeploymentEventInfo {
             system_tag: system_event_tag,
@@ -92,10 +99,10 @@ impl EventsProvider {
         ))
     }
 
-    fn choose_creator(typ: EventType, tag: &Tag, _system_event: &str) -> EventCreator {
+    fn choose_creator(&self, typ: EventType, tag: &Tag, system_event: &str) -> EventCreator {
         match typ {
             EventType::Local => Self::create_local_event_action(*tag),
-            EventType::Global => todo!(),
+            EventType::Global => Self::create_global_event_action(Rc::clone(&self.ipc), system_event),
         }
     }
 
@@ -114,6 +121,14 @@ impl EventsProvider {
                 }
                 Some(Trigger::new(n?) as Box<dyn ActionTrait>)
             }
+        }))
+    }
+
+    fn create_global_event_action(ipc: Rc<RefCell<GlobalProvider>>, system_event: &str) -> EventCreator {
+        let event = system_event.to_string();
+        Rc::new(RefCell::new(move |typ: EventActionType| match typ {
+            EventActionType::Sync => Some(Sync::new(ipc.borrow_mut().get_listener(event.as_str())?) as Box<dyn ActionTrait>),
+            EventActionType::Trigger => Some(Trigger::new(ipc.borrow_mut().get_notifier(event.as_str())?) as Box<dyn ActionTrait>),
         }))
     }
 }
@@ -179,13 +194,13 @@ mod tests {
 
     #[test]
     fn new_provider() {
-        let provider = EventsProvider::new();
+        let provider: EventsProvider = EventsProvider::new();
         assert_eq!(provider.events.len(), 0);
     }
 
     #[test]
     fn specify_event_duplicate() {
-        let mut provider = EventsProvider::new();
+        let mut provider: EventsProvider = EventsProvider::new();
 
         provider.specify_event("100", EventType::Local).unwrap();
         // Try to specify again with the same system tag
@@ -195,7 +210,7 @@ mod tests {
 
     #[test]
     fn creating_same_trigger_action_twice_causes_fail() {
-        let mut provider = EventsProvider::new();
+        let mut provider: EventsProvider = EventsProvider::new();
 
         let res = provider.specify_event("100", EventType::Local);
         assert!(res.is_ok());
@@ -210,7 +225,7 @@ mod tests {
 
     #[test]
     fn creating_same_sync_action_n_times_works() {
-        let mut provider = EventsProvider::new();
+        let mut provider: EventsProvider = EventsProvider::new();
 
         let res = provider.specify_event("100", EventType::Local);
         assert!(res.is_ok());
@@ -229,7 +244,7 @@ mod tests {
 
     #[test]
     fn sync_trigger_local_pair_works() {
-        let mut provider = EventsProvider::new();
+        let mut provider: EventsProvider = EventsProvider::new();
 
         let res = provider.specify_event("100", EventType::Local);
         assert!(res.is_ok());
@@ -257,7 +272,7 @@ mod tests {
 
     #[test]
     fn sync_trigger_local_from_different_tag_does_not_unblock() {
-        let mut provider = EventsProvider::new();
+        let mut provider: EventsProvider = EventsProvider::new();
 
         let mut res = provider.specify_event("100", EventType::Local);
         assert!(res.is_ok());

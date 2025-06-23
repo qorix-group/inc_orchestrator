@@ -27,4 +27,6 @@ loom = { version = "0.7", features = ["checkpoint"] }
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(orch_tracing)', 'cfg(loom)'] }
 
 [features]
+default = ["iceoryx-ipc"]
 runtime-api-mock = []
+iceoryx-ipc = []
