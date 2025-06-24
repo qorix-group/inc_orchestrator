@@ -50,7 +50,7 @@ fn camera_driver_design() -> Result<Design, CommonErrors> {
     design.register_event("trigger_obj_det".into())?;
 
     design.add_program("camera_driver_design", move |design_instance, builder| {
-        builder.with_body(
+        builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(SyncBuilder::from_design("timer_event", &design_instance))
                 .with_step(Invoke::from_tag(&t1_tag))
@@ -75,7 +75,7 @@ fn timer_design() -> Result<Design, CommonErrors> {
     design.register_event("trigger_obj_det".into())?;
 
     design.add_program("timer_design", move |design_instance, builder| {
-        builder.with_body(
+        builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(Invoke::from_tag(&t1_tag))
                 .with_step(TriggerBuilder::from_design("timer_event", &design_instance))
@@ -102,7 +102,7 @@ fn obj_det_design() -> Result<Design, CommonErrors> {
     design.register_event("trigger_obj_det".into())?;
 
     design.add_program("obj_det_design", move |design_instance, builder| {
-        builder.with_body(
+        builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(SyncBuilder::from_design("trigger_obj_det", &design_instance))
                 .with_step(Invoke::from_tag(&t1_tag))

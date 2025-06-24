@@ -14,7 +14,7 @@ fn single_sequence_design() -> Result<Design, CommonErrors> {
 
     // Create a program with actions
     design.add_program(file!(), move |_design_instance, builder| {
-        builder.with_body(
+        builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(JustLogAction::new("Action1"))
                 .with_step(JustLogAction::new("Action2"))
@@ -63,7 +63,7 @@ fn nested_sequence_design() -> Result<Design, CommonErrors> {
 
     // Create a program with actions
     design.add_program(file!(), move |_design_instance, builder| {
-        builder.with_body(
+        builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(JustLogAction::new("OuterAction1"))
                 .with_step(
@@ -119,7 +119,7 @@ fn awaited_sequence_design() -> Result<Design, CommonErrors> {
 
     // Create a program with actions
     design.add_program(file!(), move |_design_instance, builder| {
-        builder.with_body(
+        builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(JustLogAction::new("Action1"))
                 .with_step(

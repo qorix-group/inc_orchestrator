@@ -23,6 +23,7 @@ use crate::{
     events::events_provider::EventCreator,
 };
 use async_runtime::core::types::UniqueWorkerId;
+use foundation::containers::growable_vec::GrowableVec;
 use foundation::prelude::*;
 use iceoryx2_bb_container::slotmap::{SlotMap, SlotMapKey};
 use std::{
@@ -42,7 +43,7 @@ struct ActionData {
 
 pub(crate) struct ActionProvider {
     clonable_invokes: SlotMap<ActionData>,
-    design_events: SlotMap<DesignEvent>, // accessor to design events
+    design_events: SlotMap<DesignEvent>,
 }
 
 impl ActionProvider {
@@ -61,8 +62,11 @@ impl ActionProvider {
         }
     }
 
-    pub(crate) fn provide_event(&mut self, key: SlotMapKey, typ: EventActionType) -> Option<Box<dyn ActionTrait>> {
-        self.design_events.get(key).and_then(|e| e.creator()?.borrow_mut()(typ))
+    pub(crate) fn provide_event(&mut self, key: SlotMapKey, t: EventActionType) -> Option<Box<dyn ActionTrait>> {
+        match t {
+            EventActionType::Trigger => self.design_events.get(key).and_then(|e| e.creator()?.borrow_mut().create_trigger()),
+            EventActionType::Sync => self.design_events.get(key).and_then(|e| e.creator()?.borrow_mut().create_sync()),
+        }
     }
 }
 
@@ -74,6 +78,7 @@ impl Debug for ActionProvider {
 
 pub struct ProgramDatabase {
     action_provider: Rc<RefCell<ActionProvider>>,
+    design_shutdown_events: GrowableVec<DesignEvent>,
 }
 
 impl ProgramDatabase {
@@ -82,13 +87,14 @@ impl ProgramDatabase {
         // TODO: Provider needs to keep DesignConfig probably so tags can have info from it
         Self {
             action_provider: Rc::new(RefCell::new(ActionProvider::new(params.db_params.clonable_invokes_capacity))),
+            design_shutdown_events: GrowableVec::default(),
         }
     }
 
     pub fn register_event(&self, tag: Tag) -> Result<OrchestrationTag, CommonErrors> {
         let mut ap = self.action_provider.borrow_mut();
 
-        if tag.is_in_collection(ap.design_events.iter()) {
+        if tag.is_in_collection(ap.design_events.iter()) || tag.is_in_collection(self.design_shutdown_events.iter()) {
             return Err(CommonErrors::AlreadyDone);
         }
 
@@ -96,6 +102,20 @@ impl ProgramDatabase {
             .insert(DesignEvent::new(tag))
             .ok_or(CommonErrors::NoSpaceLeft)
             .map(|key| OrchestrationTag::new(tag, key, MapIdentifier::Event, Rc::clone(&self.action_provider)))
+    }
+
+    pub fn register_shutdown_event(&mut self, tag: Tag) -> Result<(), CommonErrors> {
+        let ap = self.action_provider.borrow_mut();
+
+        if tag.is_in_collection(ap.design_events.iter()) || tag.is_in_collection(self.design_shutdown_events.iter()) {
+            return Err(CommonErrors::AlreadyDone);
+        }
+
+        if self.design_shutdown_events.push(DesignEvent::new(tag)) {
+            Ok(())
+        } else {
+            Err(CommonErrors::GenericError)
+        }
     }
 
     /// Registers a function as an invoke action that can be created multiple times.
@@ -233,25 +253,6 @@ impl ProgramDatabase {
         Err(CommonErrors::NoData)
     }
 
-    pub(crate) fn set_event_type(&mut self, creator: EventCreator, remapped_events_tags: &[Tag]) -> Result<(), CommonErrors> {
-        let mut ap = self.action_provider.borrow_mut();
-        let mut ret = Ok(());
-
-        for tag in remapped_events_tags {
-            let item = tag.find_in_collection(ap.design_events.iter());
-
-            if let Some((key, _)) = item {
-                let design_event = ap.design_events.get_mut(key).unwrap();
-
-                design_event.set_creator(creator.clone());
-            } else {
-                ret = Err(CommonErrors::NotFound)
-            }
-        }
-
-        ret
-    }
-
     /// Returns an `OrchestrationTag` for an action previously registered with the given tag.
     ///
     /// # Returns
@@ -282,6 +283,42 @@ impl ProgramDatabase {
             Err(CommonErrors::NotFound)
         }
     }
+
+    pub(crate) fn set_creator_for_events(&self, creator: EventCreator, user_events: &[Tag]) -> Result<(), CommonErrors> {
+        let mut ap = self.action_provider.borrow_mut();
+        let mut ret = Ok(());
+
+        for event in user_events {
+            let item = event.find_in_collection(ap.design_events.iter());
+
+            if let Some((key, _)) = item {
+                ap.design_events.get_mut(key).unwrap().set_creator(Rc::clone(&creator));
+            } else {
+                ret = Err(CommonErrors::NotFound)
+            }
+        }
+
+        ret
+    }
+
+    pub(crate) fn set_creator_for_shutdown_event(&mut self, creator: EventCreator, shutdown_event: Tag) -> Result<(), CommonErrors> {
+        if let Some(design_event) = shutdown_event.find_in_collection(self.design_shutdown_events.iter_mut()) {
+            design_event.set_creator(Rc::clone(&creator));
+            Ok(())
+        } else {
+            Err(CommonErrors::NotFound)
+        }
+    }
+
+    pub(crate) fn get_creator_for_shutdown_event(&self, shutdown_event: Tag) -> Result<EventCreator, CommonErrors> {
+        if let Some(design_event) = shutdown_event.find_in_collection(self.design_shutdown_events.iter()) {
+            if let Some(creator) = design_event.creator() {
+                return Ok(creator);
+            }
+        }
+
+        Err(CommonErrors::NotFound)
+    }
 }
 
 impl Default for ProgramDatabase {
@@ -300,7 +337,11 @@ impl AsTagTrait for (SlotMapKey, &ActionData) {
 #[cfg(not(loom))]
 mod tests {
     use super::*;
-    use crate::{actions::action::ActionExecError, testing::OrchTestingPoller};
+    use crate::{
+        actions::action::ActionExecError,
+        events::events_provider::{EventCreatorTrait, ShutdownNotifier},
+        testing::OrchTestingPoller,
+    };
     use std::task::Poll;
     use testing_macros::ensure_clear_mock_runtime;
 
@@ -589,16 +630,32 @@ mod tests {
 
     #[test]
     fn specify_event_local_success() {
-        let mut pd = ProgramDatabase::default();
+        let pd = ProgramDatabase::default();
 
         let tag1 = make_tag(1);
         let tag2 = make_tag(2);
         pd.register_event(tag1).unwrap();
         pd.register_event(tag2).unwrap();
 
-        let creator: EventCreator = Rc::new(RefCell::new(|_| todo!()));
+        struct TestEventCreator {}
 
-        let res = pd.set_event_type(creator, &[tag1, tag2]);
+        impl EventCreatorTrait for TestEventCreator {
+            fn create_trigger(&mut self) -> Option<Box<dyn ActionTrait>> {
+                todo!()
+            }
+
+            fn create_sync(&mut self) -> Option<Box<dyn ActionTrait>> {
+                todo!()
+            }
+
+            fn create_shutdown_notifier(&mut self) -> Option<Box<dyn ShutdownNotifier>> {
+                todo!()
+            }
+        }
+
+        let creator: EventCreator = Rc::new(RefCell::new(TestEventCreator {}));
+
+        let res = pd.set_creator_for_events(creator, &[tag1, tag2]);
         assert!(res.is_ok());
 
         // Both design events should have a creator now

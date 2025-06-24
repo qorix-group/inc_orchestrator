@@ -30,7 +30,7 @@ fn program1_component_design() -> Result<Design, CommonErrors> {
 
     // Create a program describing task chain
     design.add_program("ExampleDesign1".into(), move |design_instance, builder| {
-        builder.with_body(
+        builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(SyncBuilder::from_design("Event1", &design_instance))
                 .with_step(Invoke::from_design("test1_sync_func", &design_instance))
@@ -49,7 +49,7 @@ fn program2_component_design() -> Result<Design, CommonErrors> {
 
     // Create a program describing task chain
     design.add_program("ExampleDesign2".into(), move |design_instance, builder| {
-        builder.with_body(
+        builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(Invoke::from_design("test4_sync_func", &design_instance))
                 .with_step(TriggerBuilder::from_design("Event1", &design_instance))

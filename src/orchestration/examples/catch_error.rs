@@ -32,7 +32,7 @@ fn catch_error_component_design() -> Result<Design, CommonErrors> {
 
     // Create a program describing task chain
     design.add_program("CatchErrorProgramDesign".into(), move |design_instance, builder| {
-        builder.with_body(
+        builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(
                     CatchBuilder::new(

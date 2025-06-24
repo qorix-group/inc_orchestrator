@@ -11,20 +11,18 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::{
-    future::Future,
-    ops::Deref,
-    sync::{Arc, Mutex},
-};
-
-use foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
-
 use crate::{
     actions::invoke,
     common::{orch_tag::OrchestrationTag, tag::Tag, DesignConfig},
     prelude::InvokeResult,
     program::{Program, ProgramBuilder},
     program_database::ProgramDatabase,
+};
+use foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
+use std::{
+    future::Future,
+    ops::Deref,
+    sync::{Arc, Mutex},
 };
 
 pub type ProgramTag = Tag;
@@ -49,7 +47,7 @@ impl Deref for DesignConfigBounded {
 pub struct Design {
     id: DesignTag,
     params: DesignConfig, // TODO: probably remove when we store it in ProgramDatabase
-    pub(super) db: ProgramDatabase,
+    pub(crate) db: ProgramDatabase,
     programs: GrowableVec<ProgramData>,
 }
 
@@ -75,10 +73,12 @@ impl Design {
         self.id
     }
 
+    /// Registers a function as an invoke action.
     pub fn register_invoke_fn(&self, tag: Tag, action: invoke::InvokeFunctionType) -> Result<OrchestrationTag, CommonErrors> {
         self.db.register_invoke_fn(tag, action)
     }
 
+    /// Registers an async function as an invoke action
     pub fn register_invoke_async<A, F>(&self, tag: Tag, action: A) -> Result<OrchestrationTag, CommonErrors>
     where
         A: Fn() -> F + 'static + Send + Clone,
@@ -87,6 +87,7 @@ impl Design {
         self.db.register_invoke_async(tag, action)
     }
 
+    /// Registers a method on an object as an invoke action.
     pub fn register_invoke_method<T: 'static + Send>(
         &self,
         tag: Tag,
@@ -96,6 +97,7 @@ impl Design {
         self.db.register_invoke_method(tag, object, method)
     }
 
+    /// Registers an async method on an object as an invoke action.
     pub fn register_invoke_method_async<T, M, F>(&self, tag: Tag, object: Arc<Mutex<T>>, method: M) -> Result<OrchestrationTag, CommonErrors>
     where
         T: 'static + Send,
@@ -108,6 +110,11 @@ impl Design {
     /// Registers an event in the design and returns an [`OrchestrationTag`] that can be used to reference this event in programs.
     pub fn register_event(&self, tag: Tag) -> Result<OrchestrationTag, CommonErrors> {
         self.db.register_event(tag)
+    }
+
+    /// Registers a shutdown event in the design.
+    pub fn register_shutdown_event(&mut self, tag: Tag) -> Result<(), CommonErrors> {
+        self.db.register_shutdown_event(tag)
     }
 
     /// Fetches an [`OrchestrationTag`] for a given tag, which can be used to reference the orchestration in programs.
@@ -131,7 +138,7 @@ impl Design {
         while let Some(program_data) = self.programs.pop() {
             let mut builder = ProgramBuilder::new(program_data.0);
             (program_data.1)(&mut self, &mut builder)?;
-            container.push(builder.build());
+            container.push(builder.build(&mut self)?);
         }
 
         Ok(container)

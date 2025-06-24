@@ -19,7 +19,7 @@ fn single_concurrency_design() -> Result<Design, CommonErrors> {
 
     // Create a program with actions
     design.add_program(file!(), move |_design_instance, builder| {
-        builder.with_body(
+        builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(
                     ConcurrencyBuilder::new()
@@ -79,7 +79,7 @@ fn multiple_concurrency_design() -> Result<Design, CommonErrors> {
     let t6_tag = design.register_invoke_fn("Function6".into(), generic_test_func!("Function6"))?;
     // Create a program with actions
     design.add_program(file!(), move |_design_instance, builder| {
-        builder.with_body(
+        builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(
                     ConcurrencyBuilder::new()
@@ -146,7 +146,7 @@ fn nested_concurrency_design() -> Result<Design, CommonErrors> {
 
     // Create a program with actions
     design.add_program(file!(), move |_design_instance, builder| {
-        builder.with_body(
+        builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(
                     ConcurrencyBuilder::new()
