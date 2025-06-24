@@ -98,7 +98,7 @@ impl TimeDriver {
         inner.next_process_time().map(|(instant, _)| instant)
     }
 
-    pub fn instant_into_u64(&self, point: Instant) -> u64 {
+    pub fn instant_into_u64(&self, point: &Instant) -> u64 {
         point
             .saturating_duration_since(self.start_time)
             .as_millis()
@@ -106,10 +106,11 @@ impl TimeDriver {
             .unwrap_or(u64::MAX)
     }
 
-    pub fn duration_since_now(&self, point: Instant) -> Duration {
+    // This will saturate to 0 if `point` is before `now`.
+    pub fn duration_since_now(&self, point: &Instant) -> Duration {
         let now = Clock::now();
 
-        Duration::from_millis(self.instant_into_u64(point) - self.instant_into_u64(now))
+        Duration::from_millis(self.instant_into_u64(point).saturating_sub(self.instant_into_u64(&now)))
     }
 }
 

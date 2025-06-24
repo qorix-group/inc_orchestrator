@@ -13,6 +13,7 @@
 
 pub use crate::sync::foundation_atomic::*;
 pub use iceoryx2_bb_container::vec::*;
+pub use iceoryx2_bb_elementary::scope_guard::*;
 pub use iceoryx2_bb_lock_free::*;
 
 pub use crate::types::*;
