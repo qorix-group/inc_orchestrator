@@ -11,9 +11,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #![allow(dead_code)]
-use std::{ops::Deref, sync::Arc, task::Waker, time::Duration};
+use std::{ops::Deref, sync::Arc, task::Waker};
 
 use foundation::prelude::FoundationAtomicU64;
+use foundation::prelude::ScopeGuardBuilder;
 use foundation::prelude::*;
 
 use crate::{
@@ -84,35 +85,37 @@ impl Inner {
     }
 
     pub fn park(&self, scheduler: &AsyncScheduler, worker: &WorkerInteractor) {
+        let _exit_guard = ScopeGuardBuilder::new(true)
+            .on_init(|_| Ok(()) as Result<(), ()>)
+            .on_drop(|_| {
+                self.time.process_timeouts(Clock::now());
+            })
+            .create()
+            .unwrap();
+
         let expire_time = self.time.next_process_time();
 
         if expire_time.is_none() {
             // No expiration is there, I sleep indefinitely
             debug!("No next expiration time, parking indefinitely");
             self.park_on_cv(scheduler, worker);
-        } else {
-            let expire_time_instant = expire_time.unwrap();
-            let expire_time_u64 = self.time.instant_into_u64(expire_time_instant);
-
-            // This is th last time we promised to wakeup this worker
-            let previous_wakeup_time = self.get_last_wakeup_time_for_worker();
-            let global_promis_next_time_wakeup = self.next_promised_wakeup.load(std::sync::atomic::Ordering::Relaxed);
-
-            if (expire_time_u64 == global_promis_next_time_wakeup) && (previous_wakeup_time != expire_time_u64) {
-                debug!("Someone else waiting on timewheel, we will park on cv without timeout");
-                self.park_on_cv(scheduler, worker);
-            } else {
-                // We sleep to new timeout
-                self.next_promised_wakeup.store(expire_time_u64, std::sync::atomic::Ordering::Relaxed);
-                self.stash_promised_wakeup_time_for_worker(expire_time_u64);
-
-                let dur = self.time.duration_since_now(expire_time_instant);
-
-                self.park_on_cv_timeout(scheduler, worker, dur);
-            }
+            return;
         }
 
-        self.time.process_timeouts(Clock::now());
+        let expire_time_instant = expire_time.unwrap();
+        let expire_time_u64 = self.time.instant_into_u64(&expire_time_instant);
+
+        // This is th last time we promised to wakeup this worker
+        let previous_wakeup_time = self.get_last_wakeup_time_for_worker();
+        let global_promis_next_time_wakeup = self.next_promised_wakeup.load(std::sync::atomic::Ordering::Relaxed);
+
+        if (expire_time_u64 == global_promis_next_time_wakeup) && (previous_wakeup_time != expire_time_u64) {
+            debug!("Someone else waiting on timewheel, we will park on cv without timeout");
+            self.park_on_cv(scheduler, worker);
+            return;
+        }
+
+        self.park_on_cv_timeout(scheduler, worker, &expire_time_instant, expire_time_u64);
     }
 
     fn park_on_cv(&self, scheduler: &AsyncScheduler, worker: &WorkerInteractor) {
@@ -157,7 +160,7 @@ impl Inner {
             ) {
                 Ok(_) => {
                     scheduler.transition_from_parked(worker_id);
-                    debug!("Woken up from sleep");
+                    debug!("Woken up from sleep after notification in park_on_cv");
                     break;
                 }
                 Err(WORKER_STATE_SHUTTINGDOWN) => {
@@ -171,7 +174,7 @@ impl Inner {
         }
     }
 
-    fn park_on_cv_timeout(&self, scheduler: &AsyncScheduler, worker: &WorkerInteractor, dur: Duration) {
+    fn park_on_cv_timeout(&self, scheduler: &AsyncScheduler, worker: &WorkerInteractor, expire_time_instant: &Instant, expire_time_u64: u64) {
         let worker_id = ctx_get_worker_id().worker_id() as usize;
 
         let mut guard = worker.mtx.lock().unwrap();
@@ -182,9 +185,7 @@ impl Inner {
             std::sync::atomic::Ordering::SeqCst,
             std::sync::atomic::Ordering::SeqCst,
         ) {
-            Ok(_) => {
-                debug!("Definite sleep decision, sleeps next {} ms", dur.as_millis());
-            }
+            Ok(_) => {}
             Err(WORKER_STATE_NOTIFIED) => {
                 // We were notified before, so we shall continue
                 scheduler.transition_from_parked(worker_id);
@@ -202,8 +203,20 @@ impl Inner {
             }
         }
 
+        let mut dur = self.time.duration_since_now(expire_time_instant);
+        if dur.is_zero() {
+            warn!("Tried to park on cv with duration zero or lower, looks like a worker was stuck for some time, unparking immediately");
+            return;
+        }
+
+        // We sleep to new timeout
+        self.next_promised_wakeup.store(expire_time_u64, std::sync::atomic::Ordering::Relaxed);
+        self.stash_promised_wakeup_time_for_worker(expire_time_u64);
+
         loop {
             let wait_result;
+
+            debug!("Definite sleep decision, try sleep {} ms", dur.as_millis());
 
             (guard, wait_result) = worker.cv.wait_timeout(guard, dur).unwrap();
 
@@ -223,7 +236,7 @@ impl Inner {
                 ) {
                     Ok(_) => {
                         scheduler.transition_from_parked(worker_id);
-                        debug!("Woken up from sleep after timeout");
+                        debug!("Woken up from sleep by notification in park_on_cv_timeout");
                         break;
                     }
                     Err(WORKER_STATE_SHUTTINGDOWN) => {
@@ -231,6 +244,8 @@ impl Inner {
                         break;
                     }
                     Err(_) => {
+                        dur = self.time.duration_since_now(expire_time_instant);
+
                         continue; // spurious wake-up
                     }
                 }

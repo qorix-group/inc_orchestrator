@@ -99,7 +99,8 @@
     "python.testing.pytestEnabled": true,
     "cSpell.words": [
         "imidietelly",
-        "nondecreasing"
+        "nondecreasing",
+        "timewheel"
     ],
     "editor.formatOnSave": true,
     "[rust]": {
