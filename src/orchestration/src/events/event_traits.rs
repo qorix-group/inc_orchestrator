@@ -17,6 +17,7 @@ use std::future::Future;
 /// NotifierTrait defines the interface for a notifier that can notify listeners with a value.
 pub trait NotifierTrait {
     fn notify(&self, value: u32) -> impl Future<Output = ActionResult> + Send + 'static;
+    fn notify_sync(&self, value: u32) -> ActionResult;
 }
 
 /// ListenerTrait defines the interface for a listener that can listen for notifications and return an action result.

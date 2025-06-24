@@ -37,7 +37,7 @@ fn example_component_design() -> Result<Design, CommonErrors> {
     design.add_program("ExampleDesignProgram", move |design_instance, builder| {
         let t3_tag = design_instance.get_orchestration_tag("test3".into())?;
 
-        builder.with_body(
+        builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(TriggerBuilder::from_design("Event1", &design_instance))
                 .with_step(Invoke::from_tag(&t1_tag))

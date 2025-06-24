@@ -13,8 +13,9 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::events::event_traits::IpcProvider;
+use crate::events::event_traits::{IpcProvider, NotifierTrait};
 use crate::events::GlobalEventProvider;
+use crate::prelude::ActionResult;
 use crate::{
     actions::{sync::Sync, trigger::Trigger},
     common::tag::AsTagTrait,
@@ -44,7 +45,7 @@ where
 {
     events: Vec<DeploymentEventInfo>,
     local_event_next_id: u64,
-    ipc: Rc<RefCell<GlobalProvider>>,
+    pub(crate) ipc: Rc<RefCell<GlobalProvider>>,
 }
 
 impl<GlobalProvider: IpcProvider + 'static> Default for EventsProvider<GlobalProvider> {
@@ -75,14 +76,22 @@ impl<GlobalProvider: IpcProvider + 'static> EventsProvider<GlobalProvider> {
         self.specify_event(name.as_str(), EventType::Local)
     }
 
-    fn specify_event(&mut self, system_event: &str, typ: EventType) -> Result<EventCreator, CommonErrors> {
+    fn specify_event(&mut self, system_event: &str, t: EventType) -> Result<EventCreator, CommonErrors> {
         let system_event_tag: Tag = system_event.into();
 
         if system_event_tag.is_in_collection(self.events.iter()) {
             return Err(CommonErrors::AlreadyDone);
         }
 
-        let creator = self.choose_creator(typ, &system_event_tag, system_event);
+        let creator = match t {
+            EventType::Local => Rc::new(RefCell::new(LocalEventCreator {
+                local_event: LocalEvent::new(),
+            })) as EventCreator,
+            EventType::Global => Rc::new(RefCell::new(GlobalEventCreator {
+                system_event_name: system_event.to_string(),
+                global_provider: Rc::clone(&self.ipc),
+            })) as EventCreator,
+        };
 
         self.events.push(DeploymentEventInfo {
             system_tag: system_event_tag,
@@ -98,39 +107,6 @@ impl<GlobalProvider: IpcProvider + 'static> EventsProvider<GlobalProvider> {
             &Into::<Tag>::into(system_event).find_in_collection(self.events.iter())?.creator,
         ))
     }
-
-    fn choose_creator(&self, typ: EventType, tag: &Tag, system_event: &str) -> EventCreator {
-        match typ {
-            EventType::Local => Self::create_local_event_action(*tag),
-            EventType::Global => Self::create_global_event_action(Rc::clone(&self.ipc), system_event),
-        }
-    }
-
-    fn create_local_event_action(tracking_tag: Tag) -> EventCreator {
-        let mut evt = LocalEvent::new();
-
-        Rc::new(RefCell::new(move |typ: EventActionType| match typ {
-            EventActionType::Sync => Some(Sync::new(evt.get_listener()?) as Box<dyn ActionTrait>),
-            EventActionType::Trigger => {
-                let n = evt.get_notifier();
-                if n.is_none() {
-                    debug!(
-                        "Failed to create Trigger Action, notifier is None. Did you tried to create two notifiers for the same event ({:?})?",
-                        tracking_tag
-                    );
-                }
-                Some(Trigger::new(n?) as Box<dyn ActionTrait>)
-            }
-        }))
-    }
-
-    fn create_global_event_action(ipc: Rc<RefCell<GlobalProvider>>, system_event: &str) -> EventCreator {
-        let event = system_event.to_string();
-        Rc::new(RefCell::new(move |typ: EventActionType| match typ {
-            EventActionType::Sync => Some(Sync::new(ipc.borrow_mut().get_listener(event.as_str())?) as Box<dyn ActionTrait>),
-            EventActionType::Trigger => Some(Trigger::new(ipc.borrow_mut().get_notifier(event.as_str())?) as Box<dyn ActionTrait>),
-        }))
-    }
 }
 
 pub(crate) enum EventActionType {
@@ -138,7 +114,76 @@ pub(crate) enum EventActionType {
     Trigger,
 }
 
-pub(crate) type EventCreator = Rc<RefCell<dyn FnMut(EventActionType) -> Option<Box<dyn ActionTrait>>>>;
+pub(crate) type EventCreator = Rc<RefCell<dyn EventCreatorTrait>>;
+
+pub trait ShutdownNotifier {
+    fn shutdown(&mut self) -> ActionResult;
+}
+
+struct ShutdownNotifierImpl<N: NotifierTrait> {
+    notifier: N,
+}
+
+impl<N: NotifierTrait> ShutdownNotifier for ShutdownNotifierImpl<N> {
+    fn shutdown(&mut self) -> ActionResult {
+        self.notifier.notify_sync(0)
+    }
+}
+
+pub(crate) trait EventCreatorTrait {
+    fn create_trigger(&mut self) -> Option<Box<dyn ActionTrait>>;
+    fn create_sync(&mut self) -> Option<Box<dyn ActionTrait>>;
+    fn create_shutdown_notifier(&mut self) -> Option<Box<dyn ShutdownNotifier>>;
+}
+
+struct LocalEventCreator {
+    local_event: LocalEvent,
+}
+
+impl EventCreatorTrait for LocalEventCreator {
+    fn create_trigger(&mut self) -> Option<Box<dyn ActionTrait>> {
+        let n = self.local_event.get_notifier();
+        if n.is_none() {
+            debug!("Failed to create Trigger Action, notifier is None. Did you tried to create two notifiers for the same event?");
+        }
+
+        Some(Trigger::new(n?) as Box<dyn ActionTrait>)
+    }
+
+    fn create_sync(&mut self) -> Option<Box<dyn ActionTrait>> {
+        Some(Sync::new(self.local_event.get_listener()?) as Box<dyn ActionTrait>)
+    }
+
+    fn create_shutdown_notifier(&mut self) -> Option<Box<dyn ShutdownNotifier>> {
+        let n = self.local_event.get_notifier();
+        if n.is_none() {
+            debug!("Failed to create Trigger Action, notifier is None. Did you tried to create two notifiers for the same event?");
+        }
+
+        Some(Box::new(ShutdownNotifierImpl { notifier: n? }))
+    }
+}
+
+struct GlobalEventCreator<GlobalProvider: IpcProvider> {
+    system_event_name: String,
+    global_provider: Rc<RefCell<GlobalProvider>>,
+}
+
+impl<GlobalProvider: IpcProvider> EventCreatorTrait for GlobalEventCreator<GlobalProvider> {
+    fn create_trigger(&mut self) -> Option<Box<dyn ActionTrait>> {
+        Some(Trigger::new(self.global_provider.borrow_mut().get_notifier(self.system_event_name.as_str())?) as Box<dyn ActionTrait>)
+    }
+
+    fn create_sync(&mut self) -> Option<Box<dyn ActionTrait>> {
+        Some(Sync::new(self.global_provider.borrow_mut().get_listener(self.system_event_name.as_str())?) as Box<dyn ActionTrait>)
+    }
+
+    fn create_shutdown_notifier(&mut self) -> Option<Box<dyn ShutdownNotifier>> {
+        Some(Box::new(ShutdownNotifierImpl {
+            notifier: self.global_provider.borrow_mut().get_notifier(self.system_event_name.as_str())?,
+        }))
+    }
+}
 
 pub(crate) struct DesignEvent {
     tag: Tag,
@@ -165,22 +210,32 @@ impl DesignEvent {
     }
 }
 
-struct DeploymentEventInfo {
-    system_tag: Tag,
-
-    #[allow(dead_code)]
-    creator: EventCreator, // EventType is bind into this
+impl AsTagTrait for &DesignEvent {
+    fn as_tag(&self) -> &Tag {
+        &self.tag
+    }
 }
 
-impl AsTagTrait for &DeploymentEventInfo {
+impl AsTagTrait for &mut DesignEvent {
     fn as_tag(&self) -> &Tag {
-        &self.system_tag
+        &self.tag
     }
 }
 
 impl AsTagTrait for (SlotMapKey, &DesignEvent) {
     fn as_tag(&self) -> &Tag {
         &self.1.tag
+    }
+}
+
+struct DeploymentEventInfo {
+    system_tag: Tag,
+    creator: EventCreator,
+}
+
+impl AsTagTrait for &DeploymentEventInfo {
+    fn as_tag(&self) -> &Tag {
+        &self.system_tag
     }
 }
 
@@ -217,10 +272,10 @@ mod tests {
 
         let creator = provider.get_event_creator("100").unwrap();
 
-        let trigger_action = creator.borrow_mut()(EventActionType::Trigger);
+        let trigger_action = creator.borrow_mut().create_trigger();
 
         assert!(trigger_action.is_some());
-        assert!(creator.borrow_mut()(EventActionType::Trigger).is_none());
+        assert!(creator.borrow_mut().create_trigger().is_none());
     }
 
     #[test]
@@ -232,13 +287,13 @@ mod tests {
 
         let creator = provider.get_event_creator("100").unwrap();
 
-        let mut trigger_action = creator.borrow_mut()(EventActionType::Sync);
+        let mut trigger_action = creator.borrow_mut().create_sync();
         assert!(trigger_action.is_some());
 
-        trigger_action = creator.borrow_mut()(EventActionType::Sync);
+        trigger_action = creator.borrow_mut().create_sync();
         assert!(trigger_action.is_some());
 
-        trigger_action = creator.borrow_mut()(EventActionType::Sync);
+        trigger_action = creator.borrow_mut().create_sync();
         assert!(trigger_action.is_some());
     }
 
@@ -249,8 +304,8 @@ mod tests {
         let res = provider.specify_event("100", EventType::Local);
         assert!(res.is_ok());
 
-        let mut trigger_action = provider.get_event_creator("100").unwrap().borrow_mut()(EventActionType::Trigger).unwrap();
-        let mut sync_action = provider.get_event_creator("100").unwrap().borrow_mut()(EventActionType::Sync).unwrap();
+        let mut trigger_action = provider.get_event_creator("100").unwrap().borrow_mut().create_trigger().unwrap();
+        let mut sync_action = provider.get_event_creator("100").unwrap().borrow_mut().create_sync().unwrap();
 
         let trig_f = trigger_action.try_execute().unwrap();
 
@@ -279,9 +334,9 @@ mod tests {
         res = provider.specify_event("101", EventType::Local);
         assert!(res.is_ok());
 
-        let mut trigger_action = provider.get_event_creator("100").unwrap().borrow_mut()(EventActionType::Trigger).unwrap();
+        let mut trigger_action = provider.get_event_creator("100").unwrap().borrow_mut().create_trigger().unwrap();
 
-        let mut sync_action = provider.get_event_creator("101").unwrap().borrow_mut()(EventActionType::Sync).unwrap();
+        let mut sync_action = provider.get_event_creator("101").unwrap().borrow_mut().create_sync().unwrap();
 
         let trig_f = trigger_action.try_execute().unwrap();
 

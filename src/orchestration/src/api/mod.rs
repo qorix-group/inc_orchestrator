@@ -45,16 +45,14 @@
 //! This separation ensures that each phase of the orchestration process is modular, testable, and maintainable.
 //!
 
-use std::{marker::PhantomData, path::Path};
-
-use foundation::prelude::Vec;
-use foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
-
 use crate::events::events_provider::EventsProvider;
 use crate::{
     api::{deployment::Deployment, design::Design},
     program::Program,
 };
+use foundation::prelude::Vec;
+use foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
+use std::{marker::PhantomData, path::Path};
 
 pub mod deployment;
 pub mod design;

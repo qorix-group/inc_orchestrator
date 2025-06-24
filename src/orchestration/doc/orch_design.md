@@ -277,7 +277,7 @@ let some_evt_id = db.register_event("some_name", EventType::Local);
 ...
 
 let program = ProgramBuilder::new()
-    .with_body(SequenceBuilder::new()
+    .with_run_action(SequenceBuilder::new()
         .with_step(Trigger::from_tag(some_evt_id))
         .with_step(Invoke::from_tag(some_fn_id)))
     .build().unwrap();

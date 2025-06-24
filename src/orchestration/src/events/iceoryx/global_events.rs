@@ -60,7 +60,7 @@ pub struct IpcNotifier {
     notifier: String,
 }
 impl IpcNotifier {
-    async fn execute_impl(event_name: String) -> ActionResult {
+    async fn trigger_async(event_name: String) -> ActionResult {
         let result = Event::get_instance().lock().unwrap().trigger_event(event_name.as_str());
         result
     }
@@ -68,7 +68,13 @@ impl IpcNotifier {
 impl NotifierTrait for IpcNotifier {
     #[allow(clippy::manual_async_fn)]
     fn notify(&self, _value: u32) -> impl Future<Output = ActionResult> + Send + 'static {
-        Self::execute_impl(self.notifier.clone())
+        Self::trigger_async(self.notifier.clone())
+    }
+
+    // Yes, it's copy-paste, but it doesn't clone the string unnecessarily.
+    fn notify_sync(&self, _value: u32) -> ActionResult {
+        let result = Event::get_instance().lock().unwrap().trigger_event(&self.notifier);
+        result
     }
 }
 

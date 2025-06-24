@@ -18,75 +18,114 @@
 // - Invoke shall be able to take from user - a function, an async function and object + method for a moment.
 //
 
-use crate::actions::action::*;
-use logging_tracing::prelude::*;
+use crate::{
+    api::design::Design,
+    common::tag::Tag,
+    prelude::{ActionExecError, ActionResult, ActionTrait},
+};
+use async_runtime::scheduler::join_handle::JoinHandle;
+use foundation::prelude::CommonErrors;
 use std::{
     fmt::Debug,
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
     time::{Duration, Instant},
 };
+use tracing::trace;
+
+// TODO: This breaks basic_new.rs
+#[cfg(not(feature = "runtime-api-mock"))]
+use async_runtime::safety::spawn_from_reusable;
+#[cfg(feature = "runtime-api-mock")]
+use async_runtime::testing::mock::spawn_from_reusable;
 
 ///
 /// Whole description to Task Chain is delivered via this instance. It shall hold all actions that build as Task Chain
 ///
 pub struct Program {
     name: String,
-    action: Option<Box<dyn ActionTrait>>,
+    run_action: Box<dyn ActionTrait>,
+    shutdown_sync: Option<Box<dyn ActionTrait>>,
 }
 
 impl Debug for Program {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Program - {}", self.name)?;
         writeln!(f, "Body:")?;
-        self.action.as_ref().unwrap().dbg_fmt(1, f)
+        self.run_action.as_ref().dbg_fmt(1, f)
     }
 }
 
-pub struct ProgramBuilder(Program);
+pub struct ProgramBuilder {
+    name: String,
+    run_action: Option<Box<dyn ActionTrait>>,
+    shutdown_event: Option<Tag>,
+}
 
 impl ProgramBuilder {
     pub fn new(name: &str) -> Self {
-        Self(Program {
+        Self {
             name: name.to_string(),
-            action: None,
-        })
+            run_action: None,
+            shutdown_event: None,
+        }
     }
 
-    pub fn with_body(&mut self, action: Box<dyn ActionTrait>) -> &mut Self {
-        self.0.action = Some(action);
+    pub fn with_run_action(&mut self, action: Box<dyn ActionTrait>) -> &mut Self {
+        self.run_action = Some(action);
         self
     }
 
-    pub fn build(mut self) -> Program {
-        self.0.action.as_mut().expect("Body must be set for program!");
-        self.0
+    pub fn with_shutdown_event(&mut self, name: Tag) -> &mut Self {
+        self.shutdown_event = Some(name);
+        self
+    }
+
+    pub fn build(self, design: &mut Design) -> Result<Program, CommonErrors> {
+        if self.run_action.is_none() {
+            trace!("Missing run action");
+            return Err(CommonErrors::NoData);
+        }
+
+        let mut shutdown_sync = None;
+
+        if let Some(shutdown_event) = self.shutdown_event {
+            match design.db.get_creator_for_shutdown_event(shutdown_event) {
+                Ok(creator) => {
+                    shutdown_sync = creator.borrow_mut().create_sync();
+                }
+                Err(CommonErrors::NotFound) => {
+                    trace!("Shutdown event {} not found", shutdown_event.tracing_str());
+                    return Err(CommonErrors::NotFound);
+                }
+                Err(_) => return Err(CommonErrors::GenericError),
+            }
+        }
+
+        Ok(Program {
+            name: self.name,
+            run_action: self.run_action.unwrap(),
+            shutdown_sync,
+        })
     }
 }
 
 impl Program {
-    ///
-    /// Shall start running a task chain in a `loop`. This means that once TaskChain finishes, it will start from beginning until requested to stop.
-    ///
+    /// Execute the run action in an infinite loop.
     pub async fn run(&mut self) -> ActionResult {
         self.internal_run(None).await
     }
 
-    ///
-    /// Shall start running a task chain `N` times
-    ///
+    /// Execute the run action a given number of times.
     pub async fn run_n(&mut self, n: usize) -> ActionResult {
         self.internal_run(Some(n)).await
-    }
-
-    ///
-    /// Should notify program to stop executing as soon as possible.
-    ///
-    pub fn stop() {
-        todo!()
     }
 
     async fn internal_run(&mut self, n: Option<usize>) -> ActionResult {
         let iteration_count: usize = n.unwrap_or_default();
         let mut iteration = 0_usize;
+        let mut shutdown_handle = self.create_shutdown_handle()?;
 
         while n.is_none() || iteration < iteration_count {
             let start_time = Instant::now();
@@ -98,20 +137,28 @@ impl Program {
             };
             trace!(meta = ?stats, "Iteration started");
 
-            let future = self.action.as_mut().unwrap().try_execute();
-            if future.is_err() {
-                trace!("Failed to execute action");
+            let run_future = self.run_action.as_mut().try_execute();
+            if run_future.is_err() {
+                trace!("Failed to execute run action");
                 return Err(ActionExecError::Internal);
             }
 
-            let result = async_runtime::spawn_from_reusable(future.unwrap()).await;
+            let mut run_handle = spawn_from_reusable(run_future.unwrap());
+            let join_either = JoinEither {
+                run_handle: &mut run_handle,
+                shutdown_handle: &mut shutdown_handle,
+            };
 
-            if result.is_err() {
-                trace!("Failed to execute action");
-                return Err(ActionExecError::Internal);
-            }
-
-            result.unwrap()?;
+            match join_either.await {
+                Ok(result) => match result.0 {
+                    JoinedHandle::Run => result.1?,
+                    JoinedHandle::Shutdown => return Ok(()), // Not checking for ActionExecError on a Sync action.
+                },
+                Err(_) => {
+                    trace!("Failed to execute run action or shutdown sync");
+                    return Err(ActionExecError::Internal);
+                }
+            };
 
             let stats = ProgramStats {
                 name: self.name.as_str(),
@@ -124,6 +171,55 @@ impl Program {
         }
 
         Ok(())
+    }
+
+    fn create_shutdown_handle(&mut self) -> Result<Option<JoinHandle<ActionResult>>, ActionExecError> {
+        if let Some(ref mut shutdown_sync) = self.shutdown_sync {
+            match shutdown_sync.try_execute() {
+                Ok(future) => Ok(Some(spawn_from_reusable(future))),
+                Err(_) => Err(ActionExecError::Internal),
+            }
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+enum JoinedHandle {
+    Run,
+    Shutdown,
+}
+
+struct JoinEither<'a> {
+    run_handle: &'a mut JoinHandle<ActionResult>,
+    shutdown_handle: &'a mut Option<JoinHandle<ActionResult>>,
+}
+
+impl Future for JoinEither<'_> {
+    type Output = Result<(JoinedHandle, ActionResult), CommonErrors>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut pin_a = Pin::new(&mut self.run_handle);
+        match pin_a.as_mut().poll(cx) {
+            Poll::Ready(result) => match result {
+                Ok(result) => return Poll::Ready(Ok((JoinedHandle::Run, result))),
+                Err(_) => return Poll::Ready(Err(CommonErrors::GenericError)),
+            },
+            Poll::Pending => (),
+        }
+
+        if let Some(ref mut shutdown_handle) = self.shutdown_handle {
+            let mut pin_b = Pin::new(shutdown_handle);
+            match pin_b.as_mut().poll(cx) {
+                Poll::Ready(result) => match result {
+                    Ok(result) => return Poll::Ready(Ok((JoinedHandle::Shutdown, result))),
+                    Err(_) => return Poll::Ready(Err(CommonErrors::GenericError)),
+                },
+                Poll::Pending => (),
+            }
+        }
+
+        std::task::Poll::Pending
     }
 }
 

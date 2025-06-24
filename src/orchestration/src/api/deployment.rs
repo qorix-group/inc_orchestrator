@@ -11,7 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use foundation::prelude::CommonErrors;
+use std::rc::Rc;
 
 use crate::{
     api::{
@@ -19,9 +19,11 @@ use crate::{
         OrchestrationApi,
     },
     common::tag::Tag,
+    events::events_provider::ShutdownNotifier,
     program::ProgramBuilder,
 };
 use async_runtime::core::types::UniqueWorkerId;
+use foundation::prelude::CommonErrors;
 
 pub struct Deployment<'a, T> {
     api: &'a mut OrchestrationApi<T>,
@@ -33,13 +35,13 @@ impl<T> Deployment<'_, T> {
     }
 
     /// Maps a system events to user events. This means that the specified user events will be treated as global events across all processes.
-    pub fn bind_events_as_global(&mut self, system_event: &str, user_events_to_bind: &[Tag]) -> Result<(), CommonErrors> {
+    pub fn bind_events_as_global(&mut self, system_event: &str, events_to_bind: &[Tag]) -> Result<(), CommonErrors> {
         let mut ret = Ok(());
 
         let creator = self.api.events.specify_global_event(system_event)?;
 
         for d in &mut self.api.designs {
-            let _ = d.db.set_event_type(creator.clone(), user_events_to_bind).or_else(|e| {
+            let _ = d.db.set_creator_for_events(Rc::clone(&creator), events_to_bind).or_else(|e| {
                 ret = Err(e);
                 ret
             });
@@ -49,13 +51,15 @@ impl<T> Deployment<'_, T> {
     }
 
     /// Binds user events to a local event. This means that the specified user events will be treated as local events within the process boundaries.
-    pub fn bind_events_as_local(&mut self, user_events_to_bind: &[Tag]) -> Result<(), CommonErrors> {
+    pub fn bind_events_as_local(&mut self, events_to_bind: &[Tag]) -> Result<(), CommonErrors> {
         let mut ret = Ok(());
 
         let creator = self.api.events.specify_local_event()?;
 
         for d in &mut self.api.designs {
-            let _ = d.db.set_event_type(creator.clone(), user_events_to_bind).or_else(|e| {
+            let _ = d.db.set_creator_for_events(Rc::clone(&creator), events_to_bind).or_else(|e| {
+                // TODO: This returns NotFound if a given event isn't in this particular design. Seems like an error?
+                //       Not all events have to be on all designs.
                 ret = Err(e);
                 ret
             });
@@ -81,6 +85,42 @@ impl<T> Deployment<'_, T> {
         }
 
         ret
+    }
+
+    /// Binds a shutdown event as a global event.
+    pub fn bind_shutdown_event_as_global(&mut self, system_event: &str, event: Tag) -> Result<(), CommonErrors> {
+        let creator = self.api.events.specify_global_event(system_event)?;
+
+        for design in &mut self.api.designs {
+            let _ = design.db.set_creator_for_shutdown_event(Rc::clone(&creator), event);
+        }
+
+        Ok(())
+    }
+
+    /// Binds a shutdown event as a local event.
+    pub fn bind_shutdown_event_as_local(&mut self, event: Tag) -> Result<(), CommonErrors> {
+        let creator = self.api.events.specify_local_event()?;
+
+        for design in &mut self.api.designs {
+            let _ = design.db.set_creator_for_shutdown_event(Rc::clone(&creator), event);
+        }
+
+        Ok(())
+    }
+
+    /// Retrieve a shutdown notifier for the given event.
+    pub fn get_shutdown_notifier(&self, event: Tag) -> Result<Box<dyn ShutdownNotifier>, CommonErrors> {
+        // All designs share a creator for the same event, so return the first found.
+        for design in &self.api.designs {
+            if let Ok(creator) = design.db.get_creator_for_shutdown_event(event) {
+                if let Some(shutdown_notifier) = creator.borrow_mut().create_shutdown_notifier() {
+                    return Ok(shutdown_notifier);
+                }
+            }
+        }
+
+        Err(CommonErrors::NotFound)
     }
 
     /// Adds a program to the design. The program is created using the provided closure, which receives a mutable reference to the design.

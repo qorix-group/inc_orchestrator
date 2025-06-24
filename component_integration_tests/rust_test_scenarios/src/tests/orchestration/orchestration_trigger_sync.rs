@@ -45,7 +45,7 @@ fn trigger_sync_design() -> Result<Design, CommonErrors> {
     let evt_sync = design.register_event(Tag::from_str_static("evt_sync"))?;
 
     design.add_program("trigger_program", move |_design_instance, builder| {
-        builder.with_body(
+        builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(Invoke::from_tag(&blocking_sleep_task_tag))
                 .with_step(TriggerBuilder::from_tag(&evt_sync))
@@ -56,7 +56,7 @@ fn trigger_sync_design() -> Result<Design, CommonErrors> {
     });
 
     design.add_program("sync_program", move |_design_instance, builder| {
-        builder.with_body(
+        builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(SyncBuilder::from_design("evt_sync", _design_instance))
                 .with_step(Invoke::from_tag(&basic_task_tag))
@@ -109,7 +109,7 @@ fn trigger_design() -> Result<Design, CommonErrors> {
     let evt_sync = design.register_event(Tag::from_str_static("evt_sync"))?;
 
     design.add_program("trigger_program", move |_design_instance, builder| {
-        builder.with_body(
+        builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(Invoke::from_tag(&blocking_sleep_task_tag))
                 .with_step(TriggerBuilder::from_tag(&evt_sync))
@@ -129,7 +129,7 @@ fn sync_design_a() -> Result<Design, CommonErrors> {
     let evt_sync = design.register_event(Tag::from_str_static("evt_sync"))?;
 
     design.add_program("sync_program_A", move |_design_instance, builder| {
-        builder.with_body(
+        builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(SyncBuilder::from_tag(&evt_sync))
                 .with_step(Invoke::from_tag(&basic_task_tag))
@@ -149,7 +149,7 @@ fn sync_design_b() -> Result<Design, CommonErrors> {
     let evt_sync = design.register_event(Tag::from_str_static("evt_sync"))?;
 
     design.add_program("sync_program_B", move |_design_instance, builder| {
-        builder.with_body(
+        builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(SyncBuilder::from_tag(&evt_sync))
                 .with_step(Invoke::from_tag(&basic_task_tag))
@@ -206,7 +206,7 @@ fn nested_trigger_sync_design() -> Result<Design, CommonErrors> {
     let evt_sync = design.register_event(Tag::from_str_static("evt_sync"))?;
 
     design.add_program("trigger_sync_program", move |_design_instance, builder| {
-        builder.with_body(
+        builder.with_run_action(
             ConcurrencyBuilder::new()
                 .with_branch(
                     SequenceBuilder::new()
@@ -271,7 +271,7 @@ fn trigger_sync_oaa_design() -> Result<Design, CommonErrors> {
     let evt_sync = design.register_event(Tag::from_str_static("evt_sync"))?;
 
     design.add_program("trigger_sync_program", move |_design_instance, builder| {
-        builder.with_body(
+        builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(Invoke::from_tag(&basic_task_a_tag))
                 .with_step(TriggerBuilder::from_tag(&evt_sync))

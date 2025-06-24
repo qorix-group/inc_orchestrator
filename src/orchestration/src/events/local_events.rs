@@ -61,16 +61,24 @@ pub struct LocalNotifier {
 }
 
 impl LocalNotifier {
-    async fn execute_impl(notifier: Arc<Sender<u32, MAX_NUM_OF_EVENTS>>, v: u32) -> ActionResult {
-        debug!("LocalSync: Notifier sending value: {}", v);
-        notifier.send(&v).map_err(|_| ActionExecError::NonRecoverableFailure)
+    fn exec_sync(notifier: Arc<Sender<u32, MAX_NUM_OF_EVENTS>>, value: u32) -> ActionResult {
+        debug!("LocalSync: Notifier sending value: {}", value);
+        notifier.send(&value).map_err(|_| ActionExecError::NonRecoverableFailure)
+    }
+
+    async fn exec_async(notifier: Arc<Sender<u32, MAX_NUM_OF_EVENTS>>, value: u32) -> ActionResult {
+        Self::exec_sync(notifier, value)
     }
 }
 
 impl NotifierTrait for LocalNotifier {
     #[allow(clippy::manual_async_fn)]
     fn notify(&self, value: u32) -> impl Future<Output = ActionResult> + Send + 'static {
-        Self::execute_impl(self.sender.clone(), value)
+        Self::exec_async(self.sender.clone(), value)
+    }
+
+    fn notify_sync(&self, value: u32) -> ActionResult {
+        Self::exec_sync(self.sender.clone(), value)
     }
 }
 
