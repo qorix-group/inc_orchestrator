@@ -1,5 +1,5 @@
 use crate::internals::helpers::runtime_helper::Runtime;
-use crate::internals::test_case::TestCase;
+use crate::internals::scenario::Scenario;
 
 use super::*;
 use foundation::prelude::*;
@@ -7,7 +7,7 @@ use orchestration::{
     api::{Orchestration, design::Design},
     common::DesignConfig,
 };
-pub struct SingleSequenceTest;
+pub struct SingleSequence;
 
 fn single_sequence_design() -> Result<Design, CommonErrors> {
     let mut design = Design::new("SingleSequence".into(), DesignConfig::default());
@@ -29,7 +29,7 @@ fn single_sequence_design() -> Result<Design, CommonErrors> {
 }
 
 /// Checks three actions in a single sequence execution
-impl TestCase for SingleSequenceTest {
+impl Scenario for SingleSequence {
     fn get_name(&self) -> &'static str {
         "single_sequence"
     }
@@ -56,7 +56,7 @@ impl TestCase for SingleSequenceTest {
     }
 }
 
-pub struct NestedSequenceTest;
+pub struct NestedSequence;
 
 fn nested_sequence_design() -> Result<Design, CommonErrors> {
     let mut design = Design::new("NestedSequence".into(), DesignConfig::default());
@@ -83,7 +83,7 @@ fn nested_sequence_design() -> Result<Design, CommonErrors> {
 }
 
 /// Checks actions in a inner and outer sequence execution
-impl TestCase for NestedSequenceTest {
+impl Scenario for NestedSequence {
     fn get_name(&self) -> &'static str {
         "nested_sequence"
     }
@@ -110,7 +110,7 @@ impl TestCase for NestedSequenceTest {
     }
 }
 
-pub struct AwaitSequenceTest;
+pub struct AwaitSequence;
 
 fn awaited_sequence_design() -> Result<Design, CommonErrors> {
     let mut design = Design::new("AwaitedSequence".into(), DesignConfig::default());
@@ -151,7 +151,7 @@ fn awaited_sequence_design() -> Result<Design, CommonErrors> {
 }
 
 /// Checks three actions in a single sequence execution
-impl TestCase for AwaitSequenceTest {
+impl Scenario for AwaitSequence {
     fn get_name(&self) -> &'static str {
         "await_sequence"
     }

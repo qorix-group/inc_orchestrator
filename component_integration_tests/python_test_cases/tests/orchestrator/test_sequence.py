@@ -4,7 +4,7 @@ from testing_tools.log_container import LogContainer
 
 class TestSingleSequence1W2Q:
     @pytest.fixture(scope="class")
-    def test_case_name(self):
+    def scenario_name(self):
         return "orchestration.single_sequence"
 
     @pytest.fixture(scope="class")
@@ -29,7 +29,7 @@ class TestSingleSequence2W2Q(TestSingleSequence1W2Q):
 
 class TestNestedSequence1W2Q:
     @pytest.fixture(scope="class")
-    def test_case_name(self):
+    def scenario_name(self):
         return "orchestration.nested_sequence"
 
     @pytest.fixture(scope="class")

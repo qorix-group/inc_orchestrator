@@ -4,7 +4,7 @@ from testing_tools.log_container import LogContainer
 
 class TestSingleConcurrency1W2Q:
     @pytest.fixture(scope="class")
-    def test_case_name(self):
+    def scenario_name(self):
         return "orchestration.single_concurrency"
 
     @pytest.fixture(scope="class")
@@ -63,7 +63,7 @@ class TestSingleConcurrency2W2Q(TestSingleConcurrency1W2Q):
 
 class TestMultipleConcurrency1W2Q:
     @pytest.fixture(scope="class")
-    def test_case_name(self):
+    def scenario_name(self):
         return "orchestration.multiple_concurrency"
 
     @pytest.fixture(scope="class")
@@ -223,7 +223,7 @@ class TestMultipleConcurrency5W256Q(TestMultipleConcurrency1W2Q):
 
 class TestNestedConcurrency1W2Q:
     @pytest.fixture(scope="class")
-    def test_case_name(self):
+    def scenario_name(self):
         return "orchestration.nested_concurrency"
 
     @pytest.fixture(scope="class")

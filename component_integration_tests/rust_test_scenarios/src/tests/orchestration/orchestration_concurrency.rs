@@ -1,5 +1,5 @@
 use crate::internals::helpers::runtime_helper::Runtime;
-use crate::internals::test_case::TestCase;
+use crate::internals::scenario::Scenario;
 
 use super::*;
 use foundation::prelude::*;
@@ -8,7 +8,7 @@ use orchestration::{
     common::DesignConfig,
 };
 
-pub struct SingleConcurrencyTest;
+pub struct SingleConcurrency;
 
 fn single_concurrency_design() -> Result<Design, CommonErrors> {
     let mut design = Design::new("SingleConcurrency".into(), DesignConfig::default());
@@ -39,7 +39,7 @@ fn single_concurrency_design() -> Result<Design, CommonErrors> {
 }
 
 /// Checks Concurrency Functions
-impl TestCase for SingleConcurrencyTest {
+impl Scenario for SingleConcurrency {
     fn get_name(&self) -> &'static str {
         "single_concurrency"
     }
@@ -66,7 +66,7 @@ impl TestCase for SingleConcurrencyTest {
     }
 }
 
-pub struct MultipleConcurrencyTest;
+pub struct MultipleConcurrency;
 
 fn multiple_concurrency_design() -> Result<Design, CommonErrors> {
     let mut design = Design::new("MultipleConcurrency".into(), DesignConfig::default());
@@ -107,7 +107,7 @@ fn multiple_concurrency_design() -> Result<Design, CommonErrors> {
 }
 
 /// Checks Concurrency Functions
-impl TestCase for MultipleConcurrencyTest {
+impl Scenario for MultipleConcurrency {
     fn get_name(&self) -> &'static str {
         "multiple_concurrency"
     }
@@ -134,7 +134,7 @@ impl TestCase for MultipleConcurrencyTest {
     }
 }
 
-pub struct NestedConcurrencyTest;
+pub struct NestedConcurrency;
 
 fn nested_concurrency_design() -> Result<Design, CommonErrors> {
     let mut design = Design::new("NestedConcurrency".into(), DesignConfig::default());
@@ -171,7 +171,7 @@ fn nested_concurrency_design() -> Result<Design, CommonErrors> {
 }
 
 /// Checks Concurrency Functions
-impl TestCase for NestedConcurrencyTest {
+impl Scenario for NestedConcurrency {
     fn get_name(&self) -> &'static str {
         "nested_concurrency"
     }
