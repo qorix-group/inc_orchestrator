@@ -15,9 +15,18 @@ def pytest_addoption(parser):
     )
     parser.addoption(
         "--build-scenarios",
-        action=build_scenarios,
+        action="store_true",
         help="Execute cargo build for test scenarios binary",
     )
+
+
+# Hooks
+@pytest.hookimpl(tryfirst=True)
+def pytest_sessionstart(session):
+    # Check if the --function argument was passed
+    if session.config.getoption("--build-scenarios"):
+        print("Building test scenarios binary...")
+        build_scenarios()
 
 
 def build_scenarios(**kwargs):
