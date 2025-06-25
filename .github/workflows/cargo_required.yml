@@ -57,6 +57,10 @@ jobs:
         if: github.event.pull_request.draft == false
         run: cargo +nightly fetch --locked
 
+      - name: Prefetch and build dependencies for Miri
+        if: github.event.pull_request.draft == false
+        run: cargo +nightly miri setup
+
       - name: Run Miri and save report
         if: github.event.pull_request.draft == false
         run: |
