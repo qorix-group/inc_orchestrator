@@ -5,8 +5,8 @@ use std::pin::Pin;
 use tracing::info;
 
 pub mod orchestration_concurrency;
+pub mod orchestration_scenario_group;
 pub mod orchestration_sequence;
-pub mod orchestration_test_group;
 
 pub struct JustLogAction {
     base: ActionBaseMeta,
