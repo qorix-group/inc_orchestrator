@@ -159,10 +159,15 @@ impl AsyncScheduler {
     }
 
     fn try_notify_siblings_worker_unconditional(&self, _: Option<usize>) {
-        let mut guard = self.parked_workers_indexes.lock().unwrap();
-        // Pop the worker index so that another worker can be notified next time (instead of the same one)
-        // TODO: Change to random pop - currently Vec does not support erasing.
-        let index_opt = guard.pop();
+        let index_opt;
+
+        // Keep section short not overlapping with worker access in unpark which can also take another mutex
+        {
+            let mut guard = self.parked_workers_indexes.lock().unwrap();
+            // Pop the worker index so that another worker can be notified next time (instead of the same one)
+            // TODO: Change to random pop - currently Vec does not support erasing.
+            index_opt = guard.pop();
+        }
 
         if let Some(index) = index_opt {
             trace!("Notifying worker at index {} to wakeup", index);

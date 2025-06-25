@@ -97,6 +97,30 @@ impl TimeWheel {
         })
     }
 
+    /// Returns the lowest expiration time in a specific slot.
+    /// If there are no entries in the slot, it returns None.
+    /// # Safety
+    /// This requires mutable access to prevent other part of API working on the list from this slot.
+    pub(super) fn next_expiration_in_slot(&mut self, slot_id: usize) -> Option<u64> {
+        self.slots.get(slot_id).and_then(|slot| {
+            let mut head = slot.head.load(Ordering::Relaxed);
+            if head.is_null() {
+                None // No entries in this slot
+            } else {
+                let mut lowest_expire_at = u64::MAX;
+
+                while !head.is_null() {
+                    let entry = unsafe { head.as_ref().unwrap() };
+                    lowest_expire_at = entry.data.expire_at.min(lowest_expire_at);
+
+                    head = entry.next.load(Ordering::Relaxed);
+                }
+
+                Some(lowest_expire_at)
+            }
+        })
+    }
+
     pub(super) fn next_occupied_slot(&self, now: u64) -> Option<u8> {
         let occupied = self.occupied_slots.load(Ordering::Relaxed);
 

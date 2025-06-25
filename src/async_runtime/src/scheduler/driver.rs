@@ -23,10 +23,7 @@ use crate::{
         scheduler_mt::AsyncScheduler,
         workers::worker_types::{WorkerInteractor, *},
     },
-    time::{
-        clock::{Clock, Instant},
-        TimeDriver,
-    },
+    time::{clock::Instant, TimeDriver},
 };
 
 #[derive(Clone)]
@@ -65,10 +62,6 @@ impl Inner {
         }
     }
 
-    // pub fn time_driver(&self) -> &TimeDriver {
-    //     &self.time
-    // }
-
     pub fn register_timeout(&self, expire_at: Instant, waker: Waker) -> Result<(), CommonErrors> {
         self.time.register_timeout(expire_at, waker)?;
 
@@ -81,14 +74,14 @@ impl Inner {
     }
 
     pub fn process_work(&self) {
-        self.time.process_timeouts(Clock::now());
+        self.time.process_timeouts();
     }
 
     pub fn park(&self, scheduler: &AsyncScheduler, worker: &WorkerInteractor) {
         let _exit_guard = ScopeGuardBuilder::new(true)
             .on_init(|_| Ok(()) as Result<(), ()>)
             .on_drop(|_| {
-                self.time.process_timeouts(Clock::now());
+                self.time.process_timeouts();
             })
             .create()
             .unwrap();
@@ -121,91 +114,33 @@ impl Inner {
     fn park_on_cv(&self, scheduler: &AsyncScheduler, worker: &WorkerInteractor) {
         let worker_id = ctx_get_worker_id().worker_id() as usize;
 
-        let mut guard = worker.mtx.lock().unwrap();
+        let mut _guard = worker.mtx.lock().unwrap();
 
-        match worker.state.0.compare_exchange(
-            WORKER_STATE_EXECUTING,
-            WORKER_STATE_SLEEPING_CV,
-            std::sync::atomic::Ordering::SeqCst,
-            std::sync::atomic::Ordering::SeqCst,
-        ) {
-            Ok(_) => {
-                debug!("Definite sleep decision without timeout");
-            }
-            Err(WORKER_STATE_NOTIFIED) => {
-                // We were notified before, so we shall continue
-                scheduler.transition_from_parked(worker_id);
-
-                worker.state.0.store(WORKER_STATE_EXECUTING, std::sync::atomic::Ordering::SeqCst);
-                debug!("Notified while try to sleep, searching again");
-                return;
-            }
-            Err(WORKER_STATE_SHUTTINGDOWN) => {
-                // If we should shutdown, we simply need to return. And the run loop exits itself.
-                return;
-            }
-            Err(s) => {
-                panic!("Inconsistent state when parking: {}", s);
-            }
+        if !self.park_on_cv_pre_stage(scheduler, worker, worker_id) {
+            // We were notified before we could park, so we just return
+            return;
         }
 
-        loop {
-            guard = worker.cv.wait(guard).unwrap();
-
-            match worker.state.0.compare_exchange(
-                WORKER_STATE_NOTIFIED,
-                WORKER_STATE_EXECUTING,
-                std::sync::atomic::Ordering::SeqCst,
-                std::sync::atomic::Ordering::SeqCst,
-            ) {
-                Ok(_) => {
-                    scheduler.transition_from_parked(worker_id);
-                    debug!("Woken up from sleep after notification in park_on_cv");
-                    break;
-                }
-                Err(WORKER_STATE_SHUTTINGDOWN) => {
-                    // break here and run loop will exit
-                    break;
-                }
-                Err(_) => {
-                    continue; // spurious wake-up
-                }
-            }
-        }
+        _guard = worker
+            .cv
+            .wait_while(_guard, |_| self.park_on_cv_condition_check(scheduler, worker, worker_id))
+            .unwrap();
     }
 
     fn park_on_cv_timeout(&self, scheduler: &AsyncScheduler, worker: &WorkerInteractor, expire_time_instant: &Instant, expire_time_u64: u64) {
         let worker_id = ctx_get_worker_id().worker_id() as usize;
 
-        let mut guard = worker.mtx.lock().unwrap();
-
-        match worker.state.0.compare_exchange(
-            WORKER_STATE_EXECUTING,
-            WORKER_STATE_SLEEPING_CV,
-            std::sync::atomic::Ordering::SeqCst,
-            std::sync::atomic::Ordering::SeqCst,
-        ) {
-            Ok(_) => {}
-            Err(WORKER_STATE_NOTIFIED) => {
-                // We were notified before, so we shall continue
-                scheduler.transition_from_parked(worker_id);
-
-                worker.state.0.store(WORKER_STATE_EXECUTING, std::sync::atomic::Ordering::SeqCst);
-                debug!("Notified while try to sleep, searching again");
-                return;
-            }
-            Err(WORKER_STATE_SHUTTINGDOWN) => {
-                // If we should shutdown, we simply need to return. And the run loop exits itself.
-                return;
-            }
-            Err(s) => {
-                panic!("Inconsistent state when parking: {}", s);
-            }
-        }
-
-        let mut dur = self.time.duration_since_now(expire_time_instant);
+        // We do it before CME to keep state consistent
+        let dur = self.time.duration_since_now(expire_time_instant);
         if dur.is_zero() {
             warn!("Tried to park on cv with duration zero or lower, looks like a worker was stuck for some time, unparking immediately");
+            return;
+        }
+
+        let mut _guard = worker.mtx.lock().unwrap();
+
+        if !self.park_on_cv_pre_stage(scheduler, worker, worker_id) {
+            // We were notified before we could park, so we just return
             return;
         }
 
@@ -213,42 +148,74 @@ impl Inner {
         self.next_promised_wakeup.store(expire_time_u64, std::sync::atomic::Ordering::Relaxed);
         self.stash_promised_wakeup_time_for_worker(expire_time_u64);
 
-        loop {
-            let wait_result;
+        let wait_result;
 
-            debug!("Definite sleep decision, try sleep {} ms", dur.as_millis());
+        debug!("Definite sleep decision, try sleep {} ms", dur.as_millis());
 
-            (guard, wait_result) = worker.cv.wait_timeout(guard, dur).unwrap();
+        // TODO: To improve accuracy of sleep, we shall switch to select and provide correct unpark condition. This could be done once we work on IoDriver since
+        // some code can be shared between IoDriver and TimeDriver.
+        (_guard, wait_result) = worker
+            .cv
+            .wait_timeout_while(_guard, dur, |_| self.park_on_cv_condition_check(scheduler, worker, worker_id))
+            .unwrap();
 
-            if wait_result.timed_out() {
-                // We did timeout due to sleep request, so we fullfilled driver promise
-                self.clear_last_wakeup_time_for_worker();
-                worker.state.0.store(WORKER_STATE_EXECUTING, std::sync::atomic::Ordering::SeqCst);
+        if wait_result.timed_out() {
+            // We did timeout due to sleep request, so we fullfilled driver promise
+            self.clear_last_wakeup_time_for_worker();
+            worker.state.0.store(WORKER_STATE_EXECUTING, std::sync::atomic::Ordering::SeqCst);
+            scheduler.transition_from_parked(worker_id);
+            debug!("Woken up from sleep after timeout");
+        }
+    }
+
+    /// # Safety
+    /// This function must be called under mutex lock of the worker.
+    fn park_on_cv_pre_stage(&self, scheduler: &AsyncScheduler, worker: &WorkerInteractor, worker_id: usize) -> bool {
+        match worker.state.0.compare_exchange(
+            WORKER_STATE_EXECUTING,
+            WORKER_STATE_SLEEPING_CV,
+            std::sync::atomic::Ordering::SeqCst,
+            std::sync::atomic::Ordering::SeqCst,
+        ) {
+            Ok(_) => true,
+            Err(WORKER_STATE_NOTIFIED) => {
+                // We were notified before, so we shall continue
                 scheduler.transition_from_parked(worker_id);
-                debug!("Woken up from sleep after timeout");
-                break;
-            } else {
-                match worker.state.0.compare_exchange(
-                    WORKER_STATE_NOTIFIED,
-                    WORKER_STATE_EXECUTING,
-                    std::sync::atomic::Ordering::SeqCst,
-                    std::sync::atomic::Ordering::SeqCst,
-                ) {
-                    Ok(_) => {
-                        scheduler.transition_from_parked(worker_id);
-                        debug!("Woken up from sleep by notification in park_on_cv_timeout");
-                        break;
-                    }
-                    Err(WORKER_STATE_SHUTTINGDOWN) => {
-                        // break here and run loop will exit
-                        break;
-                    }
-                    Err(_) => {
-                        dur = self.time.duration_since_now(expire_time_instant);
 
-                        continue; // spurious wake-up
-                    }
-                }
+                worker.state.0.store(WORKER_STATE_EXECUTING, std::sync::atomic::Ordering::SeqCst);
+                debug!("Notified while try to sleep, searching again");
+                false
+            }
+            Err(WORKER_STATE_SHUTTINGDOWN) => {
+                // If we should shutdown, we simply need to return. And the run loop exits itself.
+                false
+            }
+            Err(s) => {
+                panic!("Inconsistent state when parking: {}", s);
+            }
+        }
+    }
+
+    /// # Safety
+    /// This function must be called under mutex lock of the worker.
+    fn park_on_cv_condition_check(&self, scheduler: &AsyncScheduler, worker: &WorkerInteractor, worker_id: usize) -> bool {
+        match worker.state.0.compare_exchange(
+            WORKER_STATE_NOTIFIED,
+            WORKER_STATE_EXECUTING,
+            std::sync::atomic::Ordering::SeqCst,
+            std::sync::atomic::Ordering::SeqCst,
+        ) {
+            Ok(_) => {
+                scheduler.transition_from_parked(worker_id);
+                debug!("Woken up from sleep by notification in park_on_cv_timeout");
+                false
+            }
+            Err(WORKER_STATE_SHUTTINGDOWN) => {
+                // break here and run loop will exit
+                false
+            }
+            Err(_) => {
+                true // spurious wake-up
             }
         }
     }

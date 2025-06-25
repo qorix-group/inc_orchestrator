@@ -19,6 +19,8 @@ use crate::scheduler::driver::Drivers;
 use core::cell::Cell;
 use core::cell::RefCell;
 use foundation::containers::spmc_queue::BoundProducerConsumer;
+use foundation::not_recoverable_error;
+use foundation::prelude::error;
 use std::future::Future;
 
 use std::pin::Pin;
@@ -283,11 +285,10 @@ impl Handler {
 
     pub(crate) fn unpark_some_async_worker(&self) {
         match self.inner {
-            HandlerImpl::Async(ref sched) => {
-                sched.scheduler.try_notify_siblings_workers(None);
+            HandlerImpl::Async(_) => {
+                not_recoverable_error!("Unpark called on async handler, this is not allowed! This should be called only on dedicated handlers!");
             }
             HandlerImpl::Dedicated(ref sched) => {
-                // Nothing to do here, dedicated workers are not parked
                 sched.scheduler.try_notify_siblings_workers(None);
             }
         }
