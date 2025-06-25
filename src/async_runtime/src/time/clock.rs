@@ -11,9 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-// use foundation::prelude::*;
 use std::{
-    cell::Cell,
     ops::{Add, Sub},
     time::Duration,
 };
@@ -70,28 +68,12 @@ impl Sub for Instant {
     }
 }
 
-thread_local! {
-    /// A thread-local clock that provides the current time as an `Instant`.
-    pub static LAST_TIME: Cell<std::time::Instant> = Cell::new(std::time::Instant::now());
-}
 /// A clock that provides the current time as an `Instant`.
 pub struct Clock;
 
 impl Clock {
     /// Returns the current time as an `Instant`.
     pub fn now() -> Instant {
-        // let now = std::time::Instant::now();
-        // let a = Instant(LAST_TIME.with(|cell| {
-        //     let last_time = cell.get();
-        //     if now > last_time {
-        //         cell.set(now);
-        //         now
-        //     } else {
-        //         last_time
-        //     }
-        // }));
-
-        // info!("now was {:?}  we returned {:?}", now, a);
         Instant(std::time::Instant::now())
     }
 

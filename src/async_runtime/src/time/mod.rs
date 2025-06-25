@@ -68,9 +68,11 @@ impl TimeDriver {
     ///
     /// Processes the timeouts that have expired since the last poll.
     ///
-    pub fn process_timeouts(&self, now: Instant) {
+    pub fn process_timeouts(&self) {
         let mut inner = self.inner.write().unwrap();
-        inner.process_timeouts(now);
+
+        // We take now under a lock so it cannot go backward once someone else polled timer before us still having higher timestamp
+        inner.process_timeouts(Clock::now());
     }
 
     ///
@@ -94,8 +96,10 @@ impl TimeDriver {
     /// After this call user can register timeout closer to returned time, upper layer need to ensure correct logic to keep up with deadlines
     ///
     pub fn next_process_time(&self) -> Option<Instant> {
-        let inner = self.inner.read().unwrap();
-        inner.next_process_time().map(|(instant, _)| instant)
+        match self.inner.try_write() {
+            Ok(mut inner) => inner.next_process_time().map(|(instant, _)| instant),
+            Err(_) => None,
+        }
     }
 
     pub fn instant_into_u64(&self, point: &Instant) -> u64 {
@@ -159,12 +163,24 @@ impl Inner {
     /// Returns the next time when the poll should happen.
     /// This will return a time when first thing will expire. Keep in mind that this can change after this call since user could schedule something afterwards
     ///
-    fn next_process_time(&self) -> Option<(Instant, u64)> {
+    fn next_process_time(&mut self) -> Option<(Instant, u64)> {
         self.find_next_expiring(self.last_check_time).map(|info| {
-            (
-                self.start_time + std::time::Duration::from_millis(info.deadline),
-                info.deadline - self.last_check_time,
-            )
+            // Here we also do additional lookup into slot to find lowest time and not slot time. This mau be intensive in case of huge amount of timers in slot
+            // since it's O(N). We choose this over not precise sleep to make better sleep decisions. This is subject to reconsider once having numbers from
+            // real world applications
+            let precise_deadline = self.levels[info.level as usize].next_expiration_in_slot(info.slot_id as usize);
+
+            if let Some(deadline) = precise_deadline {
+                (
+                    self.start_time + std::time::Duration::from_millis(deadline),
+                    deadline - self.last_check_time,
+                )
+            } else {
+                (
+                    self.start_time + std::time::Duration::from_millis(info.deadline),
+                    info.deadline - self.last_check_time,
+                )
+            }
         })
     }
 
@@ -190,12 +206,7 @@ impl Inner {
     }
 
     fn process_internal(&mut self, now: u64) {
-        assert!(
-            now >= self.last_check_time,
-            "Cannot process time in the past (now {} last check {})",
-            now,
-            self.last_check_time
-        );
+        assert!(now >= self.last_check_time, "Cannot process time in the past");
 
         loop {
             match self.find_next_expiring(self.last_check_time) {
@@ -237,7 +248,6 @@ impl Inner {
 
     fn process_expired(&mut self, info: &ExpireInfo) {
         let iter = self.levels[info.level as usize].aquire_slot(info);
-        // let now = self.instant_into_u64(Clock::now());
 
         for e in iter {
             let data = unsafe { e.as_ref() };
@@ -373,27 +383,31 @@ mod tests {
     }
 
     fn poll_time_as_instant(start_time: Instant, time: u64) -> Instant {
-        if time < 64 {
-            start_time + Duration::from_millis(time) // no need to adjust, it is already in the first slot
-        } else if time < 64 * 64 {
-            start_time + Duration::from_millis(time - time % 64) // 1 second
-        } else if time < 64 * 64 * 64 {
-            start_time + Duration::from_millis(time - time % 64 * 64) // 4 seconds
-        } else {
-            start_time + Duration::from_millis(time - time % 64 * 64 * 64) // 4 minutes and 22 seconds
-        }
+        start_time + Duration::from_millis(time)
+        // Old logic left in case we revert logic in API
+        // if time < 64 {
+        //     start_time + Duration::from_millis(time) // no need to adjust, it is already in the first slot
+        // } else if time < 64 * 64 {
+        //     start_time + Duration::from_millis(time - time % 64) // 1 second
+        // } else if time < 64 * 64 * 64 {
+        //     start_time + Duration::from_millis(time - time % 64 * 64) // 4 seconds
+        // } else {
+        //     start_time + Duration::from_millis(time - time % 64 * 64 * 64) // 4 minutes and 22 seconds
+        // }
     }
 
     fn expire_time_into_next_poll_time(time: u64) -> u64 {
-        if time < 64 {
-            time // no need to adjust, it is already in the first slot
-        } else if time < 64 * 64 {
-            time - time % 64 // 1 second
-        } else if time < 64 * 64 * 64 {
-            time - time % 64 * 64 // 4 seconds
-        } else {
-            time - time % 64 * 64 * 64 // 4 minutes and 22 seconds
-        }
+        time
+        // Old logic left in case we revert logic in API
+        // if time < 64 {
+        //     time // no need to adjust, it is already in the first slot
+        // } else if time < 64 * 64 {
+        //     time - time % 64 // 1 second
+        // } else if time < 64 * 64 * 64 {
+        //     time - time % 64 * 64 // 4 seconds
+        // } else {
+        //     time - time % 64 * 64 * 64 // 4 minutes and 22 seconds
+        // }
     }
 
     #[test]

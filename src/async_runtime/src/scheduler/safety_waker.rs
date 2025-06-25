@@ -30,7 +30,6 @@ fn wake(data: *const ()) {
     let task_header_ptr = data as *const TaskHeader;
     let task_ref = unsafe { TaskRef::from_raw(task_header_ptr) };
 
-    println!("Waking up task ");
     task_ref.schedule_safety();
 
     drop(task_ref); // wake uses move semantic, so we are owner of data now, so we need to cleanup
