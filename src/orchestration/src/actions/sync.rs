@@ -11,69 +11,69 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use super::action::{ActionBaseMeta, ActionFuture, ActionResult, ActionTrait, NamedId};
-use super::event::Event;
-use async_runtime::core::types::box_future;
-use logging_tracing::prelude::*;
-use std::future::Future;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use crate::{actions::action::ActionTrait, api::design::Design, common::orch_tag::OrchestrationTag, events::events_provider::EventActionType};
 
-#[derive(Copy, Clone)]
-/// SyncInner is needed to implement Future and get Waker which will be triggered from event polling thread.
-struct SyncInner {
-    event_id: usize,
-}
-impl Future for SyncInner {
-    type Output = ();
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let waker_clone = cx.waker().clone();
-        let event_received = Event::get_instance().lock().unwrap().wake_on_event(self.event_id, waker_clone);
-        if event_received {
-            Poll::Ready(())
-        } else {
-            Poll::Pending
-        }
+use super::action::{ActionBaseMeta, ReusableBoxFutureResult};
+use crate::{common::tag::Tag, events::event_traits::ListenerTrait};
+
+use async_runtime::futures::reusable_box_future::*;
+
+pub struct SyncBuilder;
+
+///
+/// Builder for creating `Sync` action. `Sync` action is used to synchronize the execution of an orchestration with corresponding events (`Trigger`).
+///
+impl SyncBuilder {
+    /// Creates a new `Sync` action based on the provided orchestration tag.
+    pub fn from_tag(tag: &OrchestrationTag) -> Box<dyn ActionTrait> {
+        let sync = tag.action_provider().borrow_mut().provide_event(*tag.key(), EventActionType::Sync);
+        assert!(
+            sync.is_some(),
+            "Failed to create Sync Action with tag {:?}, design/deployment errors where not handled properly before or You passing wrong tag.",
+            tag,
+        );
+
+        sync.unwrap()
+    }
+
+    /// Creates a new `Sync` action based on the provided name and design. Useful when you don't have tag that was returned from [`Design`] `register_*` API
+    pub fn from_design(name: &str, design: &Design) -> Box<dyn ActionTrait> {
+        let tag = design.get_orchestration_tag(name.into());
+        assert!(
+            tag.is_ok(),
+            "Failed to create Sync Action with name '{}', design/deployment errors where not handled properly before or You passing wrong name.",
+            name
+        );
+
+        Self::from_tag(&tag.unwrap())
     }
 }
 
-/// Sync action
-pub struct Sync {
+///
+/// This action is used to synchronize the execution of an orchestration with corresponding events.
+///
+pub(crate) struct Sync<T: ListenerTrait + Send + 'static> {
     base: ActionBaseMeta,
-    event_id: usize,
+    listener: T,
 }
 
-impl Sync {
-    pub fn new(event_name: &str) -> Box<Self> {
-        Self::new_internal(event_name, NamedId::default())
-    }
+impl<T: ListenerTrait + Send> Sync<T> {
+    pub(crate) fn new(mut listener: T) -> Box<Self> {
+        const DEFAULT_TAG: &str = "orch::internal::sync";
 
-    pub fn new_with_id(event_name: &str, id: NamedId) -> Box<Self> {
-        Self::new_internal(event_name, id)
-    }
-
-    fn new_internal(event_name: &str, named_id: NamedId) -> Box<Self> {
         Box::new(Self {
-            event_id: Event::get_instance().lock().unwrap().create_listener(event_name),
             base: ActionBaseMeta {
-                named_id,
-                runtime: Default::default(),
+                tag: Tag::from_str_static(DEFAULT_TAG),
+                reusable_future_pool: ReusableBoxFuturePool::new(1, listener.next()),
             },
+            listener,
         })
     }
-
-    async fn execute_impl(meta: ActionBaseMeta, event_id: usize) -> ActionResult {
-        trace!(sync = ?meta, "Awaiting sync event");
-        SyncInner { event_id }.await;
-        trace!(sync = ?meta, "Awaited sync event");
-
-        Ok(())
-    }
 }
-
-impl ActionTrait for Sync {
-    fn execute(&mut self) -> ActionFuture {
-        box_future(Sync::execute_impl(self.base, self.event_id))
+impl<T: ListenerTrait + Send> ActionTrait for Sync<T> {
+    fn try_execute(&mut self) -> ReusableBoxFutureResult {
+        let fut = self.listener.next();
+        self.base.reusable_future_pool.next(fut)
     }
 
     fn name(&self) -> &'static str {
@@ -81,11 +81,6 @@ impl ActionTrait for Sync {
     }
 
     fn dbg_fmt(&self, nest: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let indent = " ".repeat(nest);
-        writeln!(f, "{}|-{} - {:?} event_id({})", indent, self.name(), self.base, self.event_id)
-    }
-
-    fn fill_runtime_info(&mut self, p: &mut super::action::ActionRuntimeInfoProvider) {
-        self.base.runtime = p.next();
+        writeln!(f, "{}|-{}", " ".repeat(nest), self.name())
     }
 }

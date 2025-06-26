@@ -11,62 +11,74 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use async_runtime::core::types::box_future;
-use foundation::prelude::CommonErrors;
-use logging_tracing::prelude::*;
+use crate::{
+    actions::action::ActionTrait,
+    api::design::Design,
+    common::orch_tag::OrchestrationTag,
+    events::{event_traits::NotifierTrait, events_provider::EventActionType},
+};
 
-use super::action::{ActionBaseMeta, ActionFuture, ActionResult, ActionTrait, NamedId};
-use super::event::Event;
+use super::action::{ActionBaseMeta, ReusableBoxFutureResult};
+use crate::common::tag::Tag;
 
-pub struct Trigger {
-    base: ActionBaseMeta,
-    event_name: String,
+use async_runtime::futures::reusable_box_future::*;
+
+pub struct TriggerBuilder;
+
+///
+/// Builder for creating `Trigger` action. `Trigger` action is used to trigger the execution of an orchestration with corresponding events (`Sync`).
+///
+impl TriggerBuilder {
+    /// Creates a new `Trigger` action based on the provided orchestration tag.
+    pub fn from_tag(tag: &OrchestrationTag) -> Box<dyn ActionTrait> {
+        let trigger = tag.action_provider().borrow_mut().provide_event(*tag.key(), EventActionType::Trigger);
+        assert!(
+            trigger.is_some(),
+            "Failed to create Trigger Action with tag {:?}, design/deployment errors where not handled properly before or You passing wrong tag.",
+            tag,
+        );
+
+        trigger.unwrap()
+    }
+
+    /// Creates a new `Trigger` action based on the provided name and design. Useful when you don't have tag that was returned from [`Design`] `register_*` API
+    pub fn from_design(name: &str, design: &Design) -> Box<dyn ActionTrait> {
+        let tag = design.get_orchestration_tag(name.into());
+        assert!(
+            tag.is_ok(),
+            "Failed to create Trigger Action with name '{}', design/deployment errors where not handled properly before or You passing wrong name.",
+            name
+        );
+
+        Self::from_tag(&tag.unwrap())
+    }
 }
 
-impl Trigger {
-    /// Create a trigger action for triggering a single event
-    pub fn new(event_name: &str) -> Box<Self> {
-        Self::new_internal(event_name, NamedId::default())
-    }
+///
+/// This action is used to send events(notifications) to corresponding `Sync` actions
+///
+pub(crate) struct Trigger<T: NotifierTrait + Send + 'static> {
+    base: ActionBaseMeta,
+    notifier: T,
+}
 
-    pub fn new_with_id(event_name: &str, id: NamedId) -> Box<Self> {
-        Self::new_internal(event_name, id)
-    }
-
-    fn new_internal(event_name: &str, named_id: NamedId) -> Box<Self> {
-        // create the new notifier in the singleton object
-        Event::get_instance().lock().unwrap().create_notifier(event_name);
+impl<T: NotifierTrait + Send> Trigger<T> {
+    pub(crate) fn new(notifier: T) -> Box<Self> {
+        const DEFAULT_TAG: &str = "orch::internal::trigger";
 
         Box::new(Self {
-            event_name: event_name.to_string(),
             base: ActionBaseMeta {
-                named_id,
-                runtime: Default::default(),
+                tag: Tag::from_str_static(DEFAULT_TAG),
+                reusable_future_pool: ReusableBoxFuturePool::new(1, notifier.notify(0)),
             },
+            notifier,
         })
     }
-
-    /// Execute the trigger future
-    async fn execute_impl(meta: ActionBaseMeta, event_name: String) -> ActionResult {
-        // we cannot call this earlier because Notifier<ipc::Service> is not Send
-        match Event::get_instance().lock().unwrap().trigger_event(&event_name) {
-            Ok(_) => {
-                trace!(trigger= ?meta, "Triggered event {}", event_name);
-                Ok(())
-            }
-            Err(_) => {
-                error!(trigger= ?meta, "error: triggering event id: {}", event_name);
-                // return GenericError since we do not have a direct 1:1 mapping
-                Err(CommonErrors::GenericError)
-            }
-        }
-    }
 }
-
-impl ActionTrait for Trigger {
-    /// Will be called on each trigger action
-    fn execute(&mut self) -> ActionFuture {
-        box_future(Trigger::execute_impl(self.base, self.event_name.clone()))
+impl<T: NotifierTrait + Send> ActionTrait for Trigger<T> {
+    fn try_execute(&mut self) -> ReusableBoxFutureResult {
+        let fut = self.notifier.notify(0);
+        self.base.reusable_future_pool.next(fut)
     }
 
     fn name(&self) -> &'static str {
@@ -74,11 +86,6 @@ impl ActionTrait for Trigger {
     }
 
     fn dbg_fmt(&self, nest: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let indent = " ".repeat(nest);
-        writeln!(f, "{}|-{} - {:?} event_name({})", indent, self.name(), self.base, self.event_name)
-    }
-
-    fn fill_runtime_info(&mut self, p: &mut super::action::ActionRuntimeInfoProvider) {
-        self.base.runtime = p.next();
+        writeln!(f, "{}|-{}", " ".repeat(nest), self.name())
     }
 }
