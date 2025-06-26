@@ -14,7 +14,7 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 /// IMPORTANT: This is temporary solution for iceoryx integration. This will be re-written later.
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-use crate::actions::internal::action::ActionResult;
+use crate::actions::action::ActionResult;
 use crate::events::event_traits::{IpcProvider, ListenerTrait, NotifierTrait};
 use crate::events::iceoryx::event::Event;
 use std::future::Future;

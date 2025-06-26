@@ -19,7 +19,7 @@ use crate::{
         OrchestrationApi,
     },
     common::tag::Tag,
-    program::internal::{self},
+    program::ProgramBuilder,
 };
 
 pub struct Deployment<'a, T> {
@@ -72,7 +72,7 @@ impl<T> Deployment<'_, T> {
     ///
     pub fn add_program<F>(&mut self, design_tag: DesignTag, program: F, name: &'static str) -> Result<(), CommonErrors>
     where
-        F: FnOnce(&mut Design, &mut internal::ProgramBuilder) -> Result<(), CommonErrors> + 'static,
+        F: FnOnce(&mut Design, &mut ProgramBuilder) -> Result<(), CommonErrors> + 'static,
     {
         let p = &mut self.api.designs.iter_mut().find(|d| d.id() == design_tag);
 

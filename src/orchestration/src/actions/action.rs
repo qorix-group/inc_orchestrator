@@ -11,35 +11,87 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use async_runtime::core::types::FutureBox;
-use foundation::prelude::*;
-use std::fmt::{Debug, Formatter};
+use crate::{actions::invoke::InvokeResult, common::tag::Tag};
+
+use async_runtime::futures::reusable_box_future::{ReusableBoxFuture, ReusableBoxFuturePool};
+use foundation::prelude::CommonErrors;
+
+use std::{
+    fmt::{Debug, Formatter},
+    ops::Deref,
+};
+
+/// Represents a user-defined error value that can be propagated through the action execution chain.
+/// This allows user code to signal specific errors that can be handled or logged by the orchestrator.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct UserErrValue(u64);
+
+impl Deref for UserErrValue {
+    type Target = u64;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<u64> for UserErrValue {
+    fn from(value: u64) -> Self {
+        UserErrValue(value)
+    }
+}
+
+impl From<UserErrValue> for InvokeResult {
+    fn from(value: UserErrValue) -> Self {
+        Err(value)
+    }
+}
+
+#[allow(clippy::from_over_into)]
+impl Into<ActionExecError> for UserErrValue {
+    fn into(self) -> ActionExecError {
+        ActionExecError::UserError(self)
+    }
+}
+
+/// Enum representing possible errors that can occur during action execution.
+///
+/// Variants:
+/// - `UserError(UserErrValue)`: Indicates an error returned by user code, allowing it to propagate through the chain. It means signature to `Invoke` needs to capture Futures/functions with Result<(), UserErrValue>
+/// - `NonRecoverableFailure`: Represents a failure that cannot be recovered from.
+/// - `Internal`: Placeholder for internal errors, with potential for expansion as needed.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ActionExecError {
+    UserError(UserErrValue),
+    NonRecoverableFailure,
+    Timeout,
+    Internal, // TODO add more errors if needed
+}
 
 ///
-/// Result to indicate the given action status. [`Ok(())`] if everything went fine, Err(_) to mark error in execution.
+/// Result to indicate the given action status. [`Ok(())`] if everything went fine, Err(ActionExecError) to mark error in execution.
 ///
-pub type ActionResult = Result<(), CommonErrors>;
+pub type ActionResult = Result<(), ActionExecError>;
 
 ///
-/// Action future type alias
+/// Result to indicate the acquisition status of the reusable (boxed) future. [`Ok(ReusableBoxFuture<ActionResult>)`] if everything went fine, Err(CommonErrors) to mark error in execution.
 ///
-pub type ActionFuture = FutureBox<ActionResult>;
+pub type ReusableBoxFutureResult = Result<ReusableBoxFuture<ActionResult>, CommonErrors>;
 
 ///
-/// Describes action interface that let us build task chain from program. Each action should store it's actions as [`Box<dyn ActionTrait>`] for now
+/// Describes action interface that let us build task chain from program.
 ///
 pub trait ActionTrait: Send {
     ///
     /// Will be called on each `Program` iteration.
     ///
     /// Key assumptions:
-    ///     - should avoid allocation except creation of boxed future
+    ///     - should avoid allocation due to the usage of reusable boxed future
     ///     - each action shall propagate ActionResult down the chain in Future and should immediately stop it's work once Err(_) is reached, propagating it down.
     ///
-    fn execute(&mut self) -> ActionFuture;
+    fn try_execute(&mut self) -> ReusableBoxFutureResult;
 
     ///
-    /// Provide debug name of action
+    /// Provide name of the action
     ///
     fn name(&self) -> &'static str;
 
@@ -47,80 +99,15 @@ pub trait ActionTrait: Send {
     /// Since we store actions behind dyn ActionTrait, we need an API that we can call from program to print constructed representation
     ///
     fn dbg_fmt(&self, nest: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
-
-    fn fill_runtime_info(&mut self, p: &mut ActionRuntimeInfoProvider);
 }
 
-pub trait ClonableActionTrait: ActionTrait {
-    fn clone_boxed<'a>(&self) -> Box<dyn ClonableActionTrait + 'a>
-    where
-        Self: 'a;
-
-    fn into_boxed_action<'a>(self: Box<Self>) -> Box<dyn ActionTrait + 'a>
-    where
-        Self: 'a;
-}
-
-#[derive(Default)]
-pub struct ActionRuntimeInfoProvider {
-    id: usize,
-}
-
-#[derive(Clone, Copy, Default)]
-pub struct ActionRuntimeInfo(usize);
-
-impl Debug for ActionRuntimeInfo {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-#[allow(clippy::should_implement_trait)]
-impl ActionRuntimeInfoProvider {
-    pub fn next(&mut self) -> ActionRuntimeInfo {
-        self.id += 1;
-        ActionRuntimeInfo(self.id)
-    }
-}
-
-#[derive(Copy, Clone)]
-enum NamedIdInner {
-    Static(&'static str),
-    Empty,
-}
-
-#[derive(Copy, Clone)]
-pub struct NamedId(NamedIdInner);
-
-impl Default for NamedId {
-    fn default() -> Self {
-        Self(NamedIdInner::Empty)
-    }
-}
-
-impl NamedId {
-    pub fn new_static(data: &'static str) -> Self {
-        Self(NamedIdInner::Static(data))
-    }
-}
-
-impl Debug for NamedId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self.0 {
-            NamedIdInner::Static(arg0) => write!(f, "{:?}", arg0),
-            NamedIdInner::Empty => write!(f, "Empty"),
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
 pub struct ActionBaseMeta {
-    pub named_id: NamedId, // Consider support dynamic string. This has a problem that each iteration we would clone it (sick!), otherwise we can only do unsafe ptr magic as we don't bind action into async
-    pub runtime: ActionRuntimeInfo,
+    pub tag: Tag,
+    pub reusable_future_pool: ReusableBoxFuturePool<ActionResult>,
 }
 
 impl Debug for ActionBaseMeta {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "named_id({:?}), runtime_id({:?})", self.named_id, self.runtime)
+        write!(f, "{:?}", self.tag)
     }
 }

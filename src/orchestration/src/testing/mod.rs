@@ -19,7 +19,7 @@ use std::{
     time::Instant,
 };
 
-use crate::actions::internal::action::{ActionResult, ActionTrait, ReusableBoxFutureResult};
+use crate::actions::action::{ActionResult, ActionTrait, ReusableBoxFutureResult};
 
 use async_runtime::futures::reusable_box_future::{ReusableBoxFuture, ReusableBoxFuturePool};
 use foundation::containers::{reusable_objects::ReusableObject, reusable_objects::ReusableObjects};
@@ -185,7 +185,7 @@ impl OrchTestingPoller {
 mod tests {
 
     use super::*;
-    use crate::actions::internal::action::ActionExecError;
+    use crate::actions::action::ActionExecError;
 
     use std::task::Poll;
 
