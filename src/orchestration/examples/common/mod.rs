@@ -16,11 +16,11 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 use async_runtime::futures::yield_now;
 use foundation::prelude::*;
-use orchestration::actions::internal::action::UserErrValue;
+use orchestration::actions::action::UserErrValue;
 use orchestration::api::design::Design;
 use orchestration::prelude::ActionResult;
 
-use orchestration::actions::internal::invoke::InvokeResult;
+use orchestration::actions::invoke::InvokeResult;
 
 /// emulate some sleep as workaround until sleep is supported in runtime
 pub fn busy_sleep() -> ActionResult {

@@ -11,7 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use crate::actions::internal::action::ActionResult;
+use crate::actions::action::ActionResult;
 use std::future::Future;
 
 /// NotifierTrait defines the interface for a notifier that can notify listeners with a value.

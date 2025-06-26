@@ -10,64 +10,53 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
-#![allow(dead_code)]
-use std::time::Duration;
 
-use async_runtime::{core::types::box_future, runtime::async_runtime::AsyncRuntimeBuilder, scheduler::execution_engine::*};
+use async_runtime::{runtime::async_runtime::AsyncRuntimeBuilder, scheduler::execution_engine::*};
 use foundation::prelude::*;
 use logging_tracing::{TraceScope, TracingLibraryBuilder};
 use orchestration::{
-    actions::{action::ActionTrait, concurrency::Concurrency},
+    api::{design::Design, Orchestration},
+    common::{tag::Tag, DesignConfig},
     prelude::*,
-    program::ProgramBuilder,
 };
-use std::cell::RefCell;
 
 mod common;
-use common::*;
+use common::{test1_sync_func, test2_sync_func, test3_sync_func};
 
-pub struct SomeAction {}
+fn example_component_design() -> Result<Design, CommonErrors> {
+    let mut design = Design::new("ExampleDesign".into(), DesignConfig::default());
 
-impl SomeAction {
-    fn new() -> Box<SomeAction> {
-        Box::new(Self {})
-    }
+    let t1_tag = design.register_invoke_fn("test1".into(), test1_sync_func)?;
+    let t2_tag = design.register_invoke_fn("test2".into(), test2_sync_func)?;
+    design.register_invoke_fn("test3".into(), test3_sync_func)?;
+
+    let evt1 = design.register_event(Tag::from_str_static("Event1"))?;
+    let evt2 = design.register_event(Tag::from_str_static("Event2"))?;
+    // Create a program with some actions
+
+    design.add_program("ExampleDesignProgram", move |design_instance, builder| {
+        let t3_tag = design_instance.get_orchestration_tag("test3".into())?;
+
+        builder.with_body(
+            SequenceBuilder::new()
+                .with_step(TriggerBuilder::from_design("Event1", &design_instance))
+                .with_step(Invoke::from_tag(&t1_tag))
+                .with_step(Invoke::from_tag(&t2_tag))
+                .with_step(Invoke::from_tag(&t2_tag))
+                .with_step(SyncBuilder::from_tag(&evt1))
+                .with_step(SyncBuilder::from_tag(&evt2))
+                .with_step(Invoke::from_tag(&t3_tag))
+                .build(),
+        );
+
+        Ok(())
+    });
+
+    Ok(design)
 }
 
-impl ActionTrait for SomeAction {
-    fn execute(&mut self) -> orchestration::actions::action::ActionFuture {
-        box_future(async {
-            info!("SomeAction was executed ;)");
-            Ok(())
-        })
-    }
-
-    fn name(&self) -> &'static str {
-        "SomeAction"
-    }
-
-    fn dbg_fmt(&self, nest: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let indent = " ".repeat(nest);
-        writeln!(f, "{}|-{}", indent, self.name())
-    }
-
-    fn fill_runtime_info(&mut self, _p: &mut orchestration::actions::action::ActionRuntimeInfoProvider) {}
-}
-
-async fn testasync() -> ActionResult {
-    info!("Testing this one from testasync!");
-
-    {
-        async_runtime::spawn(async move {
-            // println!("x {}", x2);
-        });
-    }
-
-    Ok(())
-}
-
-// playground for testing
 fn main() {
+    // Setup any logging framework you want to use.
     let mut logger = TracingLibraryBuilder::new()
         .global_log_level(Level::DEBUG)
         .enable_tracing(TraceScope::AppScope)
@@ -76,76 +65,33 @@ fn main() {
 
     logger.init_log_trace();
 
+    // Create runtime
     let (builder, _engine_id) = AsyncRuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(256).workers(2));
     let mut runtime = builder.build().unwrap();
 
-    {
-        // Start the event handling thread.
-        // This can be moved inside engine.
-        Event::get_instance().lock().unwrap().create_polling_thread();
-    }
+    // Build Orchestration
 
-    let _ = runtime.block_on(async {
-        let x = RefCell::new(1);
-        let event_name: &str = "Test_Event_1";
-        let event_name2: &str = "Test_Event_2";
-        let event_name3: &str = "Test_Event_3";
-        let mut program = ProgramBuilder::new("basic")
-            .with_body(
-                Sequence::new_with_id(NamedId::new_static("sequence1"))
-                    .with_step(
-                        Concurrency::new_with_id(NamedId::new_static("concurrency1 in sequence1"))
-                            .with_branch(Invoke::from_async(test1_func))
-                            .with_branch(Invoke::from_async(test2_func))
-                            .with_branch(Invoke::from_async(test1_func))
-                            .with_branch(Invoke::from_async(test1_func)),
-                    )
-                    .with_step(
-                        Concurrency::new_with_id(NamedId::new_static("some_tracking_string"))
-                            .with_branch(SomeAction::new())
-                            .with_branch(
-                                Sequence::new()
-                                    .with_step(SomeAction::new())
-                                    .with_step(Concurrency::new().with_branch(SomeAction::new()))
-                                    .with_step(SomeAction::new()),
-                            )
-                            .with_branch(SomeAction::new())
-                            .with_branch(Invoke::from_async(testasync))
-                            .with_branch(Sequence::new().with_step(Sync::new(event_name)).with_step(Invoke::from_async(wait_ends)))
-                            .with_branch(
-                                Sequence::new()
-                                    .with_step(Invoke::from_fn(busy_sleep).into_boxed_action())
-                                    .with_step(Trigger::new(event_name)),
-                            )
-                            .with_branch(
-                                Sequence::new()
-                                    .with_step(Sync::new(event_name2))
-                                    .with_step(Invoke::from_async(wait_ends2)),
-                            )
-                            .with_branch(Sequence::new().with_step(Invoke::from_async(wait_ends3)))
-                            .with_branch(
-                                Sequence::new()
-                                    // .with_step(Invoke::from_fn(busy_sleep))
-                                    .with_step(Trigger::new(event_name3)),
-                            )
-                            .with_branch(
-                                Sequence::new()
-                                    .with_step(Invoke::from_fn(busy_sleep).into_boxed_action())
-                                    .with_step(Trigger::new(event_name2)),
-                            ),
-                    ),
-            )
-            .with_cycle_time(Duration::from_millis(1000))
-            .with_shutdown_notification(Sync::new(event_name3))
-            .build();
+    let mut orch = Orchestration::new()
+        .add_design(example_component_design().expect("Failed to create design"))
+        .design_done();
 
-        println!("{:?}", program);
+    // Deployment part - specify event details
+    let mut deployment = orch.get_deployment_mut();
 
-        let res = program.run().await;
-        info!("Done {:?} {}", res, x.borrow());
+    // Mark user events as local one.
+    deployment
+        .bind_events_as_local(&["Event1".into(), "Event2".into()])
+        .expect("Failed to specify event");
 
+    // Create programs
+    let mut programs = orch.create_programs().unwrap();
+
+    // Put programs into runtime and run them
+    let _ = runtime.block_on(async move {
+        let _ = programs.programs.pop().unwrap().run_n(1).await;
+        info!("Program finished running.");
         Ok(0)
     });
 
-    println!("Exit.");
+    info!("Exit.");
 }
