@@ -13,9 +13,10 @@ runs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Install protoc
+    - name: Install protoc 26.1
       uses: arduino/setup-protoc@v3
       with:
+        version: 26.1
         repo-token: ${{ inputs.repo-token }}
 
     - name: Cache cargo & target
@@ -31,7 +32,7 @@ runs:
     - name: Install cargo-tarpaulin if not already installed
       run: |
         if ! command -v cargo-tarpaulin > /dev/null; then
-          cargo install cargo-tarpaulin
+          cargo install cargo-tarpaulin --version 0.32.7 --locked
         else
           echo "cargo-tarpaulin is already installed"
         fi
