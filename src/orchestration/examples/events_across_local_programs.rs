@@ -15,7 +15,7 @@ use async_runtime::{runtime::async_runtime::AsyncRuntimeBuilder, scheduler::exec
 use foundation::prelude::*;
 use logging_tracing::TracingLibraryBuilder;
 use orchestration::{
-    actions::internal::{invoke::Invoke, sequence::SequenceBuilder, sync::SyncBuilder, trigger::TriggerBuilder},
+    actions::{invoke::Invoke, sequence::SequenceBuilder, sync::SyncBuilder, trigger::TriggerBuilder},
     api::{design::Design, Orchestration},
     common::DesignConfig,
 };

@@ -53,7 +53,7 @@ use foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
 use crate::events::events_provider::EventsProvider;
 use crate::{
     api::{deployment::Deployment, design::Design},
-    program::internal::Program,
+    program::Program,
 };
 
 pub mod deployment;

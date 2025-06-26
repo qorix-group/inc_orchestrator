@@ -16,9 +16,9 @@ use std::ops::Deref;
 use foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
 
 use crate::{
-    actions::internal::invoke,
+    actions::invoke,
     common::{orch_tag::OrchestrationTag, tag::Tag, DesignConfig},
-    program::internal::{self, Program},
+    program::{Program, ProgramBuilder},
     program_database::ProgramDatabase,
 };
 
@@ -87,7 +87,7 @@ impl Design {
     /// Adds a program to the design. The program is created using the provided closure, which receives a mutable reference to the design.
     pub fn add_program<F>(&mut self, name: &'static str, program_creator: F)
     where
-        F: FnOnce(&mut Self, &mut internal::ProgramBuilder) -> Result<(), CommonErrors> + 'static,
+        F: FnOnce(&mut Self, &mut ProgramBuilder) -> Result<(), CommonErrors> + 'static,
     {
         self.programs.push(ProgramData::new(name, Box::new(program_creator)));
     }
@@ -98,7 +98,7 @@ impl Design {
 
     pub(super) fn get_programs(mut self, mut container: GrowableVec<Program>) -> Result<GrowableVec<Program>, CommonErrors> {
         while let Some(program_data) = self.programs.pop() {
-            let mut builder = internal::ProgramBuilder::new(program_data.0);
+            let mut builder = ProgramBuilder::new(program_data.0);
             (program_data.1)(&mut self, &mut builder)?;
             container.push(builder.build());
         }
@@ -107,7 +107,7 @@ impl Design {
     }
 }
 
-type ProgramBuilderFn = Box<dyn FnOnce(&mut Design, &mut internal::ProgramBuilder) -> Result<(), CommonErrors>>;
+type ProgramBuilderFn = Box<dyn FnOnce(&mut Design, &mut ProgramBuilder) -> Result<(), CommonErrors>>;
 
 #[allow(dead_code)]
 pub(super) struct ProgramData(&'static str, ProgramBuilderFn);
@@ -121,7 +121,7 @@ impl ProgramData {
 #[cfg(test)]
 mod tests {
 
-    use crate::actions::internal::action::UserErrValue;
+    use crate::actions::action::UserErrValue;
 
     use super::*;
 

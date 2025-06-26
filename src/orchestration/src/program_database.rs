@@ -16,7 +16,7 @@ use crate::common::tag::{AsTagTrait, Tag};
 use crate::common::DesignConfig;
 use crate::events::events_provider::{DesignEvent, EventActionType, DEFAULT_EVENTS_CAPACITY};
 use crate::{
-    actions::internal::{
+    actions::{
         action::ActionTrait,
         invoke::{Invoke, InvokeFunctionType, InvokeResult},
     },
@@ -300,7 +300,7 @@ impl AsTagTrait for (SlotMapKey, &ActionData) {
 #[cfg(not(loom))]
 mod tests {
     use super::*;
-    use crate::{actions::internal::action::ActionExecError, testing::OrchTestingPoller};
+    use crate::{actions::action::ActionExecError, testing::OrchTestingPoller};
     use std::task::Poll;
     use testing_macros::ensure_clear_mock_runtime;
 

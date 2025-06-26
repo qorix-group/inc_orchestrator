@@ -16,13 +16,13 @@ use std::rc::Rc;
 use crate::events::event_traits::IpcProvider;
 use crate::events::GlobalEventProvider;
 use crate::{
-    actions::internal::{sync::Sync, trigger::Trigger},
+    actions::{sync::Sync, trigger::Trigger},
     common::tag::AsTagTrait,
 };
 use foundation::prelude::*;
 use iceoryx2_bb_container::slotmap::SlotMapKey;
 
-use crate::{actions::internal::action::ActionTrait, common::tag::Tag, events::local_events::LocalEvent};
+use crate::{actions::action::ActionTrait, common::tag::Tag, events::local_events::LocalEvent};
 
 pub const DEFAULT_EVENTS_CAPACITY: usize = 256;
 

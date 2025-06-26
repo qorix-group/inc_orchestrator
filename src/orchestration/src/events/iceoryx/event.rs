@@ -26,7 +26,7 @@ use std::task::Waker;
 use std::thread;
 use std::time::Duration;
 
-use crate::actions::internal::action::{ActionExecError, ActionResult};
+use crate::actions::action::{ActionExecError, ActionResult};
 use foundation::prelude::*;
 
 static EVENT_OBJ: LazyLock<Mutex<Event>> = LazyLock::new(|| {
