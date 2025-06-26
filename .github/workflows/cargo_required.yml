@@ -35,7 +35,7 @@ jobs:
 
       # ---------- TARPAULIN(TEST + COVERAGE) ----------
       - name: Run tests under coverage
-        run: cargo +nightly tarpaulin --skip-clean --out Html --verbose --no-dead-code --engine llvm
+        run: cargo +nightly tarpaulin --version 0.32.7 --skip-clean --out Html --verbose --no-dead-code --engine llvm --all-features
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
@@ -48,24 +48,26 @@ jobs:
         uses: actions-rs/toolchain@v1
         if: github.event.pull_request.draft == false
         with:
-          toolchain: nightly
+          toolchain: nightly-2025-05-30
           profile: minimal
           components: miri
           override: true
 
       - name: Prefetch crates for nightly
         if: github.event.pull_request.draft == false
-        run: cargo +nightly fetch --locked
+        run: cargo +nightly-2025-05-30 fetch --locked
 
       - name: Prefetch and build dependencies for Miri
         if: github.event.pull_request.draft == false
-        run: cargo +nightly miri setup
+        run: cargo +nightly-2025-05-30 miri setup
 
       - name: Run Miri and save report
         if: github.event.pull_request.draft == false
+        env:
+          CARGO_INCREMENTAL: "0" # turn off incremental
         run: |
           set -o pipefail
-          cargo +nightly miri test --workspace \
+          cargo +nightly-2025-05-30 miri test --workspace \
           -- --skip test_mt_one_pop_one_stealer \
              --skip test_mt_one_push_mpmc_one_stealer \
              --skip test_one_producer_multi_stealer_mt_thread \

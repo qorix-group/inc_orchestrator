@@ -15,14 +15,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4.2.2
 
-      - name: Install protoc
+      - name: Install protoc 26.1
         uses: arduino/setup-protoc@v3
         with:
+          version: 26.1
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Bazel with shared caching
-        uses: bazel-contrib/setup-bazel@0.14.0
+        uses: bazel-contrib/setup-bazel@0.15.0
         with:
+          bazelisk-version: 1.26.0
           disk-cache: true
           repository-cache: true
           bazelisk-cache: true
