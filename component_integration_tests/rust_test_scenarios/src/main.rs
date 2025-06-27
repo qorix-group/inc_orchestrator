@@ -1,6 +1,7 @@
 mod internals;
 mod tests;
 
+use internals::helpers::monotonic_clock::MonotonicClockTime;
 use internals::test_context::TestContext;
 use tests::root_test_group::RootTestGroup;
 
@@ -40,6 +41,7 @@ fn init_tracing_subscriber() {
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::TRACE)
         .with_thread_ids(true)
+        .with_timer(MonotonicClockTime::new())
         .json()
         .finish();
 
