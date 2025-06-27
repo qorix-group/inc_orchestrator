@@ -2,8 +2,31 @@ use crate::internals::helpers::runtime_helper::Runtime;
 use crate::internals::test_case::TestCase;
 
 use super::*;
-use orchestration::{prelude::*, program::ProgramBuilder};
+use foundation::prelude::*;
+use orchestration::{
+    api::{Orchestration, design::Design},
+    common::DesignConfig,
+};
 pub struct SingleSequenceTest;
+
+fn single_sequence_design() -> Result<Design, CommonErrors> {
+    let mut design = Design::new("SingleSequence".into(), DesignConfig::default());
+
+    // Create a program with actions
+    design.add_program(file!(), move |_design_instance, builder| {
+        builder.with_body(
+            SequenceBuilder::new()
+                .with_step(JustLogAction::new("Action1"))
+                .with_step(JustLogAction::new("Action2"))
+                .with_step(JustLogAction::new("Action3"))
+                .build(),
+        );
+
+        Ok(())
+    });
+
+    Ok(design)
+}
 
 /// Checks three actions in a single sequence execution
 impl TestCase for SingleSequenceTest {
@@ -14,18 +37,18 @@ impl TestCase for SingleSequenceTest {
     fn run(&self, input: Option<String>) -> Result<(), String> {
         let mut rt = Runtime::new(&input).build();
 
-        let _ = rt.block_on(async move {
-            let mut program = ProgramBuilder::new(file!())
-                .with_body(
-                    Sequence::new_with_id(NamedId::new_static("Sequence1"))
-                        .with_step(JustLogAction::new("Action1"))
-                        .with_step(JustLogAction::new("Action2"))
-                        .with_step(JustLogAction::new("Action3")),
-                )
-                .with_shutdown_notification(Sync::new("Shutdown"))
-                .build();
+        // Build Orchestration
+        let orch = Orchestration::new()
+            .add_design(single_sequence_design().expect("Failed to create design"))
+            .design_done();
 
-            program.run_n(1).await;
+        // Create programs
+        let mut programs = orch.create_programs().unwrap();
+
+        // Put programs into runtime and run them
+        let _ = rt.block_on(async move {
+            let _ = programs.programs.pop().unwrap().run_n(1).await;
+            info!("Program finished running.");
             Ok(0)
         });
 
@@ -34,6 +57,30 @@ impl TestCase for SingleSequenceTest {
 }
 
 pub struct NestedSequenceTest;
+
+fn nested_sequence_design() -> Result<Design, CommonErrors> {
+    let mut design = Design::new("NestedSequence".into(), DesignConfig::default());
+
+    // Create a program with actions
+    design.add_program(file!(), move |_design_instance, builder| {
+        builder.with_body(
+            SequenceBuilder::new()
+                .with_step(JustLogAction::new("OuterAction1"))
+                .with_step(
+                    SequenceBuilder::new()
+                        .with_step(JustLogAction::new("InnerAction1"))
+                        .with_step(JustLogAction::new("InnerAction2"))
+                        .build(),
+                )
+                .with_step(JustLogAction::new("OuterAction2"))
+                .build(),
+        );
+
+        Ok(())
+    });
+
+    Ok(design)
+}
 
 /// Checks actions in a inner and outer sequence execution
 impl TestCase for NestedSequenceTest {
@@ -44,22 +91,18 @@ impl TestCase for NestedSequenceTest {
     fn run(&self, input: Option<String>) -> Result<(), String> {
         let mut rt = Runtime::new(&input).build();
 
-        let _ = rt.block_on(async move {
-            let mut program = ProgramBuilder::new(file!())
-                .with_body(
-                    Sequence::new_with_id(NamedId::new_static("OuterSequence"))
-                        .with_step(JustLogAction::new("OuterAction1"))
-                        .with_step(
-                            Sequence::new_with_id(NamedId::new_static("InnerSequence"))
-                                .with_step(JustLogAction::new("InnerAction1"))
-                                .with_step(JustLogAction::new("InnerAction2")),
-                        )
-                        .with_step(JustLogAction::new("OuterAction2")),
-                )
-                .with_shutdown_notification(Sync::new("Shutdown"))
-                .build();
+        // Build Orchestration
+        let orch = Orchestration::new()
+            .add_design(nested_sequence_design().expect("Failed to create design"))
+            .design_done();
 
-            program.run_n(1).await;
+        // Create programs
+        let mut programs = orch.create_programs().unwrap();
+
+        // Put programs into runtime and run them
+        let _ = rt.block_on(async move {
+            let _ = programs.programs.pop().unwrap().run_n(1).await;
+            info!("Program finished running.");
             Ok(0)
         });
 
@@ -68,6 +111,44 @@ impl TestCase for NestedSequenceTest {
 }
 
 pub struct AwaitSequenceTest;
+
+fn awaited_sequence_design() -> Result<Design, CommonErrors> {
+    let mut design = Design::new("AwaitedSequence".into(), DesignConfig::default());
+
+    let evt1 = design.register_event(Tag::from_str_static("Test_Event_1"))?;
+
+    // Create a program with actions
+    design.add_program(file!(), move |_design_instance, builder| {
+        builder.with_body(
+            SequenceBuilder::new()
+                .with_step(JustLogAction::new("Action1"))
+                .with_step(
+                    ConcurrencyBuilder::new()
+                        .with_branch(
+                            SequenceBuilder::new()
+                                .with_step(JustLogAction::new("Action2"))
+                                .with_step(JustLogAction::new("Action3"))
+                                .build(),
+                        )
+                        .with_branch(
+                            SequenceBuilder::new()
+                                .with_step(JustLogAction::new("Action4"))
+                                .with_step(SyncBuilder::from_tag(&evt1))
+                                .with_step(TriggerBuilder::from_tag(&evt1))
+                                .with_step(JustLogAction::new("Action5"))
+                                .build(),
+                        )
+                        .build(),
+                )
+                .with_step(JustLogAction::new("FinishAction"))
+                .build(),
+        );
+
+        Ok(())
+    });
+
+    Ok(design)
+}
 
 /// Checks three actions in a single sequence execution
 impl TestCase for AwaitSequenceTest {
@@ -78,34 +159,18 @@ impl TestCase for AwaitSequenceTest {
     fn run(&self, input: Option<String>) -> Result<(), String> {
         let mut rt = Runtime::new(&input).build();
 
+        // Build Orchestration
+        let orch = Orchestration::new()
+            .add_design(awaited_sequence_design().expect("Failed to create design"))
+            .design_done();
+
+        // Create programs
+        let mut programs = orch.create_programs().unwrap();
+
+        // Put programs into runtime and run them
         let _ = rt.block_on(async move {
-            let event_name: &str = "Test_Event_1";
-
-            let mut program = ProgramBuilder::new(file!())
-                .with_body(
-                    Sequence::new_with_id(NamedId::new_static("OuterSequence"))
-                        .with_step(JustLogAction::new("Action1"))
-                        .with_step(
-                            Concurrency::new_with_id(NamedId::new_static("Concurrency1"))
-                                .with_branch(
-                                    Sequence::new_with_id(NamedId::new_static("InnerSequence1"))
-                                        .with_step(JustLogAction::new("Action2"))
-                                        .with_step(JustLogAction::new("Action3")),
-                                )
-                                .with_branch(
-                                    Sequence::new_with_id(NamedId::new_static("InnerSequence2"))
-                                        .with_step(JustLogAction::new("Action4"))
-                                        .with_step(Sync::new(event_name))
-                                        .with_step(Trigger::new(event_name))
-                                        .with_step(JustLogAction::new("Action5")),
-                                ),
-                        )
-                        .with_step(JustLogAction::new("FinishAction")),
-                )
-                .with_shutdown_notification(Sync::new("Shutdown"))
-                .build();
-
-            program.run_n(1).await;
+            let _ = programs.programs.pop().unwrap().run_n(1).await;
+            info!("Program finished running.");
             Ok(0)
         });
 

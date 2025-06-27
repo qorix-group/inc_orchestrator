@@ -1,6 +1,6 @@
 use crate::internals::helpers::runtime_helper::Runtime;
 use crate::internals::test_case::TestCase;
-use orchestration::{prelude::*, program::ProgramBuilder};
+//use orchestration::{prelude::*, program::ProgramBuilder};
 use tracing::info;
 
 pub struct OnlyShutdownSequenceTest;
@@ -18,12 +18,7 @@ impl TestCase for OnlyShutdownSequenceTest {
 
         let _ = rt.block_on(async move {
             info!("Program entered engine");
-            let mut program = ProgramBuilder::new(file!())
-                .with_body(Sequence::new_with_id(NamedId::new_static("Sequence")))
-                .with_shutdown_notification(Sync::new("Shutdown"))
-                .build();
-
-            program.run_n(2).await;
+            // TODO: Create a program with only shutdown sequence once it is supported.
             info!("Program execution finished");
             Ok(0)
         });

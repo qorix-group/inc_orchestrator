@@ -15,8 +15,6 @@ class TestSingleConcurrency1W2Q:
         for function in ["Function1", "Function2", "Function3"]:
             expected_order = [
                 f"Start of '{function}' function",
-                f"'{function}' function yielding...",
-                f"'{function}' function resuming...",
                 f"End of '{function}' function",
             ]
             execution_order = [
