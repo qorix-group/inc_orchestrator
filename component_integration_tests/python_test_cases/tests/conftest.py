@@ -101,8 +101,10 @@ def print_to_report(execute_rust, targeted_test_results, request):
     else:
         traces = execute_rust
 
-    for msg in traces:
-        print(str(msg))
+    for trace in traces:
+        # Convert timestamp to string for better readability in the report
+        trace["timestamp"] = str(trace["timestamp"])
+        print(str(trace))
 
 
 def pytest_html_report_title(report):
