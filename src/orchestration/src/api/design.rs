@@ -11,13 +11,18 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::ops::Deref;
+use std::{
+    future::Future,
+    ops::Deref,
+    sync::{Arc, Mutex},
+};
 
 use foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
 
 use crate::{
     actions::invoke,
     common::{orch_tag::OrchestrationTag, tag::Tag, DesignConfig},
+    prelude::InvokeResult,
     program::{Program, ProgramBuilder},
     program_database::ProgramDatabase,
 };
@@ -72,6 +77,32 @@ impl Design {
 
     pub fn register_invoke_fn(&self, tag: Tag, action: invoke::InvokeFunctionType) -> Result<OrchestrationTag, CommonErrors> {
         self.db.register_invoke_fn(tag, action)
+    }
+
+    pub fn register_invoke_async<A, F>(&self, tag: Tag, action: A) -> Result<OrchestrationTag, CommonErrors>
+    where
+        A: Fn() -> F + 'static + Send + Clone,
+        F: Future<Output = InvokeResult> + 'static + Send,
+    {
+        self.db.register_invoke_async(tag, action)
+    }
+
+    pub fn register_invoke_method<T: 'static + Send>(
+        &self,
+        tag: Tag,
+        object: Arc<Mutex<T>>,
+        method: fn(&mut T) -> InvokeResult,
+    ) -> Result<OrchestrationTag, CommonErrors> {
+        self.db.register_invoke_method(tag, object, method)
+    }
+
+    pub fn register_invoke_method_async<T, M, F>(&self, tag: Tag, object: Arc<Mutex<T>>, method: M) -> Result<OrchestrationTag, CommonErrors>
+    where
+        T: 'static + Send,
+        M: Fn(Arc<Mutex<T>>) -> F + 'static + Send + Clone,
+        F: Future<Output = InvokeResult> + 'static + Send,
+    {
+        self.db.register_invoke_method_async(tag, object, method)
     }
 
     /// Registers an event in the design and returns an [`OrchestrationTag`] that can be used to reference this event in programs.
