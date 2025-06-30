@@ -78,10 +78,9 @@ def targeted_test_results(unfiltered_test_results):
     """
     Returns LogContainer messages that are generated strictly by the tested code.
     """
-    [*results] = unfiltered_test_results.get_logs_by_field(
+    return unfiltered_test_results.get_logs_by_field(
         field="target", pattern="rust_test_scenarios.*"
     )
-    return tt.LogContainer.from_entries(results)
 
 
 @pytest.fixture(scope="class")
@@ -89,8 +88,7 @@ def test_results(targeted_test_results):
     """
     Returns LogContainer messages with just INFO level.
     """
-    [*results] = targeted_test_results.get_logs_by_field(field="level", pattern="INFO")
-    return tt.LogContainer.from_entries(results)
+    return targeted_test_results.get_logs_by_field(field="level", pattern="INFO")
 
 
 # Console log and HTML report
