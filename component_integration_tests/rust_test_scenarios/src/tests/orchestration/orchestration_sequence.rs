@@ -4,7 +4,7 @@ use crate::internals::scenario::Scenario;
 use super::*;
 use foundation::prelude::*;
 use orchestration::{
-    api::{Orchestration, design::Design},
+    api::{design::Design, Orchestration},
     common::DesignConfig,
 };
 pub struct SingleSequence;
