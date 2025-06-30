@@ -1,12 +1,43 @@
+use crate::internals::scenario::{ScenarioGroup, ScenarioGroupImpl};
 use async_runtime::futures::{reusable_box_future::ReusableBoxFuturePool, yield_now};
 use orchestration::common::tag::Tag;
 use orchestration::prelude::*;
+use orchestration_concurrency::{MultipleConcurrency, NestedConcurrency, SingleConcurrency};
+use orchestration_sequence::{AwaitSequence, NestedSequence, SingleSequence};
 use std::pin::Pin;
 use tracing::info;
 
 pub mod orchestration_concurrency;
-pub mod orchestration_scenario_group;
 pub mod orchestration_sequence;
+
+pub struct OrchestrationScenarioGroup {
+    group: ScenarioGroupImpl,
+}
+
+impl OrchestrationScenarioGroup {
+    pub fn new() -> Self {
+        OrchestrationScenarioGroup {
+            group: ScenarioGroupImpl::new("orchestration"),
+        }
+    }
+}
+
+impl ScenarioGroup for OrchestrationScenarioGroup {
+    fn get_group_impl(&mut self) -> &mut ScenarioGroupImpl {
+        &mut self.group
+    }
+
+    fn init(&mut self) -> () {
+        // Sequence scenarios
+        self.group.add_scenario(Box::new(SingleSequence));
+        self.group.add_scenario(Box::new(NestedSequence));
+        self.group.add_scenario(Box::new(AwaitSequence));
+        // Concurrency scenarios
+        self.group.add_scenario(Box::new(SingleConcurrency));
+        self.group.add_scenario(Box::new(MultipleConcurrency));
+        self.group.add_scenario(Box::new(NestedConcurrency));
+    }
+}
 
 pub struct JustLogAction {
     base: ActionBaseMeta,
