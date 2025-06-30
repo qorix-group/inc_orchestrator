@@ -4,18 +4,25 @@ use crate::internals::scenario::Scenario;
 use super::*;
 use foundation::prelude::*;
 use orchestration::{
-    api::{Orchestration, design::Design},
+    api::{design::Design, Orchestration},
     common::DesignConfig,
 };
+
+#[macro_export]
+macro_rules! generic_test_func {
+    ($name:expr) => {
+        || generic_test_sync_func($name)
+    };
+}
 
 pub struct SingleConcurrency;
 
 fn single_concurrency_design() -> Result<Design, CommonErrors> {
     let mut design = Design::new("SingleConcurrency".into(), DesignConfig::default());
 
-    let t1_tag = design.register_invoke_fn("Function1".into(), function1)?;
-    let t2_tag = design.register_invoke_fn("Function2".into(), function2)?;
-    let t3_tag = design.register_invoke_fn("Function3".into(), function3)?;
+    let t1_tag = design.register_invoke_fn("Function1".into(), generic_test_func!("Function1"))?;
+    let t2_tag = design.register_invoke_fn("Function2".into(), generic_test_func!("Function2"))?;
+    let t3_tag = design.register_invoke_fn("Function3".into(), generic_test_func!("Function3"))?;
 
     // Create a program with actions
     design.add_program(file!(), move |_design_instance, builder| {
@@ -71,12 +78,12 @@ pub struct MultipleConcurrency;
 fn multiple_concurrency_design() -> Result<Design, CommonErrors> {
     let mut design = Design::new("MultipleConcurrency".into(), DesignConfig::default());
 
-    let t1_tag = design.register_invoke_fn("Function1".into(), function1)?;
-    let t2_tag = design.register_invoke_fn("Function2".into(), function2)?;
-    let t3_tag = design.register_invoke_fn("Function3".into(), function3)?;
-    let t4_tag = design.register_invoke_fn("Function4".into(), function4)?;
-    let t5_tag = design.register_invoke_fn("Function5".into(), function5)?;
-    let t6_tag = design.register_invoke_fn("Function6".into(), function6)?;
+    let t1_tag = design.register_invoke_fn("Function1".into(), generic_test_func!("Function1"))?;
+    let t2_tag = design.register_invoke_fn("Function2".into(), generic_test_func!("Function2"))?;
+    let t3_tag = design.register_invoke_fn("Function3".into(), generic_test_func!("Function3"))?;
+    let t4_tag = design.register_invoke_fn("Function4".into(), generic_test_func!("Function4"))?;
+    let t5_tag = design.register_invoke_fn("Function5".into(), generic_test_func!("Function5"))?;
+    let t6_tag = design.register_invoke_fn("Function6".into(), generic_test_func!("Function6"))?;
     // Create a program with actions
     design.add_program(file!(), move |_design_instance, builder| {
         builder.with_body(
@@ -139,10 +146,10 @@ pub struct NestedConcurrency;
 fn nested_concurrency_design() -> Result<Design, CommonErrors> {
     let mut design = Design::new("NestedConcurrency".into(), DesignConfig::default());
 
-    let t1_tag = design.register_invoke_fn("OuterFunction1".into(), outer_function1)?;
-    let t2_tag = design.register_invoke_fn("InnerFunction1".into(), inner_function1)?;
-    let t3_tag = design.register_invoke_fn("InnerFunction2".into(), inner_function2)?;
-    let t4_tag = design.register_invoke_fn("OuterFunction2".into(), outer_function2)?;
+    let t1_tag = design.register_invoke_fn("OuterFunction1".into(), generic_test_func!("OuterFunction1"))?;
+    let t2_tag = design.register_invoke_fn("InnerFunction1".into(), generic_test_func!("InnerFunction1"))?;
+    let t3_tag = design.register_invoke_fn("InnerFunction2".into(), generic_test_func!("InnerFunction2"))?;
+    let t4_tag = design.register_invoke_fn("OuterFunction2".into(), generic_test_func!("OuterFunction2"))?;
 
     // Create a program with actions
     design.add_program(file!(), move |_design_instance, builder| {

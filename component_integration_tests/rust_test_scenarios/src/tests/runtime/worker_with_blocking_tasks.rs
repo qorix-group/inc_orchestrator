@@ -8,8 +8,8 @@ use foundation::threading::thread_wait_barrier::ThreadReadyNotifier;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::{
-    Arc,
     atomic::{AtomicUsize, Ordering},
+    Arc,
 };
 use std::time::Duration;
 use tracing::info;

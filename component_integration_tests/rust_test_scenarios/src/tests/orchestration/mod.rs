@@ -1,10 +1,9 @@
 use crate::internals::scenario::{ScenarioGroup, ScenarioGroupImpl};
-use async_runtime::futures::{reusable_box_future::ReusableBoxFuturePool, yield_now};
+use async_runtime::futures::reusable_box_future::ReusableBoxFuturePool;
 use orchestration::common::tag::Tag;
 use orchestration::prelude::*;
 use orchestration_concurrency::{MultipleConcurrency, NestedConcurrency, SingleConcurrency};
 use orchestration_sequence::{AwaitSequence, NestedSequence, SingleSequence};
-use std::pin::Pin;
 use tracing::info;
 
 pub mod orchestration_concurrency;
@@ -74,8 +73,7 @@ impl ActionTrait for JustLogAction {
     }
 }
 
-/// emulate some sleep as workaround until sleep is supported in runtime
-#[allow(dead_code)]
+/// emulate some computing
 fn busy_sleep() -> ActionResult {
     info!("Start sleeping");
     let mut ctr = 1_000_000;
@@ -86,56 +84,10 @@ fn busy_sleep() -> ActionResult {
     Ok(())
 }
 
-#[allow(dead_code)]
-async fn generic_test_func(name: &'static str) -> ActionResult {
-    info!("Start of '{}' function", name);
-    info!("'{}' function yielding...", name);
-    yield_now::yield_now().await;
-    info!("'{}' function resuming...", name);
-    let rv = busy_sleep();
-    info!("End of '{}' function", name);
-    rv
-}
-
-#[allow(dead_code)]
-fn factory_test_func(name: &'static str) -> impl Fn() -> Pin<Box<dyn Future<Output = ActionResult> + Send>> + Clone {
-    move || Box::pin(generic_test_func(name))
-}
-
 fn generic_test_sync_func(name: &'static str) -> InvokeResult {
     info!("Start of '{}' function", name);
-
+    // Spend some time to simulate work
+    let _ = busy_sleep();
     info!("End of '{}' function", name);
     Ok(())
-}
-
-pub fn function1() -> InvokeResult {
-    generic_test_sync_func("Function1")
-}
-pub fn function2() -> InvokeResult {
-    generic_test_sync_func("Function2")
-}
-pub fn function3() -> InvokeResult {
-    generic_test_sync_func("Function3")
-}
-pub fn function4() -> InvokeResult {
-    generic_test_sync_func("Function4")
-}
-pub fn function5() -> InvokeResult {
-    generic_test_sync_func("Function5")
-}
-pub fn function6() -> InvokeResult {
-    generic_test_sync_func("Function6")
-}
-pub fn outer_function1() -> InvokeResult {
-    generic_test_sync_func("OuterFunction1")
-}
-pub fn outer_function2() -> InvokeResult {
-    generic_test_sync_func("OuterFunction2")
-}
-pub fn inner_function1() -> InvokeResult {
-    generic_test_sync_func("InnerFunction1")
-}
-pub fn inner_function2() -> InvokeResult {
-    generic_test_sync_func("InnerFunction2")
 }
