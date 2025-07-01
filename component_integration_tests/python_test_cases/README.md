@@ -29,3 +29,9 @@ Alternatively, test scenarios can be built directly before test execution with e
 python -m pytest -vv --self-contained-html --html=report.html --build-scenarios
 ```
 This will set TEST_BINARY_PATH automatically.
+
+You can repeat tests n-times to catch sporadic issues:
+```sh
+python -m pytest --count 15 --repeat-scope=session -x
+```
+`-x` flag stops further testing on first FAIL occurrence.
