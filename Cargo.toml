@@ -1,6 +1,8 @@
 [workspace]
 resolver = "2"
-members=[
+# Split to default members without component integration tests.
+# Used when executing cargo from project root.
+default-members=[
     "src/foundation",
     "src/async_runtime",
     "src/orchestration",
@@ -9,9 +11,18 @@ members=[
     "src/testing",
     "src/testing_macros",
 ]
-exclude=[
-    "component_integration_tests"
+# Include component integration tests as a member for IDE support and Bazel builds.
+members=[
+    "src/foundation",
+    "src/async_runtime",
+    "src/orchestration",
+    "src/logging_tracing",
+    "src/xtask",
+    "src/testing",
+    "src/testing_macros",
+    "component_integration_tests/rust_test_scenarios",
 ]
+
 
 [workspace.package]
 version = "0.1.0"

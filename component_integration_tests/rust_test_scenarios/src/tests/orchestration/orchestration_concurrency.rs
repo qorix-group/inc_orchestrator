@@ -8,13 +8,6 @@ use orchestration::{
     common::DesignConfig,
 };
 
-#[macro_export]
-macro_rules! generic_test_func {
-    ($name:expr) => {
-        || generic_test_sync_func($name)
-    };
-}
-
 pub struct SingleConcurrency;
 
 fn single_concurrency_design() -> Result<Design, CommonErrors> {

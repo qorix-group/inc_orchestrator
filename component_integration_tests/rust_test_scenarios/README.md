@@ -8,7 +8,9 @@ cargo build
 ```
 
 ### Bazel
-TBD..
+```bash
+bazel build //component_integration_tests/rust_test_scenarios:rust_test_scenarios
+```
 
 ## Standalone execution of Test Scenarios
 ### Cargo run
@@ -20,8 +22,17 @@ e.g.
 ```bash
 cargo run -- --name orchestration.single_sequence <<< '{"runtime": {"task_queue_size": 256, "workers": 1}}'
 ```
+### Bazel
+Bazel equivalence to cargo:
+```bash
+bazel run //component_integration_tests/rust_test_scenarios:rust_test_scenarios -- --name TEST_GROUP.TEST_SCENARIO
+```
+e.g.
+```bash
+bazel run //component_integration_tests/rust_test_scenarios:rust_test_scenarios -- --name orchestration.single_sequence <<< '{"runtime": {"task_queue_size": 256, "workers": 1}}'
+```
 ### Direct binary execution
-Test Scenario can be run also directly using binary instead of `cargo run`
+Test Scenario can be run also directly using binary instead of `cargo run`. Target directory is located in root of the project.
 ```bash
 ./target/debug/rust_test_scenarios --name orchestration.single_sequence <<< '{"runtime": {"task_queue_size": 256, "workers": 1}}'
 ```

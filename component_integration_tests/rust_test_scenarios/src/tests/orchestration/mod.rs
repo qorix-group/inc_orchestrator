@@ -1,13 +1,19 @@
 use crate::internals::scenario::{ScenarioGroup, ScenarioGroupImpl};
 use async_runtime::futures::reusable_box_future::ReusableBoxFuturePool;
-use orchestration::common::tag::Tag;
-use orchestration::prelude::*;
+use orchestration::{common::tag::Tag, prelude::*};
 use orchestration_concurrency::{MultipleConcurrency, NestedConcurrency, SingleConcurrency};
 use orchestration_sequence::{AwaitSequence, NestedSequence, SingleSequence};
 use tracing::info;
 
-pub mod orchestration_concurrency;
 pub mod orchestration_sequence;
+
+macro_rules! generic_test_func {
+    ($name:expr) => {
+        || generic_test_sync_func($name)
+    };
+}
+#[macro_use]
+pub mod orchestration_concurrency;
 
 pub struct OrchestrationScenarioGroup {
     group: ScenarioGroupImpl,
