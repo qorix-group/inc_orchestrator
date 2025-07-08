@@ -1,0 +1,138 @@
+from datetime import timedelta
+
+import pytest
+from testing_tools.log_container import LogContainer
+
+BLOCKING_TASK_ID = "blocking_sleep_task"
+BLOCKING_TASK_DELAY_MS = 1000
+BASIC_TASK_A_ID = "basic_task_A"
+BASIC_TASK_B_ID = "basic_task_B"
+
+
+class TestOneTriggerOneSyncTwoPrograms:
+    @pytest.fixture(scope="class")
+    def scenario_name(self):
+        return "orchestration.1_trigger_1_sync_2_programs"
+
+    @pytest.fixture(scope="class")
+    def test_config(self):
+        return {"runtime": {"task_queue_size": 256, "workers": 4}}
+
+    def test_execution_order(self, test_results: LogContainer):
+        results = test_results.get_logs()
+        assert len(results) == 3, "Expected 3 messages in total"
+
+        sleep_begin_msg = results.pop(0)
+        assert (
+            sleep_begin_msg.id == BLOCKING_TASK_ID
+            and sleep_begin_msg.location == "begin"
+        ), "Expected the first message to be the start of the blocking sleep task"
+
+        sleep_end_msg = results.pop(0)
+        assert (
+            sleep_end_msg.id == BLOCKING_TASK_ID and sleep_end_msg.location == "end"
+        ), "Expected the second message to be the end of the blocking sleep task"
+
+        basic_task_msg = results.pop(0)
+        assert basic_task_msg.id == BASIC_TASK_A_ID, (
+            f"Expected the third message to be {BASIC_TASK_A_ID}"
+        )
+
+    def test_execution_delay(self, test_results: LogContainer):
+        sleep_begin_msg = test_results.get_logs_by_field(
+            "id", BLOCKING_TASK_ID
+        ).find_log("location", "begin")
+        sleep_end_msg = test_results.get_logs_by_field("id", BLOCKING_TASK_ID).find_log(
+            "location", "end"
+        )
+
+        assert sleep_end_msg.timestamp - sleep_begin_msg.timestamp >= timedelta(
+            milliseconds=BLOCKING_TASK_DELAY_MS
+        ), (
+            "Expected the blocking sleep task to take at least "
+            f"{BLOCKING_TASK_DELAY_MS} ms, but it took "
+            f"{sleep_end_msg.timestamp - sleep_begin_msg.timestamp}"
+        )
+
+
+class TestOneTriggerTwoSyncsThreePrograms:
+    @pytest.fixture(scope="class")
+    def scenario_name(self):
+        return "orchestration.1_trigger_2_syncs_3_programs"
+
+    @pytest.fixture(scope="class")
+    def test_config(self):
+        return {"runtime": {"task_queue_size": 256, "workers": 4}}
+
+    def test_execution_order(self, test_results: LogContainer):
+        results = test_results.get_logs()
+        assert len(results) == 4, "Expected 4 messages in total"
+
+        sleep_begin_msg = results.pop(0)
+        assert (
+            sleep_begin_msg.id == BLOCKING_TASK_ID
+            and sleep_begin_msg.location == "begin"
+        ), "Expected the first message to be the start of the blocking sleep task"
+
+        sleep_end_msg = results.pop(0)
+        assert (
+            sleep_end_msg.id == BLOCKING_TASK_ID and sleep_end_msg.location == "end"
+        ), "Expected the second message to be the end of the blocking sleep task"
+
+        expected_basic_task_ids = {BASIC_TASK_A_ID, BASIC_TASK_B_ID}
+        basic_task_msg = results.pop(0)
+        assert basic_task_msg.id in expected_basic_task_ids, (
+            f"Expected the third message to be one of {expected_basic_task_ids}, "
+        )
+        expected_basic_task_ids.remove(basic_task_msg.id)
+
+        basic_task_msg = results.pop(0)
+        assert basic_task_msg.id in expected_basic_task_ids, (
+            "Expected the fourth message to be {expected_basic_task_ids}"
+        )
+
+    def test_execution_delay(self, test_results: LogContainer):
+        sleep_begin_msg = test_results.get_logs_by_field(
+            "id", BLOCKING_TASK_ID
+        ).find_log("location", "begin")
+        sleep_end_msg = test_results.get_logs_by_field("id", BLOCKING_TASK_ID).find_log(
+            "location", "end"
+        )
+
+        assert sleep_end_msg.timestamp - sleep_begin_msg.timestamp >= timedelta(
+            milliseconds=BLOCKING_TASK_DELAY_MS
+        ), (
+            "Expected the blocking sleep task to take at least "
+            f"{BLOCKING_TASK_DELAY_MS} ms, but it took "
+            f"{sleep_end_msg.timestamp - sleep_begin_msg.timestamp}"
+        )
+
+
+class TestTriggerAndSyncInNestedBranches(TestOneTriggerOneSyncTwoPrograms):
+    @pytest.fixture(scope="class")
+    def scenario_name(self):
+        return "orchestration.trigger_and_sync_in_nested_branches"
+
+
+class TestTriggerSyncOneAfterAnother:
+    @pytest.fixture(scope="class")
+    def scenario_name(self):
+        return "orchestration.trigger_sync_one_after_another"
+
+    @pytest.fixture(scope="class")
+    def test_config(self):
+        return {"runtime": {"task_queue_size": 256, "workers": 1}}
+
+    def test_execution_order(self, test_results: LogContainer):
+        results = test_results.get_logs()
+        assert len(results) == 2, "Expected 2 messages in total"
+
+        basic_task_a_msg = results.pop(0)
+        assert basic_task_a_msg.id == BASIC_TASK_A_ID, (
+            f"Expected the first message to be {BASIC_TASK_A_ID}"
+        )
+
+        basic_task_b_msg = results.pop(0)
+        assert basic_task_b_msg.id == BASIC_TASK_B_ID, (
+            f"Expected the first message to be {BASIC_TASK_B_ID}"
+        )
