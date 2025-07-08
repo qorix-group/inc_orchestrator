@@ -5,7 +5,7 @@ from testing_tools import LogContainer
 class TestRuntimeOneWorkerOneTask:
     @pytest.fixture(scope="class")
     def scenario_name(self):
-        return "runtime.worker"
+        return "runtime.worker.basic"
 
     @pytest.fixture(scope="class")
     def test_config(self):
@@ -31,7 +31,7 @@ class TestRuntimeTwoWorkersOneTask(TestRuntimeOneWorkerOneTask):
 class TestRuntimeOneWorkerManyTasks:
     @pytest.fixture(scope="class")
     def scenario_name(self):
-        return "runtime.worker"
+        return "runtime.worker.basic"
 
     @pytest.fixture(scope="class")
     def test_config(self):

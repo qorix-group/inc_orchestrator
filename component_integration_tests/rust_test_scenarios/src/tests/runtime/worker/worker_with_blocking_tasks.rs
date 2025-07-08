@@ -53,7 +53,7 @@ pub struct WorkerWithBlockingTasks;
 
 impl Scenario for WorkerWithBlockingTasks {
     fn get_name(&self) -> &'static str {
-        "worker_with_blocking_tasks"
+        "with_blocking_tasks"
     }
 
     ///

@@ -32,7 +32,7 @@ pub struct BasicWorker;
 
 impl Scenario for BasicWorker {
     fn get_name(&self) -> &'static str {
-        "worker"
+        "basic"
     }
 
     ///
