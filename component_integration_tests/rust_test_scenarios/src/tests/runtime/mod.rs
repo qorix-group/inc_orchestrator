@@ -1,9 +1,7 @@
-pub mod worker_basic;
-pub mod worker_with_blocking_tasks;
+pub mod sleep;
+pub mod worker;
 
 use crate::internals::scenario::{ScenarioGroup, ScenarioGroupImpl};
-use worker_basic::BasicWorker;
-use worker_with_blocking_tasks::WorkerWithBlockingTasks;
 
 pub struct RuntimeScenarioGroup {
     group: ScenarioGroupImpl,
@@ -23,7 +21,7 @@ impl ScenarioGroup for RuntimeScenarioGroup {
     }
 
     fn init(&mut self) -> () {
-        self.group.add_scenario(Box::new(BasicWorker));
-        self.group.add_scenario(Box::new(WorkerWithBlockingTasks));
+        self.group.add_group(Box::new(sleep::SleepScenarioGroup::new()));
+        self.group.add_group(Box::new(worker::WorkerScenarioGroup::new()));
     }
 }
