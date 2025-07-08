@@ -970,7 +970,6 @@ dependencies = [
  "libc",
  "logging_tracing",
  "loom",
- "orchestration",
  "testing",
  "testing_macros",
  "tracing",

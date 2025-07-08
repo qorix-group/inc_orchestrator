@@ -14,10 +14,10 @@
 use super::action::{ActionBaseMeta, ActionResult, ActionTrait, ReusableBoxFutureResult};
 use crate::actions::action::ActionExecError;
 use crate::common::tag::Tag;
-#[cfg(feature = "runtime-api-mock")]
+#[cfg(any(test, feature = "runtime-api-mock"))]
 use async_runtime::testing::mock::*;
 
-#[cfg(not(feature = "runtime-api-mock"))]
+#[cfg(not(any(test, feature = "runtime-api-mock")))]
 use async_runtime::*;
 
 use async_runtime::futures::reusable_box_future::{ReusableBoxFuture, ReusableBoxFuturePool};

@@ -25,9 +25,9 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-#[cfg(not(feature = "runtime-api-mock"))]
+#[cfg(not(any(test, feature = "runtime-api-mock")))]
 use async_runtime::safety::spawn_from_reusable_on_dedicated;
-#[cfg(feature = "runtime-api-mock")]
+#[cfg(any(test, feature = "runtime-api-mock"))]
 use async_runtime::testing::mock::spawn_from_reusable_on_dedicated;
 
 /// A result of an invoke action.
