@@ -21,6 +21,7 @@ use crate::{
     common::tag::Tag,
     program::ProgramBuilder,
 };
+use async_runtime::core::types::UniqueWorkerId;
 
 pub struct Deployment<'a, T> {
     api: &'a mut OrchestrationApi<T>,
@@ -55,6 +56,25 @@ impl<T> Deployment<'_, T> {
 
         for d in &mut self.api.designs {
             let _ = d.db.set_event_type(creator.clone(), user_events_to_bind).or_else(|e| {
+                ret = Err(e);
+                ret
+            });
+        }
+
+        ret
+    }
+
+    /// Binds an invoke action to a worker across all designs wherever that invoke action is registered.
+    /// The registered invoke action will always be executed by the specified worker.
+    /// # Arguments
+    /// * `tag` - The tag of the invoke action to bind.
+    /// * `worker_id` - The unique identifier of the worker to bind the invoke action to.
+    ///
+    pub fn bind_invoke_to_worker(&mut self, tag: Tag, worker_id: UniqueWorkerId) -> Result<(), CommonErrors> {
+        let mut ret = Ok(());
+
+        for d in &mut self.api.designs {
+            let _ = d.db.set_invoke_worker_id(tag, worker_id).or_else(|e| {
                 ret = Err(e);
                 ret
             });

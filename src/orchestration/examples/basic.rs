@@ -11,6 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+use async_runtime::testing::mock::{allow_routing_over_mock, init_runtime_mock};
 use async_runtime::{runtime::async_runtime::AsyncRuntimeBuilder, scheduler::execution_engine::*};
 use foundation::prelude::*;
 use logging_tracing::{TraceScope, TracingLibraryBuilder};
@@ -56,6 +57,11 @@ fn example_component_design() -> Result<Design, CommonErrors> {
 }
 
 fn main() {
+    init_runtime_mock();
+    unsafe {
+        allow_routing_over_mock();
+    }
+
     // Setup any logging framework you want to use.
     let mut logger = TracingLibraryBuilder::new()
         .global_log_level(Level::DEBUG)
@@ -66,7 +72,13 @@ fn main() {
     logger.init_log_trace();
 
     // Create runtime
-    let (builder, _engine_id) = AsyncRuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(256).workers(2));
+    let (builder, _engine_id) = AsyncRuntimeBuilder::new().with_engine(
+        ExecutionEngineBuilder::new()
+            .task_queue_size(256)
+            .workers(2)
+            .with_dedicated_worker("dedicated_worker1".into()),
+    );
+
     let mut runtime = builder.build().unwrap();
 
     // Build Orchestration
@@ -82,6 +94,11 @@ fn main() {
     deployment
         .bind_events_as_local(&["Event1".into(), "Event2".into()])
         .expect("Failed to specify event");
+
+    // Bind a invoke action to a dedicated worker
+    deployment
+        .bind_invoke_to_worker("test1".into(), "dedicated_worker1".into())
+        .expect("Failed to bind invoke action to worker");
 
     // Create programs
     let mut programs = orch.create_programs().unwrap();
