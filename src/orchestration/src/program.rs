@@ -34,11 +34,10 @@ use std::{
 };
 use tracing::trace;
 
-// TODO: This breaks basic_new.rs
-#[cfg(not(feature = "runtime-api-mock"))]
+#[cfg(not(any(test, feature = "runtime-api-mock")))]
 use async_runtime::safety::spawn_from_reusable;
-#[cfg(feature = "runtime-api-mock")]
-use async_runtime::testing::mock::spawn_from_reusable;
+#[cfg(any(test, feature = "runtime-api-mock"))]
+use async_runtime::testing::mock::safety::spawn_from_reusable;
 
 ///
 /// Whole description to Task Chain is delivered via this instance. It shall hold all actions that build as Task Chain
@@ -46,6 +45,10 @@ use async_runtime::testing::mock::spawn_from_reusable;
 pub struct Program {
     name: String,
     run_action: Box<dyn ActionTrait>,
+    start_action: Option<Box<dyn ActionTrait>>,
+    stop_action: Option<Box<dyn ActionTrait>>,
+    #[allow(dead_code)]
+    stop_timeout: Duration,
     shutdown_sync: Option<Box<dyn ActionTrait>>,
 }
 
@@ -60,6 +63,9 @@ impl Debug for Program {
 pub struct ProgramBuilder {
     name: String,
     run_action: Option<Box<dyn ActionTrait>>,
+    start_action: Option<Box<dyn ActionTrait>>,
+    stop_action: Option<Box<dyn ActionTrait>>,
+    stop_timeout: Duration,
     shutdown_event: Option<Tag>,
 }
 
@@ -68,12 +74,27 @@ impl ProgramBuilder {
         Self {
             name: name.to_string(),
             run_action: None,
+            start_action: None,
+            stop_action: None,
+            stop_timeout: Default::default(),
             shutdown_event: None,
         }
     }
 
     pub fn with_run_action(&mut self, action: Box<dyn ActionTrait>) -> &mut Self {
         self.run_action = Some(action);
+        self
+    }
+
+    pub fn with_start_action(&mut self, action: Box<dyn ActionTrait>) -> &mut Self {
+        self.start_action = Some(action);
+        self
+    }
+
+    pub fn with_stop_action(&mut self, action: Box<dyn ActionTrait>, timeout: Duration) -> &mut Self {
+        self.stop_action = Some(action);
+        // TODO(#151): The timeout is currently unused.
+        self.stop_timeout = timeout;
         self
     }
 
@@ -106,6 +127,9 @@ impl ProgramBuilder {
         Ok(Program {
             name: self.name,
             run_action: self.run_action.unwrap(),
+            start_action: self.start_action,
+            stop_action: self.stop_action,
+            stop_timeout: self.stop_timeout,
             shutdown_sync,
         })
     }
@@ -126,6 +150,9 @@ impl Program {
         let iteration_count: usize = n.unwrap_or_default();
         let mut iteration = 0_usize;
         let mut shutdown_handle = self.create_shutdown_handle()?;
+
+        // Stop execution if the start action is present and results in an error.
+        self.run_start_action().await?;
 
         while n.is_none() || iteration < iteration_count {
             let start_time = Instant::now();
@@ -152,7 +179,7 @@ impl Program {
             match join_either.await {
                 Ok(result) => match result.0 {
                     JoinedHandle::Run => result.1?,
-                    JoinedHandle::Shutdown => return Ok(()), // Not checking for ActionExecError on a Sync action.
+                    JoinedHandle::Shutdown => break, // Not checking for ActionExecError on a Sync action.
                 },
                 Err(_) => {
                     trace!("Failed to execute run action or shutdown sync");
@@ -170,7 +197,35 @@ impl Program {
             iteration += 1;
         }
 
-        Ok(())
+        self.run_stop_action().await
+    }
+
+    async fn run_start_action(&mut self) -> ActionResult {
+        if let Some(ref mut start_action) = self.start_action.take() {
+            match start_action.try_execute() {
+                Ok(future) => match spawn_from_reusable(future).await {
+                    Ok(result) => result,
+                    Err(_) => Err(ActionExecError::Internal),
+                },
+                Err(_) => Err(ActionExecError::Internal),
+            }
+        } else {
+            Ok(())
+        }
+    }
+
+    async fn run_stop_action(&mut self) -> ActionResult {
+        if let Some(ref mut stop_action) = self.stop_action.take() {
+            match stop_action.try_execute() {
+                Ok(future) => match spawn_from_reusable(future).await {
+                    Ok(result) => result,
+                    Err(_) => Err(ActionExecError::Internal),
+                },
+                Err(_) => Err(ActionExecError::Internal),
+            }
+        } else {
+            Ok(())
+        }
     }
 
     fn create_shutdown_handle(&mut self) -> Result<Option<JoinHandle<ActionResult>>, ActionExecError> {
@@ -219,7 +274,7 @@ impl Future for JoinEither<'_> {
             }
         }
 
-        std::task::Poll::Pending
+        Poll::Pending
     }
 }
 

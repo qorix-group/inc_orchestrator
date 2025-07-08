@@ -25,12 +25,23 @@ mod common;
 
 fn example_component_design() -> Result<Design, CommonErrors> {
     let mut design = Design::new("ExampleDesign".into(), DesignConfig::default());
-    let t1 = design.register_invoke_async("PendingIndefinitely".into(), async || std::future::pending().await)?;
+    let run_tag = design.register_invoke_async("PendingIndefinitely".into(), async || std::future::pending().await)?;
+    let start_tag = design.register_invoke_fn("StartAction".into(), || {
+        info!("Start action executed.");
+        Ok(())
+    })?;
+    let stop_tag = design.register_invoke_fn("StopAction".into(), || {
+        info!("Stop action executed.");
+        Ok(())
+    })?;
+
     design.register_shutdown_event("ExampleShutdown".into())?;
 
     design.add_program("ExampleDesignProgram", move |_design, builder| {
         builder
-            .with_run_action(Invoke::from_tag(&t1))
+            .with_run_action(Invoke::from_tag(&run_tag))
+            .with_start_action(Invoke::from_tag(&start_tag))
+            .with_stop_action(Invoke::from_tag(&stop_tag), Duration::from_secs(5))
             .with_shutdown_event("ExampleShutdown".into());
 
         Ok(())

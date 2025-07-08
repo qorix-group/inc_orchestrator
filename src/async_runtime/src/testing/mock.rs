@@ -48,11 +48,11 @@ impl MockRuntime {
     }
 
     ///
-    /// Pool each task once to advance it's state. When task returns Ready, it will be removed from the queue.
+    /// Poll each task once to advance it's state. When task returns Ready, it will be removed from the queue.
     ///
     pub fn advance_tasks(&mut self) {
-        let mut t = VecDeque::<TaskRef>::new();
-        t.reserve(self.tasks.len());
+        //let mut t = VecDeque::<TaskRef>::new();
+        //t.reserve(self.tasks.len());
 
         while let Some(task) = self.tasks.pop_front() {
             let waker = create_waker(task.clone());
@@ -61,13 +61,13 @@ impl MockRuntime {
             match task.poll(&mut ctx) {
                 _ => {
                     if !task.is_done() {
-                        t.push_back(task);
+                        self.tasks.push_back(task);
                     }
                 }
             }
         }
 
-        self.tasks = t;
+        //self.tasks = t;
     }
 
     ///
