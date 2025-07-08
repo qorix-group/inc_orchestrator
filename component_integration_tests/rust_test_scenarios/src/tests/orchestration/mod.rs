@@ -1,11 +1,17 @@
 use crate::internals::scenario::{ScenarioGroup, ScenarioGroupImpl};
-use async_runtime::futures::reusable_box_future::ReusableBoxFuturePool;
-use orchestration::{common::tag::Tag, prelude::*};
 use orchestration_concurrency::{MultipleConcurrency, NestedConcurrency, SingleConcurrency};
 use orchestration_sequence::{AwaitSequence, NestedSequence, SingleSequence};
+use orchestration_trigger_sync::{
+    OneTriggerOneSyncTwoPrograms, OneTriggerTwoSyncsThreePrograms, TriggerAndSyncInNestedBranches, TriggerSyncOneAfterAnother,
+};
+
+use async_runtime::futures::reusable_box_future::ReusableBoxFuturePool;
+use orchestration::{common::tag::Tag, prelude::*};
+
 use tracing::info;
 
 pub mod orchestration_sequence;
+pub mod orchestration_trigger_sync;
 
 macro_rules! generic_test_func {
     ($name:expr) => {
@@ -41,6 +47,11 @@ impl ScenarioGroup for OrchestrationScenarioGroup {
         self.group.add_scenario(Box::new(SingleConcurrency));
         self.group.add_scenario(Box::new(MultipleConcurrency));
         self.group.add_scenario(Box::new(NestedConcurrency));
+        // Trigger and sync scenarios
+        self.group.add_scenario(Box::new(OneTriggerOneSyncTwoPrograms));
+        self.group.add_scenario(Box::new(OneTriggerTwoSyncsThreePrograms));
+        self.group.add_scenario(Box::new(TriggerAndSyncInNestedBranches));
+        self.group.add_scenario(Box::new(TriggerSyncOneAfterAnother));
     }
 }
 
