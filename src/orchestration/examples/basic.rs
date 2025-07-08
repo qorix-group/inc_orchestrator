@@ -11,7 +11,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use async_runtime::testing::mock::{allow_routing_over_mock, init_runtime_mock};
 use async_runtime::{runtime::async_runtime::AsyncRuntimeBuilder, scheduler::execution_engine::*};
 use foundation::prelude::*;
 use logging_tracing::{TraceScope, TracingLibraryBuilder};
@@ -57,11 +56,6 @@ fn example_component_design() -> Result<Design, CommonErrors> {
 }
 
 fn main() {
-    init_runtime_mock();
-    unsafe {
-        allow_routing_over_mock();
-    }
-
     // Setup any logging framework you want to use.
     let mut logger = TracingLibraryBuilder::new()
         .global_log_level(Level::DEBUG)
