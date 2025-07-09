@@ -14,16 +14,14 @@
 
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use async_runtime::futures::yield_now;
+use async_runtime::futures::{sleep, yield_now};
 use foundation::prelude::*;
 use orchestration::actions::action::UserErrValue;
-use orchestration::api::design::Design;
-use orchestration::prelude::ActionResult;
-
 use orchestration::actions::invoke::InvokeResult;
+use orchestration::api::design::Design;
 
 /// emulate some sleep as workaround until sleep is supported in runtime
-pub fn busy_sleep() -> ActionResult {
+pub fn busy_sleep() -> InvokeResult {
     info!("Start sleeping");
     let mut ctr = 1000000;
     while ctr > 0 {
@@ -33,55 +31,55 @@ pub fn busy_sleep() -> ActionResult {
     Ok(())
 }
 
-pub async fn wait_ends() -> ActionResult {
+pub async fn wait_ends() -> InvokeResult {
     info!("Test_Event_1 triggered");
     Ok(())
 }
 
-pub async fn wait_ends2() -> ActionResult {
+pub async fn wait_ends2() -> InvokeResult {
     info!("Test_Event_2 triggered");
     Ok(())
 }
 
-pub async fn wait_ends3() -> ActionResult {
+pub async fn wait_ends3() -> InvokeResult {
     info!("Test_Event_3 triggered");
     Ok(())
 }
 
-pub async fn test1_func() -> ActionResult {
-    info!("Start of 'test1' function.");
-    info!("'test1' function yielding....");
+pub async fn test1_async_func() -> InvokeResult {
+    info!("Start of 'test1_async_func' function.");
+    info!("'test1_async_func' function yielding....");
     // yield for other tasks to run.
     yield_now::yield_now().await;
-    info!("'test1' function resuming....");
+    info!("'test1_async_func' function resuming....");
     let rv = busy_sleep();
-    info!("End of 'test1' function.");
+    info!("End of 'test1_async_func' function.");
     return rv;
 }
 
-pub async fn test2_func() -> ActionResult {
-    info!("Start of 'test2' function.");
+pub async fn test2_async_func() -> InvokeResult {
+    info!("Start of 'test2_async_func' function.");
     let rv = busy_sleep();
-    info!("End of 'test2' function.");
+    info!("End of 'test2_async_func' function.");
     return rv;
 }
 
-pub async fn test3_func() -> ActionResult {
-    info!("Start of 'test3' function.");
-    info!("'test3' function yielding....");
+pub async fn test3_async_func() -> InvokeResult {
+    info!("Start of 'test3_async_func' function.");
+    info!("'test3_async_func' function yielding....");
     // yield for other tasks to run.
     yield_now::yield_now().await;
-    info!("'test3' function resuming....");
+    info!("'test3_async_func' function resuming....");
     let rv = busy_sleep();
-    info!("End of 'test3' function.");
+    info!("End of 'test3_async_func' function.");
     return rv;
 }
 
-pub async fn test4_func() -> ActionResult {
-    info!("Start of 'test4' function.");
-    let rv = busy_sleep();
-    info!("End of 'test4' function.");
-    return rv;
+pub async fn test4_async_func() -> InvokeResult {
+    info!("Start of 'test4_async_func' function.");
+    sleep::sleep(std::time::Duration::from_millis(10)).await;
+    info!("End of 'test4_async_func' function.");
+    Ok(())
 }
 
 pub fn test1_sync_func() -> InvokeResult {
@@ -136,6 +134,10 @@ pub fn register_all_common_into_design(design: &mut Design) -> Result<(), Common
     design.register_invoke_fn("test2_sync_func".into(), test2_sync_func)?;
     design.register_invoke_fn("test3_sync_func".into(), test3_sync_func)?;
     design.register_invoke_fn("test4_sync_func".into(), test4_sync_func)?;
+    design.register_invoke_async("test1_async_func".into(), test1_async_func)?;
+    design.register_invoke_async("test2_async_func".into(), test2_async_func)?;
+    design.register_invoke_async("test3_async_func".into(), test3_async_func)?;
+    design.register_invoke_async("test4_async_func".into(), test4_async_func)?;
     design.register_invoke_fn("always_produce_error".into(), always_produce_error)?;
     design.register_invoke_fn("error_after_third_run".into(), error_after_third_run)?;
 
