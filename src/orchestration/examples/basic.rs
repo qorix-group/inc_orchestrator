@@ -16,36 +16,31 @@ use foundation::prelude::*;
 use logging_tracing::{TraceScope, TracingLibraryBuilder};
 use orchestration::{
     api::{design::Design, Orchestration},
-    common::{tag::Tag, DesignConfig},
+    common::DesignConfig,
     prelude::*,
 };
 
 mod common;
-use common::{test1_sync_func, test2_sync_func, test3_sync_func};
+use common::register_all_common_into_design;
 
 fn example_component_design() -> Result<Design, CommonErrors> {
     let mut design = Design::new("ExampleDesign".into(), DesignConfig::default());
 
-    let t1_tag = design.register_invoke_fn("test1".into(), test1_sync_func)?;
-    let t2_tag = design.register_invoke_fn("test2".into(), test2_sync_func)?;
-    design.register_invoke_fn("test3".into(), test3_sync_func)?;
+    register_all_common_into_design(&mut design)?; // Register our common functions, events, etc
 
-    let evt1 = design.register_event(Tag::from_str_static("Event1"))?;
-    let evt2 = design.register_event(Tag::from_str_static("Event2"))?;
     // Create a program with some actions
-
     design.add_program("ExampleDesignProgram", move |design_instance, builder| {
-        let t3_tag = design_instance.get_orchestration_tag("test3".into())?;
-
         builder.with_run_action(
             SequenceBuilder::new()
-                .with_step(TriggerBuilder::from_design("Event1", &design_instance))
-                .with_step(Invoke::from_tag(&t1_tag))
-                .with_step(Invoke::from_tag(&t2_tag))
-                .with_step(Invoke::from_tag(&t2_tag))
-                .with_step(SyncBuilder::from_tag(&evt1))
-                .with_step(SyncBuilder::from_tag(&evt2))
-                .with_step(Invoke::from_tag(&t3_tag))
+                .with_step(Invoke::from_design("test1_sync_func", &design_instance))
+                .with_step(Invoke::from_design("test2_sync_func", &design_instance))
+                .with_step(
+                    ConcurrencyBuilder::new()
+                        .with_branch(Invoke::from_design("test3_sync_func", &design_instance))
+                        .with_branch(Invoke::from_design("test4_sync_func", &design_instance))
+                        .build(),
+                )
+                .with_step(Invoke::from_design("test4_async_func", &design_instance))
                 .build(),
         );
 
@@ -84,14 +79,9 @@ fn main() {
     // Deployment part - specify event details
     let mut deployment = orch.get_deployment_mut();
 
-    // Mark user events as local one.
-    deployment
-        .bind_events_as_local(&["Event1".into(), "Event2".into()])
-        .expect("Failed to specify event");
-
     // Bind a invoke action to a dedicated worker
     deployment
-        .bind_invoke_to_worker("test1".into(), "dedicated_worker1".into())
+        .bind_invoke_to_worker("test1_sync_func".into(), "dedicated_worker1".into())
         .expect("Failed to bind invoke action to worker");
 
     // Create programs
