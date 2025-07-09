@@ -62,11 +62,6 @@ fn program2_component_design() -> Result<Design, CommonErrors> {
 }
 
 fn main() {
-    // Examples are treated as tests, so we need to allow routing over mock runtime which we use during testing.
-    unsafe {
-        async_runtime::testing::mock::allow_routing_over_mock();
-    }
-
     // Setup any logging framework you want to use.
     let mut logger = TracingLibraryBuilder::new()
         .global_log_level(Level::DEBUG)

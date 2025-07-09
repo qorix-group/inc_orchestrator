@@ -10,17 +10,23 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 # *******************************************************************************
-
 load("@crates//:defs.bzl", "all_crate_deps")
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
 
-_COMMON_DEPS = [
+_BASE_DEPS = [
     "//src/foundation:libfoundation",
-    "//src/async_runtime:libasync_runtime",
     "//src/logging_tracing:liblogging_tracing",
 ] + all_crate_deps(
     normal = True,
 )
+
+_COMMON_DEPS = _BASE_DEPS + [
+    "//src/async_runtime:libasync_runtime",
+]
+
+_EXAMPLE_DEPS = _COMMON_DEPS + [
+    ":liborchestration",
+]
 
 rust_library(
     name = "liborchestration",
@@ -36,20 +42,15 @@ rust_test(
     name = "tests",
     srcs = glob(["src/**/*.rs"]),
     crate_features = [
-        "runtime-api-mock",
         "iceoryx-ipc",
     ],
     proc_macro_deps = [
         "//src/testing_macros:test_macro_utils",
     ],
-    deps = [
+    deps = _BASE_DEPS + [
         "//src/async_runtime:libasync_runtime_mocked",
-        "//src/foundation:libfoundation",
-        "//src/logging_tracing:liblogging_tracing",
         "//src/testing:test_utils",
-    ] + all_crate_deps(
-        normal = True,
-    ),
+    ],
 )
 
 rust_binary(
@@ -58,9 +59,25 @@ rust_binary(
         "examples/basic.rs",
     ] + glob(["examples/common/**/*.rs"]),
     visibility = ["//visibility:public"],
-    deps = _COMMON_DEPS + [
-        ":liborchestration",
-    ],
+    deps = _EXAMPLE_DEPS,
+)
+
+rust_binary(
+    name = "catch_error",
+    srcs = [
+        "examples/catch_error.rs",
+    ] + glob(["examples/common/**/*.rs"]),
+    visibility = ["//visibility:public"],
+    deps = _EXAMPLE_DEPS,
+)
+
+rust_binary(
+    name = "events_across_local_programs",
+    srcs = [
+        "examples/events_across_local_programs.rs",
+    ] + glob(["examples/common/**/*.rs"]),
+    visibility = ["//visibility:public"],
+    deps = _EXAMPLE_DEPS,
 )
 
 rust_binary(
@@ -71,7 +88,5 @@ rust_binary(
         "examples/camera_drv_object_det/object_detection.rs",
     ] + glob(["examples/common/**/*.rs"]),
     visibility = ["//visibility:public"],
-    deps = _COMMON_DEPS + [
-        ":liborchestration",
-    ],
+    deps = _EXAMPLE_DEPS,
 )
