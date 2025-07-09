@@ -2,14 +2,14 @@ import pytest
 from testing_tools.log_container import LogContainer
 
 
-class TestSingleConcurrency1W2Q:
+class TestSingleConcurrency1W256Q:
     @pytest.fixture(scope="class")
     def scenario_name(self):
         return "orchestration.single_concurrency"
 
     @pytest.fixture(scope="class")
     def test_config(self):
-        return {"runtime": {"task_queue_size": 2, "workers": 1}}
+        return {"runtime": {"task_queue_size": 256, "workers": 1}}
 
     def test_each_function_standalone_order(self, test_results: LogContainer):
         for function in ["Function1", "Function2", "Function3"]:
@@ -55,20 +55,20 @@ class TestSingleConcurrency1W2Q:
         )
 
 
-class TestSingleConcurrency2W2Q(TestSingleConcurrency1W2Q):
+class TestSingleConcurrency2W256Q(TestSingleConcurrency1W256Q):
     @pytest.fixture(scope="class")
     def test_config(self):
-        return {"runtime": {"task_queue_size": 2, "workers": 2}}
+        return {"runtime": {"task_queue_size": 256, "workers": 2}}
 
 
-class TestMultipleConcurrency1W2Q:
+class TestMultipleConcurrency1W256Q:
     @pytest.fixture(scope="class")
     def scenario_name(self):
         return "orchestration.multiple_concurrency"
 
     @pytest.fixture(scope="class")
     def test_config(self):
-        return {"runtime": {"task_queue_size": 2, "workers": 1}}
+        return {"runtime": {"task_queue_size": 256, "workers": 1}}
 
     def test_concurrency1_finished_before_final_task(self, test_results: LogContainer):
         # Check if all branches in Concurrency1 were executed before FinishAction
@@ -209,26 +209,26 @@ class TestMultipleConcurrency1W2Q:
         )
 
 
-class TestMultipleConcurrency2W2Q(TestMultipleConcurrency1W2Q):
+class TestMultipleConcurrency2W256Q(TestMultipleConcurrency1W256Q):
     @pytest.fixture(scope="class")
     def test_config(self):
-        return {"runtime": {"task_queue_size": 2, "workers": 2}}
+        return {"runtime": {"task_queue_size": 256, "workers": 2}}
 
 
-class TestMultipleConcurrency5W256Q(TestMultipleConcurrency1W2Q):
+class TestMultipleConcurrency5W256Q(TestMultipleConcurrency1W256Q):
     @pytest.fixture(scope="class")
     def test_config(self):
         return {"runtime": {"task_queue_size": 256, "workers": 5}}
 
 
-class TestNestedConcurrency1W2Q:
+class TestNestedConcurrency1W256Q:
     @pytest.fixture(scope="class")
     def scenario_name(self):
         return "orchestration.nested_concurrency"
 
     @pytest.fixture(scope="class")
     def test_config(self):
-        return {"runtime": {"task_queue_size": 2, "workers": 1}}
+        return {"runtime": {"task_queue_size": 256, "workers": 1}}
 
     def test_inner_concurrency_finished_before_final_task(
         self, test_results: LogContainer
@@ -263,13 +263,13 @@ class TestNestedConcurrency1W2Q:
         )
 
 
-class TestNestedConcurrency2W2Q(TestNestedConcurrency1W2Q):
+class TestNestedConcurrency2W256Q(TestNestedConcurrency1W256Q):
     @pytest.fixture(scope="class")
     def test_config(self):
-        return {"runtime": {"task_queue_size": 2, "workers": 2}}
+        return {"runtime": {"task_queue_size": 256, "workers": 2}}
 
 
-class TestNestedConcurrency5W256Q(TestNestedConcurrency1W2Q):
+class TestNestedConcurrency5W256Q(TestNestedConcurrency1W256Q):
     @pytest.fixture(scope="class")
     def test_config(self):
         return {"runtime": {"task_queue_size": 256, "workers": 5}}

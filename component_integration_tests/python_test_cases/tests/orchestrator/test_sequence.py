@@ -2,14 +2,14 @@ import pytest
 from testing_tools.log_container import LogContainer
 
 
-class TestSingleSequence1W2Q:
+class TestSingleSequence1W256Q:
     @pytest.fixture(scope="class")
     def scenario_name(self):
         return "orchestration.single_sequence"
 
     @pytest.fixture(scope="class")
     def test_config(self):
-        return {"runtime": {"task_queue_size": 2, "workers": 1}}
+        return {"runtime": {"task_queue_size": 256, "workers": 1}}
 
     def test_execution_order_one_branch(self, test_results: LogContainer):
         action1 = test_results.find_log(field="message", pattern="Action1 was executed")
@@ -21,20 +21,20 @@ class TestSingleSequence1W2Q:
         )
 
 
-class TestSingleSequence2W2Q(TestSingleSequence1W2Q):
+class TestSingleSequence2W256Q(TestSingleSequence1W256Q):
     @pytest.fixture(scope="class")
     def test_config(self):
-        return {"runtime": {"task_queue_size": 2, "workers": 2}}
+        return {"runtime": {"task_queue_size": 256, "workers": 2}}
 
 
-class TestNestedSequence1W2Q:
+class TestNestedSequence1W256Q:
     @pytest.fixture(scope="class")
     def scenario_name(self):
         return "orchestration.nested_sequence"
 
     @pytest.fixture(scope="class")
     def test_config(self):
-        return {"runtime": {"task_queue_size": 2, "workers": 1}}
+        return {"runtime": {"task_queue_size": 256, "workers": 1}}
 
     def test_outer_sequence_executed(self, test_results: LogContainer):
         assert test_results.contains_log(field="message", pattern="OuterAction*"), (
@@ -64,7 +64,7 @@ class TestNestedSequence1W2Q:
         )
 
 
-class TestNestedSequence2W2Q(TestNestedSequence1W2Q):
+class TestNestedSequence2W256Q(TestNestedSequence1W256Q):
     @pytest.fixture(scope="class")
     def test_config(self):
         return {"runtime": {"task_queue_size": 256, "workers": 2}}
