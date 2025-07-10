@@ -32,3 +32,11 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 [features]
 default = ["iceoryx-ipc"]
 iceoryx-ipc = []
+
+[[example]]
+name = "inter_process_event_sender"
+path = "examples/inter_process_event/sender.rs"
+
+[[example]]
+name = "inter_process_event_receiver"
+path = "examples/inter_process_event/receiver.rs"
