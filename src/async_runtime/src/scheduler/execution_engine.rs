@@ -33,8 +33,8 @@ use crate::{
 use foundation::containers::growable_vec::GrowableVec;
 use foundation::containers::mpmc_queue::MpmcQueue;
 use foundation::containers::trigger_queue::{TriggerQueue, TriggerQueueConsumer};
-use foundation::prelude::*;
 use foundation::threading::thread_wait_barrier::ThreadWaitBarrier;
+use foundation::{not_recoverable_error, prelude::*};
 
 pub struct JoinHandle {
     recv: Option<TriggerQueueConsumer<Result<u32, RuntimeErrors>>>,
@@ -49,6 +49,33 @@ impl JoinHandle {
     }
 }
 
+enum EngineState {
+    Starting,
+    Running(JoinHandle),
+    Finished, // Main task is finished, but workers are still running
+    Stopped,  // Engine is stopped, no workers are running anymore
+}
+
+impl EngineState {
+    fn is_running(&self) -> bool {
+        matches!(self, EngineState::Running(_))
+    }
+
+    fn is_stopped(&self) -> bool {
+        matches!(self, EngineState::Stopped)
+    }
+
+    fn move_to_finished(&mut self) -> Result<JoinHandle, RuntimeErrors> {
+        if !self.is_running() {
+            return Err(RuntimeErrors::NoTaskRunning);
+        }
+
+        match std::mem::replace(self, Self::Finished) {
+            EngineState::Running(join_handle) => Ok(join_handle),
+            _ => not_recoverable_error!("Shall never be here since we checked that state is Running"),
+        }
+    }
+}
 /// The central engine for managing and executing asynchronous and dedicated tasks.
 ///
 /// `ExecutionEngine` encapsulates worker threads, schedulers, and their associated queues.
@@ -64,7 +91,7 @@ pub struct ExecutionEngine {
 
     safety_worker: Option<SafetyWorker>,
     thread_params: ThreadParameters,
-    current_handle: Option<JoinHandle>,
+    state: EngineState,
 }
 
 impl ExecutionEngine {
@@ -75,7 +102,7 @@ impl ExecutionEngine {
     /// Returns an error if a task is already running or if no result is available.
     pub(crate) fn block_on<T: Future<Output = Result<u32, RuntimeErrors>> + 'static + Send>(&mut self, future: T) -> Result<u32, RuntimeErrors> {
         self.run_in_engine(future)?;
-        self.current_handle.take().ok_or(RuntimeErrors::NoTaskRunning)?.join()
+        self.wait_for()
     }
 
     /// Starts the engine and executes the given future within the runtime context.
@@ -83,14 +110,14 @@ impl ExecutionEngine {
     /// Returns an error if a task is already running.
     /// Execution is asynchronous; the result can be retrieved later using [`wait_for`].
     pub(crate) fn run_in_engine<T: Future<Output = Result<u32, RuntimeErrors>> + 'static + Send>(&mut self, future: T) -> Result<(), RuntimeErrors> {
-        if self.current_handle.is_some() {
+        if self.state.is_running() {
             return Err(RuntimeErrors::TaskAlreadyRunning);
         }
 
         let tq = Arc::new(TriggerQueue::new(1));
         let recv = tq.clone().get_consumer();
 
-        self.current_handle = Some(JoinHandle { recv });
+        self.state = EngineState::Running(JoinHandle { recv });
         let boxed = box_future(async move {
             let res = future.await;
 
@@ -172,20 +199,26 @@ impl ExecutionEngine {
     /// It is required to asynchronously start a task with [`run_in_engine`] before using this.
     /// Returns the result of a finished task or an error if no task is running.
     pub(crate) fn wait_for(&mut self) -> Result<u32, RuntimeErrors> {
-        if let Some(handle) = self.current_handle.take() {
-            return handle.join();
+        match self.state {
+            EngineState::Running(_) => self.state.move_to_finished()?.join(),
+            EngineState::Starting | EngineState::Finished => Err(RuntimeErrors::NoTaskRunning),
+            EngineState::Stopped => Err(RuntimeErrors::EngineNotAvailable),
         }
-
-        Err(RuntimeErrors::NoTaskRunning)
     }
 
     /// Stops all worker threads managed by the engine.
     ///
     /// The running tasks are not finished, they are only finishing their currently running
-    /// iteration and are then aborted. That means that running taskes are driven until their
+    /// iteration and are then aborted. That means that running tasks are driven until their
     /// current poll iteration finishes, regardless of the return value. Even when a task returns
     /// Poll::Pending, it will be stopped after the current iteration.
     pub(crate) fn stop(&mut self) {
+        if self.state.is_stopped() {
+            return; // Already stopped, nothing to do
+        }
+
+        self.state = EngineState::Stopped;
+
         for worker in self.async_workers.iter_mut() {
             worker.stop();
         }
@@ -242,7 +275,7 @@ impl ExecutionEngineBuilder {
     }
 
     ///
-    /// Will create runtime with `cnt` async workers
+    /// Will create engine with `cnt` async workers
     ///
     pub fn workers(mut self, cnt: usize) -> Self {
         self.async_workers_cnt = cnt;
@@ -259,33 +292,39 @@ impl ExecutionEngineBuilder {
         self
     }
 
+    /// Configures thread priority for the async workers.
     pub fn thread_priority(mut self, thread_prio: u8) -> Self {
         self.thread_params.priority = Some(thread_prio);
         self
     }
 
+    /// Configures thread affinity for the async workers.
     pub fn thread_affinity(mut self, thread_affinity: usize) -> Self {
         self.thread_params.affinity = Some(thread_affinity);
         self
     }
 
+    /// Configures the scheduler type for the async workers.
     pub fn thread_scheduler(mut self, thread_scheduler_type: SchedulerType) -> Self {
         self.thread_params.scheduler_type = Some(thread_scheduler_type);
         self
     }
 
+    /// Configures the stack size for the async workers.
     pub fn thread_stack_size(mut self, thread_stack_size: u64) -> Self {
         self.thread_params.stack_size = Some(thread_stack_size);
         self
     }
 
+    /// Enables the safety worker with the given thread parameters `params`.
+    ///
     pub fn enable_safety_worker(mut self, params: ThreadParameters) -> Self {
         self.with_safe_worker = (true, params);
         self
     }
 
     ///
-    /// Adds new dedicated worker to the engine identified by `id`
+    /// Adds new dedicated worker identified by `id` to the engine
     ///
     #[allow(dead_code)]
     pub fn with_dedicated_worker(mut self, id: UniqueWorkerId) -> Self {
@@ -371,7 +410,7 @@ impl ExecutionEngineBuilder {
             dedicated_scheduler,
             safety_worker,
             thread_params: self.thread_params,
-            current_handle: None,
+            state: EngineState::Starting,
         }
     }
 }
