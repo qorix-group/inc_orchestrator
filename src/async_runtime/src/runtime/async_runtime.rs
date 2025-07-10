@@ -81,14 +81,14 @@ pub struct AsyncRuntime {
 }
 
 impl AsyncRuntime {
-    /// Runs the given future to completion on the default engine, blocking the current thread.
+    /// Runs the given future (denoted as main async task) to completion on the default engine, blocking the current thread.
     ///
     /// Returns the result of the future or an error if the engine is not available.
     pub fn block_on<T: Future<Output = Result<u32, RuntimeErrors>> + 'static + Send>(&mut self, future: T) -> Result<u32, RuntimeErrors> {
         self.block_on_engine(0, future)
     }
 
-    /// Runs the given future to completion on the specified engine, blocking the current thread.
+    /// Runs the given future (denoted as main async task) to completion on the specified engine, blocking the current thread.
     ///
     /// Returns the result of the future or an error if the engine is not available.
     pub fn block_on_engine<T: Future<Output = Result<u32, RuntimeErrors>> + 'static + Send>(
@@ -106,16 +106,16 @@ impl AsyncRuntime {
 
     /// Starts the given future asynchronously on the default engine.
     ///
-    /// The result can be retrieved later using [`wait_for_engine_id`] or just the completion of
-    /// all engines with [`wait_for_all_engines`].
+    /// The result can be retrieved later using [`AsyncRuntime::wait_for_engine`] or just the completion of
+    /// all engines with [`AsyncRuntime::wait_for_all_engines`].
     pub fn spawn<T: Future<Output = Result<u32, RuntimeErrors>> + 'static + Send>(&mut self, future: T) -> Result<(), RuntimeErrors> {
         self.spawn_in_engine(0, future)
     }
 
     /// Starts the given future asynchronously on the specified engine.
     ///
-    /// The result can be retrieved later using [`wait_for_engine_id`] or just the completion of
-    /// all engines with [`wait_for_all_engines`].
+    /// The result can be retrieved later using [`AsyncRuntime::wait_for_engine`] or just the completion of
+    /// all engines with [`AsyncRuntime::wait_for_all_engines`].
     pub fn spawn_in_engine<T: Future<Output = Result<u32, RuntimeErrors>> + 'static + Send>(
         &mut self,
         engine_id: usize,
@@ -127,36 +127,40 @@ impl AsyncRuntime {
             .run_in_engine(future)
     }
 
-    /// Stops all engines and their worker threads.
+    /// Waits for the result of the currently running main async task on the specified engine `engine_id`.
     ///
-    /// Any running tasks will be aborted after their current iteration, even if they still return
-    /// `Poll::Pending`. They will be run until they return the next `Poll::Ready` or
-    /// `Poll::Pending` and then stopped.
-    pub fn shutdown(&mut self) {
-        for engine in self.engines.iter_mut() {
-            engine.stop();
-        }
-    }
-
-    /// Waits for the result of the currently running task on the specified engine.
+    /// This is a companion for [`AsyncRuntime::spawn_in_engine`]. This waits for the Future you spawn there to finish.
     ///
-    /// This is a companion for [`spawn_in_engine`] or [`spawn`]. Tasks started with these
-    /// functions can be joined here. This waits for the Future you gave to the [`spawn`] /
-    /// [`spawn_in_engine`] function to finish. If there where any addtional tasks spawned from
-    /// within the starting Future, they will not be waited for. You should take care of
-    /// waiting for them yourself, if you have the need to do so.
-    /// Returns the result or an error if no task is running.
+    /// # ATTENTION:
+    /// If there where any additional tasks spawned from within the starting Future,
+    /// they will not be waited for. You should take care of waiting for them yourself, if you have the need to do so, in main async task.
+    ///
+    /// # Returns
+    /// The result or an error if no task is running.
     pub fn wait_for_engine(&mut self, engine_id: usize) -> Result<u32, RuntimeErrors> {
         self.engines.get_mut(engine_id).ok_or(RuntimeErrors::EngineNotAvailable)?.wait_for()
     }
 
-    /// Waits for all engines to finish their currently running tasks.
+    /// Waits for all engines to finish their currently running main async task (spawned via [`AsyncRuntime::spawn_in_engine`]/[`AsyncRuntime::spawn`]).
     ///
+    // # ATTENTION:
+    /// If there were any additional tasks spawned from within the starting Future,
+    /// they will not be waited for. You should take care of waiting for them yourself, if you have the need to do so, in main async task.
+    ///
+    /// # Returns
     /// The results of the engines are consumed but not delivered anywhere. After calling this
     /// function the engines do not have a result.
     pub fn wait_for_all_engines(&mut self) {
         for engine in self.engines.iter_mut() {
             let _ = engine.wait_for();
+        }
+    }
+
+    /// Stops all engines and their worker threads. This is forceful call that will abort after currently
+    /// running task in each worker will cooperatively yield execution to worker (via returning Ready or Pending)
+    pub fn shutdown(&mut self) {
+        for engine in self.engines.iter_mut() {
+            engine.stop();
         }
     }
 }
