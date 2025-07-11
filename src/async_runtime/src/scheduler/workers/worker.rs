@@ -240,9 +240,9 @@ impl WorkerInner {
         self.maybe_run_driver();
 
         // First check our queue for work
-        let mut task = self.producer_consumer.pop();
+        let (mut task, mut should_notify) = self.next_task();
         if task.is_some() {
-            return (task, false);
+            return (task, should_notify);
         }
 
         // Now we enter searching if there is no enough contention already.
@@ -255,7 +255,6 @@ impl WorkerInner {
 
         // Next, try steal from other workers. Do this only, if no more than half the workers are
         // already searching for work.
-        let mut should_notify;
 
         (task, should_notify) = self.try_steal_work();
         if task.is_some() {
@@ -269,6 +268,17 @@ impl WorkerInner {
         }
 
         (None, false)
+    }
+
+    fn next_task(&mut self) -> (Option<TaskRef>, bool) {
+        let mut should_notify = false;
+        //TODO: Remove hardcoded values into global config
+        if self.next_task_tick % 16 == 0 {
+            // It's time to check if we have work in global queue
+            should_notify = self.try_take_global_work_internal() > 0; //TODO(https://github.com/qorix-group/inc_orchestrator_internal/issues/153) - try semantic missing
+        }
+
+        (self.producer_consumer.pop(), should_notify)
     }
 
     fn try_steal_work(&mut self) -> (Option<TaskRef>, bool) {
