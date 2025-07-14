@@ -30,7 +30,6 @@ use ::core::{
     task::{Context, Poll},
     time::Duration,
 };
-
 use async_runtime::{scheduler::join_handle::JoinHandle, time::clock::Clock};
 use foundation::prelude::CommonErrors;
 use tracing::trace;
@@ -285,4 +284,87 @@ struct ProgramStats<'a> {
     name: &'a str,
     iteration: usize,
     iteration_time: Duration,
+}
+
+#[cfg(test)]
+#[cfg(not(loom))]
+mod tests {
+    use super::*;
+    use crate::{
+        common::DesignConfig,
+        prelude::{Invoke, InvokeResult},
+    };
+    use async_runtime::testing;
+    use std::{
+        sync::{Arc, Mutex},
+        //task::Waker,
+        time::Duration,
+    };
+    use testing_macros::ensure_clear_mock_runtime;
+
+    #[test]
+    #[ensure_clear_mock_runtime]
+    fn test_start_and_stop_action() {
+        let mut design = Design::new("ExampleDesign".into(), DesignConfig::default());
+
+        struct Flags {
+            start_called: bool,
+            run_called: bool,
+            stop_called: bool,
+        }
+
+        impl Flags {
+            fn new() -> Self {
+                Self {
+                    start_called: false,
+                    run_called: false,
+                    stop_called: false,
+                }
+            }
+
+            fn start(&mut self) -> InvokeResult {
+                self.start_called = true;
+                Ok(())
+            }
+
+            fn run(&mut self) -> InvokeResult {
+                self.run_called = true;
+                Ok(())
+            }
+
+            fn stop(&mut self) -> InvokeResult {
+                self.stop_called = true;
+                Ok(())
+            }
+        }
+
+        let flags = Arc::new(Mutex::new(Flags::new()));
+        let start_tag = design
+            .register_invoke_method("StartAction".into(), Arc::clone(&flags), Flags::start)
+            .unwrap();
+        let run_tag = design.register_invoke_method("RunAction".into(), Arc::clone(&flags), Flags::run).unwrap();
+        let stop_tag = design
+            .register_invoke_method("StopAction".into(), Arc::clone(&flags), Flags::stop)
+            .unwrap();
+
+        let mut builder = ProgramBuilder::new("TestBuilder");
+        builder
+            .with_start_action(Invoke::from_tag(&start_tag))
+            .with_run_action(Invoke::from_tag(&run_tag))
+            .with_stop_action(Invoke::from_tag(&stop_tag), Duration::from_secs(10));
+
+        let mut program = builder.build(&mut design).unwrap();
+        testing::mock::spawn(async move {
+            program.run_n(1).await.unwrap();
+        });
+
+        for _ in 0..10 {
+            testing::mock::runtime::step();
+        }
+
+        let flags = flags.lock().unwrap();
+        assert!(flags.start_called);
+        assert!(flags.run_called);
+        assert!(flags.stop_called);
+    }
 }

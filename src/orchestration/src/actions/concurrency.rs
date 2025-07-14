@@ -266,6 +266,7 @@ mod tests {
     use crate::testing::MockActionBuilder;
     use crate::testing::OrchTestingPoller;
     use ::core::task::Poll;
+    use async_runtime::testing::mock;
     use testing_macros::ensure_clear_mock_runtime;
 
     #[test]
@@ -314,12 +315,9 @@ mod tests {
         let _ = poller.poll();
 
         // Use the mock runtime to execute all spawned concurrent actions.
-        let _x = async_runtime::testing::mock::runtime_instance(|runtime| {
-            assert!(runtime.remaining_tasks() > 0);
-            runtime.advance_tasks();
-
-            assert_eq!(runtime.remaining_tasks(), 0);
-        });
+        assert!(mock::runtime::remaining_tasks() > 0);
+        mock::runtime::step();
+        assert_eq!(mock::runtime::remaining_tasks(), 0);
 
         // Get the result
         let result = poller.poll();
@@ -341,12 +339,9 @@ mod tests {
         let _ = poller.poll();
 
         // Use the mock runtime to execute all spawned concurrent actions.
-        let _x = async_runtime::testing::mock::runtime_instance(|runtime| {
-            assert!(runtime.remaining_tasks() > 0);
-            runtime.advance_tasks();
-
-            assert_eq!(runtime.remaining_tasks(), 0);
-        });
+        assert!(mock::runtime::remaining_tasks() > 0);
+        mock::runtime::step();
+        assert_eq!(mock::runtime::remaining_tasks(), 0);
 
         // Get the result
         let result = poller.poll();
@@ -377,12 +372,9 @@ mod tests {
         let _ = poller.poll();
 
         // Use the mock runtime to execute all spawned concurrent actions.
-        let _x = async_runtime::testing::mock::runtime_instance(|runtime| {
-            assert!(runtime.remaining_tasks() > 0);
-            runtime.advance_tasks();
-
-            assert_eq!(runtime.remaining_tasks(), 0);
-        });
+        assert!(mock::runtime::remaining_tasks() > 0);
+        mock::runtime::step();
+        assert_eq!(mock::runtime::remaining_tasks(), 0);
 
         // Get the result
         let result = poller.poll();
@@ -405,15 +397,12 @@ mod tests {
         let _ = poller.poll();
 
         // Use the mock runtime to execute all spawned concurrent actions.
-        let _x = async_runtime::testing::mock::runtime_instance(|runtime| {
-            assert!(runtime.remaining_tasks() > 0);
-            let _ = poller.poll(); // Poll again before advancing tasks
-            let result = poller.poll();
-            assert_eq!(result, Poll::Pending); // Should still be pending since tasks are not advanced yet
-            runtime.advance_tasks();
-
-            assert_eq!(runtime.remaining_tasks(), 0);
-        });
+        assert!(mock::runtime::remaining_tasks() > 0);
+        let _ = poller.poll(); // Poll again before advancing tasks
+        let result = poller.poll();
+        assert_eq!(result, Poll::Pending); // Should still be pending since tasks are not advanced yet
+        mock::runtime::step();
+        assert_eq!(mock::runtime::remaining_tasks(), 0);
 
         // Get the result
         let result = poller.poll();
@@ -437,12 +426,9 @@ mod tests {
         let _ = poller.poll();
 
         // Use the mock runtime to execute all spawned concurrent actions.
-        let _x = async_runtime::testing::mock::runtime_instance(|runtime| {
-            assert!(runtime.remaining_tasks() > 0);
-            runtime.advance_tasks();
-
-            assert_eq!(runtime.remaining_tasks(), 0);
-        });
+        assert!(mock::runtime::remaining_tasks() > 0);
+        mock::runtime::step();
+        assert_eq!(mock::runtime::remaining_tasks(), 0);
 
         // Get the result
         let result = poller.poll();
@@ -471,12 +457,9 @@ mod tests {
             let _ = poller.poll();
 
             // Use the mock runtime to execute all spawned concurrent actions.
-            let _x = async_runtime::testing::mock::runtime_instance(|runtime| {
-                assert!(runtime.remaining_tasks() > 0);
-                runtime.advance_tasks();
-
-                assert_eq!(runtime.remaining_tasks(), 0);
-            });
+            assert!(mock::runtime::remaining_tasks() > 0);
+            mock::runtime::step();
+            assert_eq!(mock::runtime::remaining_tasks(), 0);
 
             // Get the result
             let result = poller.poll();
@@ -506,12 +489,9 @@ mod tests {
             let _ = poller.poll();
 
             // Use the mock runtime to execute all spawned concurrent actions.
-            let _x = async_runtime::testing::mock::runtime_instance(|runtime| {
-                assert!(runtime.remaining_tasks() > 0);
-                runtime.advance_tasks();
-
-                assert_eq!(runtime.remaining_tasks(), 0);
-            });
+            assert!(mock::runtime::remaining_tasks() > 0);
+            mock::runtime::step();
+            assert_eq!(mock::runtime::remaining_tasks(), 0);
 
             // Get the result
             let result = poller.poll();
