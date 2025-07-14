@@ -13,90 +13,110 @@
 
 #![allow(dead_code)]
 
-use crate::core::types::{box_future, FutureBox, UniqueWorkerId};
-use crate::scheduler::waker::create_waker;
-
-use ::core::cell::RefCell;
-use ::core::future::Future;
-
-use ::core::task::Context;
-use std::sync::Arc;
-
-use crate::futures::reusable_box_future::ReusableBoxFuture;
-
-use crate::scheduler::{join_handle::JoinHandle, task::async_task::TaskRef};
+use crate::{
+    core::types::{box_future, FutureBox, UniqueWorkerId},
+    futures::reusable_box_future::ReusableBoxFuture,
+    scheduler::{join_handle::JoinHandle, task::async_task::TaskRef, waker::create_waker},
+    testing::*,
+};
+use ::core::{cell::RefCell, future::Future, sync::atomic, task::Context};
 use std::collections::VecDeque;
-
-use crate::testing::*;
+use std::sync::Arc;
 
 ///
 /// Mock runtime API with possibility to poll tasks manually.
 /// ATTENTION: Instance of runtime is SINGLETON but in TLS so one for each thread.
-///
 ///
 pub struct MockRuntime {
     tasks: VecDeque<TaskRef>,
     sched: Arc<SchedulerMock>,
 }
 
-impl MockRuntime {
+thread_local! {
+    static MOCK_RUNTIME: RefCell<Option<MockRuntime>> = RefCell::new(None);
+}
+
+static DEV_CODE_ALLOW_ROUTING_OVER_MOCK: atomic::AtomicBool = atomic::AtomicBool::new(false);
+
+pub mod runtime {
+
+    use super::*;
+
     ///
-    /// Removes all tasks from runtime. Shall be called before each test to ensure that no tasks are left from previous tests.
+    /// Initialize the runtime
     ///
-    pub fn reset(&mut self) {
-        self.tasks.clear();
+    pub fn init() {
+        MOCK_RUNTIME.set(Some(MockRuntime {
+            tasks: VecDeque::new(),
+            sched: Arc::new(SchedulerMock::default()),
+        }));
     }
 
     ///
-    /// Poll each task once to advance it's state. When task returns Ready, it will be removed from the queue.
+    /// Get access to the mock runtime via closure
     ///
-    pub fn advance_tasks(&mut self) {
-        //let mut t = VecDeque::<TaskRef>::new();
-        //t.reserve(self.tasks.len());
+    pub fn instance<C: FnMut(&mut MockRuntime) -> T, T>(mut c: C) -> T {
+        MOCK_RUNTIME.with(|instance| {
+            c(instance
+                .borrow_mut()
+                .as_mut()
+                .expect("Runtime mock instance is not initialized. Did you call `init`?"))
+        })
+    }
 
-        while let Some(task) = self.tasks.pop_front() {
+    ///
+    /// Reset the runtime
+    ///
+    pub fn reset() {
+        MOCK_RUNTIME.with(|instance| {
+            instance
+                .borrow_mut()
+                .as_mut()
+                .expect("Runtime mock instance is not initialized. Did you call `init`?")
+                .tasks
+                .clear();
+        });
+    }
+
+    ///
+    /// Poll each task once to advance its state
+    ///
+    pub fn step() {
+        while let Some(task) = dequeue_task() {
             let waker = create_waker(task.clone());
             let mut ctx = Context::from_waker(&waker);
 
             match task.poll(&mut ctx) {
                 _ => {
                     if !task.is_done() {
-                        self.tasks.push_back(task);
+                        enqueue_task(task);
                     }
                 }
             }
         }
-
-        //self.tasks = t;
     }
 
     ///
-    /// Number of tasks waiting for poll
+    /// Number of pending tasks
     ///
-    pub fn remaining_tasks(&self) -> usize {
-        self.tasks.len()
+    pub fn remaining_tasks() -> usize {
+        MOCK_RUNTIME.with(|instance| {
+            instance
+                .borrow()
+                .as_ref()
+                .expect("Runtime mock instance is not initialized. Did you call `init`?")
+                .tasks
+                .len()
+        })
     }
-}
 
-thread_local! {
-    static RUNTIME_MOCK_INSTANCE: RefCell<Option<MockRuntime>> = RefCell::new(None);
-}
-
-static DEV_CODE_ALLOW_ROUTING_OVER_MOCK: ::core::sync::atomic::AtomicBool = ::core::sync::atomic::AtomicBool::new(false);
-
-pub fn init_runtime_mock() {
-    RUNTIME_MOCK_INSTANCE.set(Some(MockRuntime {
-        tasks: VecDeque::new(),
-        sched: Arc::new(SchedulerMock::default()),
-    }));
-}
-
-///
-/// Allows to run development process with RUNTIME MOCK compiled in so it will route to real runtime.
-/// THIS IS ONLY ALLOWED IN DEV CODE, NOT IN PRODUCTION.
-pub unsafe fn allow_routing_over_mock() {
-    DEV_CODE_ALLOW_ROUTING_OVER_MOCK.store(true, ::core::sync::atomic::Ordering::Relaxed);
-    println!(
+    ///
+    /// Allows to run development process with RUNTIME MOCK compiled in so it will route to real runtime.
+    /// THIS IS ONLY ALLOWED IN DEV CODE, NOT IN PRODUCTION.
+    ///
+    pub unsafe fn allow_routing_over_mock() {
+        DEV_CODE_ALLOW_ROUTING_OVER_MOCK.store(true, atomic::Ordering::Relaxed);
+        println!(
         "\n{bar}\n\
      {warn:^80}\n\
      {msg:^80}\n\
@@ -106,32 +126,29 @@ pub unsafe fn allow_routing_over_mock() {
         msg =
             "This build include RUNTIME API MOCK AND SHALL NOT BE USED IN ANY PRODUCTION! THIS WORKS BECAUSE YOU EXPLICITLY ALLOWED IT IN DEV CODE.",
     );
-}
-///
-/// Reset runtime
-///
-pub fn runtime_reset() {
-    RUNTIME_MOCK_INSTANCE.with(|instance| {
-        let mut instance = instance.borrow_mut();
+    }
 
-        instance
-            .as_mut()
-            .expect("Runtime mock instance is not initialized. Did you call `init_runtime_mock`?")
-            .tasks
-            .clear();
-    });
-}
+    fn dequeue_task() -> Option<TaskRef> {
+        MOCK_RUNTIME.with(|instance| {
+            instance
+                .borrow_mut()
+                .as_mut()
+                .expect("Runtime mock instance is not initialized. Did you call `init`?")
+                .tasks
+                .pop_front()
+        })
+    }
 
-///
-/// Get access to mock instance within closure `c`
-///
-pub fn runtime_instance<C: FnMut(&mut MockRuntime) -> T, T>(mut c: C) -> T {
-    RUNTIME_MOCK_INSTANCE.with(|instance| {
-        c(instance
-            .borrow_mut()
-            .as_mut()
-            .expect("Runtime mock instance is not initialized. Did you call `init_runtime_mock`?"))
-    })
+    fn enqueue_task(task: TaskRef) {
+        MOCK_RUNTIME.with(|instance| {
+            instance
+                .borrow_mut()
+                .as_mut()
+                .expect("Runtime mock instance is not initialized. Did you call `init`?")
+                .tasks
+                .push_back(task)
+        });
+    }
 }
 
 ///
@@ -154,15 +171,13 @@ pub fn spawn_from_boxed<T>(boxed: FutureBox<T>) -> JoinHandle<T>
 where
     T: Send + 'static,
 {
-    if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(::core::sync::atomic::Ordering::Relaxed) {
+    if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(atomic::Ordering::Relaxed) {
         crate::spawn_from_boxed(boxed)
     } else {
-        RUNTIME_MOCK_INSTANCE.with(|instance| {
+        MOCK_RUNTIME.with(|instance| {
             let mut instance = instance.borrow_mut();
 
-            let runtime = instance
-                .as_mut()
-                .expect("Runtime mock instance is not initialized. Did you call `init_runtime_mock`?");
+            let runtime = instance.as_mut().expect("Runtime mock instance is not initialized. Did you call `init`?");
 
             let task = Arc::new(AsyncTask::new(boxed, 0, runtime.sched.clone()));
             let task_ref = TaskRef::new(task);
@@ -179,15 +194,13 @@ pub fn spawn_from_reusable<T>(reusable: ReusableBoxFuture<T>) -> JoinHandle<T>
 where
     T: Send + 'static,
 {
-    if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(::core::sync::atomic::Ordering::Relaxed) {
+    if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(atomic::Ordering::Relaxed) {
         crate::spawn_from_reusable(reusable)
     } else {
-        RUNTIME_MOCK_INSTANCE.with(|instance| {
+        MOCK_RUNTIME.with(|instance| {
             let mut instance = instance.borrow_mut();
 
-            let runtime = instance
-                .as_mut()
-                .expect("Runtime mock instance is not initialized. Did you call `init_runtime_mock`?");
+            let runtime = instance.as_mut().expect("Runtime mock instance is not initialized. Did you call `init`?");
 
             let task = Arc::new(AsyncTask::new(reusable.into_pin(), 0, runtime.sched.clone()));
             let task_ref = TaskRef::new(task);
@@ -217,15 +230,13 @@ pub fn spawn_from_boxed_on_dedicated<T>(boxed: FutureBox<T>, _worker_id: UniqueW
 where
     T: Send + 'static,
 {
-    if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(::core::sync::atomic::Ordering::Relaxed) {
+    if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(atomic::Ordering::Relaxed) {
         crate::spawn_from_boxed_on_dedicated(boxed, _worker_id)
     } else {
-        RUNTIME_MOCK_INSTANCE.with(|instance| {
+        MOCK_RUNTIME.with(|instance| {
             let mut instance = instance.borrow_mut();
 
-            let runtime = instance
-                .as_mut()
-                .expect("Runtime mock instance is not initialized. Did you call `init_runtime_mock`?");
+            let runtime = instance.as_mut().expect("Runtime mock instance is not initialized. Did you call `init`?");
 
             let task = Arc::new(AsyncTask::new(boxed, 0, runtime.sched.clone()));
             let task_ref = TaskRef::new(task);
@@ -242,15 +253,13 @@ pub fn spawn_from_reusable_on_dedicated<T>(reusable: ReusableBoxFuture<T>, _work
 where
     T: Send + 'static,
 {
-    if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(::core::sync::atomic::Ordering::Relaxed) {
+    if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(atomic::Ordering::Relaxed) {
         crate::spawn_from_reusable_on_dedicated(reusable, _worker_id)
     } else {
-        RUNTIME_MOCK_INSTANCE.with(|instance| {
+        MOCK_RUNTIME.with(|instance| {
             let mut instance = instance.borrow_mut();
 
-            let runtime = instance
-                .as_mut()
-                .expect("Runtime mock instance is not initialized. Did you call `init_runtime_mock`?");
+            let runtime = instance.as_mut().expect("Runtime mock instance is not initialized. Did you call `init`?");
 
             let task = Arc::new(AsyncTask::new(reusable.into_pin(), 0, runtime.sched.clone()));
             let task_ref = TaskRef::new(task);
@@ -291,15 +300,13 @@ pub mod safety {
         T: Send + 'static,
         E: Send + 'static,
     {
-        if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(::core::sync::atomic::Ordering::Relaxed) {
+        if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(atomic::Ordering::Relaxed) {
             crate::safety::spawn_from_boxed(boxed)
         } else {
-            RUNTIME_MOCK_INSTANCE.with(|instance| {
+            MOCK_RUNTIME.with(|instance| {
                 let mut instance = instance.borrow_mut();
 
-                let runtime = instance
-                    .as_mut()
-                    .expect("Runtime mock instance is not initialized. Did you call `init_runtime_mock`?");
+                let runtime = instance.as_mut().expect("Runtime mock instance is not initialized. Did you call `init`?");
 
                 let task = Arc::new(AsyncTask::new_safety(true, boxed, 0, runtime.sched.clone()));
                 let task_ref = TaskRef::new(task);
@@ -314,15 +321,13 @@ pub mod safety {
         T: Send + 'static,
         E: Send + 'static,
     {
-        if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(::core::sync::atomic::Ordering::Relaxed) {
+        if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(atomic::Ordering::Relaxed) {
             crate::safety::spawn_from_reusable(reusable)
         } else {
-            RUNTIME_MOCK_INSTANCE.with(|instance| {
+            MOCK_RUNTIME.with(|instance| {
                 let mut instance = instance.borrow_mut();
 
-                let runtime = instance
-                    .as_mut()
-                    .expect("Runtime mock instance is not initialized. Did you call `init_runtime_mock`?");
+                let runtime = instance.as_mut().expect("Runtime mock instance is not initialized. Did you call `init`?");
 
                 let task = Arc::new(AsyncTask::new_safety(true, reusable.into_pin(), 0, runtime.sched.clone()));
                 let task_ref = TaskRef::new(task);
@@ -348,15 +353,13 @@ pub mod safety {
         T: Send + 'static,
         E: Send + 'static,
     {
-        if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(::core::sync::atomic::Ordering::Relaxed) {
+        if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(atomic::Ordering::Relaxed) {
             crate::safety::spawn_from_boxed_on_dedicated(boxed, _worker_id)
         } else {
-            RUNTIME_MOCK_INSTANCE.with(|instance| {
+            MOCK_RUNTIME.with(|instance| {
                 let mut instance = instance.borrow_mut();
 
-                let runtime = instance
-                    .as_mut()
-                    .expect("Runtime mock instance is not initialized. Did you call `init_runtime_mock`?");
+                let runtime = instance.as_mut().expect("Runtime mock instance is not initialized. Did you call `init`?");
 
                 let task = Arc::new(AsyncTask::new_safety(true, boxed, 0, runtime.sched.clone()));
                 let task_ref = TaskRef::new(task);
@@ -374,15 +377,13 @@ pub mod safety {
         T: Send + 'static,
         E: Send + 'static,
     {
-        if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(::core::sync::atomic::Ordering::Relaxed) {
+        if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(atomic::Ordering::Relaxed) {
             crate::safety::spawn_from_reusable_on_dedicated(reusable, _worker_id)
         } else {
-            RUNTIME_MOCK_INSTANCE.with(|instance| {
+            MOCK_RUNTIME.with(|instance| {
                 let mut instance = instance.borrow_mut();
 
-                let runtime = instance
-                    .as_mut()
-                    .expect("Runtime mock instance is not initialized. Did you call `init_runtime_mock`?");
+                let runtime = instance.as_mut().expect("Runtime mock instance is not initialized. Did you call `init`?");
 
                 let task = Arc::new(AsyncTask::new_safety(true, reusable.into_pin(), 0, runtime.sched.clone()));
                 let task_ref = TaskRef::new(task);

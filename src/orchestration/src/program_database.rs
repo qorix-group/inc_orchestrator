@@ -342,6 +342,7 @@ mod tests {
         testing::OrchTestingPoller,
     };
     use ::core::task::Poll;
+    use async_runtime::testing;
     use testing_macros::ensure_clear_mock_runtime;
 
     #[test]
@@ -485,11 +486,9 @@ mod tests {
         // Wait for invoke to schedule the action.
         let _ = poller.poll();
         // Run the action.
-        let _ = async_runtime::testing::mock::runtime_instance(|runtime| {
-            assert!(runtime.remaining_tasks() > 0);
-            runtime.advance_tasks();
-            assert_eq!(runtime.remaining_tasks(), 0);
-        });
+        assert!(testing::mock::runtime::remaining_tasks() > 0);
+        testing::mock::runtime::step();
+        assert_eq!(testing::mock::runtime::remaining_tasks(), 0);
         // Check the result.
         assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xcafe_u64.into()))));
     }
@@ -511,11 +510,9 @@ mod tests {
         // Wait for invoke to schedule the action.
         let _ = poller.poll();
         // Run the action.
-        let _ = async_runtime::testing::mock::runtime_instance(|runtime| {
-            assert!(runtime.remaining_tasks() > 0);
-            runtime.advance_tasks();
-            assert_eq!(runtime.remaining_tasks(), 0);
-        });
+        assert!(testing::mock::runtime::remaining_tasks() > 0);
+        testing::mock::runtime::step();
+        assert_eq!(testing::mock::runtime::remaining_tasks(), 0);
         // Check the result.
         assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xcafe_u64.into()))));
     }
@@ -543,11 +540,9 @@ mod tests {
         // Wait for invoke to schedule the action.
         let _ = poller.poll();
         // Run the action.
-        let _ = async_runtime::testing::mock::runtime_instance(|runtime| {
-            assert!(runtime.remaining_tasks() > 0);
-            runtime.advance_tasks();
-            assert_eq!(runtime.remaining_tasks(), 0);
-        });
+        assert!(testing::mock::runtime::remaining_tasks() > 0);
+        testing::mock::runtime::step();
+        assert_eq!(testing::mock::runtime::remaining_tasks(), 0);
         // Check the result.
         assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xcafe_u64.into()))));
     }
@@ -574,11 +569,9 @@ mod tests {
         // Wait for invoke to schedule the action.
         let _ = poller.poll();
         // Run the action.
-        let _ = async_runtime::testing::mock::runtime_instance(|runtime| {
-            assert!(runtime.remaining_tasks() > 0);
-            runtime.advance_tasks();
-            assert_eq!(runtime.remaining_tasks(), 0);
-        });
+        assert!(testing::mock::runtime::remaining_tasks() > 0);
+        testing::mock::runtime::step();
+        assert_eq!(testing::mock::runtime::remaining_tasks(), 0);
         // Check the result.
         assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xcafe_u64.into()))));
     }
