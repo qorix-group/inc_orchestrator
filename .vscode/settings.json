@@ -106,4 +106,8 @@
         "editor.formatOnSave": true,
     },
     "rust-analyzer.runnables.command": "cargo xtask",
+    "rust-analyzer.cargo.cfgs": [
+        "debug_assertions",
+        "!miri"
+    ],
 }

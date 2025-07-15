@@ -13,9 +13,10 @@
 
 pub mod event_traits;
 pub mod events_provider;
+pub mod local_events;
+
 #[cfg(feature = "iceoryx-ipc")]
 pub(crate) mod iceoryx;
-pub mod local_events;
 #[cfg(not(feature = "iceoryx-ipc"))]
 pub(crate) mod stub_global_events;
 

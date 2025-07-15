@@ -65,27 +65,30 @@ impl<GlobalProvider: IpcProvider + 'static> EventsProvider<GlobalProvider> {
 
     /// Deployment time event specification
     /// This let integrator register new event and specify whether it's local or global and which design events should map to it.
-    pub(crate) fn specify_global_event(&mut self, system_event: &str) -> Result<EventCreator, CommonErrors> {
-        self.specify_event(system_event, EventType::Global)
+    pub(crate) fn specify_global_event(&mut self, system_event: &str, events_to_bind: &[Tag]) -> Result<EventCreator, CommonErrors> {
+        self.specify_event(system_event, EventType::Global, events_to_bind)
     }
 
-    pub(crate) fn specify_local_event(&mut self) -> Result<EventCreator, CommonErrors> {
+    pub(crate) fn specify_local_event(&mut self, events_to_bind: &[Tag]) -> Result<EventCreator, CommonErrors> {
         let name = format!("local_event_{}", self.local_event_next_id);
         self.local_event_next_id += 1;
 
-        self.specify_event(name.as_str(), EventType::Local)
+        self.specify_event(name.as_str(), EventType::Local, events_to_bind)
     }
 
-    fn specify_event(&mut self, system_event: &str, t: EventType) -> Result<EventCreator, CommonErrors> {
+    fn specify_event(&mut self, system_event: &str, t: EventType, events_to_bind: &[Tag]) -> Result<EventCreator, CommonErrors> {
         let system_event_tag: Tag = system_event.into();
 
         if system_event_tag.is_in_collection(self.events.iter()) {
+            warn!("Event({:?}) with tag {:?} has been already bind, ignoring.", t, system_event_tag);
             return Err(CommonErrors::AlreadyDone);
         }
 
+        trace!("Binding event({:?}) {} to user events {:?}", t, system_event, events_to_bind);
+
         let creator = match t {
             EventType::Local => Rc::new(RefCell::new(LocalEventCreator {
-                local_event: LocalEvent::new(),
+                local_event: LocalEvent::new(system_event_tag),
             })) as EventCreator,
             EventType::Global => Rc::new(RefCell::new(GlobalEventCreator {
                 system_event_name: system_event.to_string(),
@@ -257,9 +260,9 @@ mod tests {
     fn specify_event_duplicate() {
         let mut provider: EventsProvider = EventsProvider::new();
 
-        provider.specify_event("100", EventType::Local).unwrap();
+        provider.specify_event("100", EventType::Local, &["UserEvt".into()]).unwrap();
         // Try to specify again with the same system tag
-        let res = provider.specify_event("100", EventType::Local);
+        let res = provider.specify_event("100", EventType::Local, &["UserEvt".into()]);
         assert_eq!(res.err().unwrap(), CommonErrors::AlreadyDone);
     }
 
@@ -267,7 +270,7 @@ mod tests {
     fn creating_same_trigger_action_twice_causes_fail() {
         let mut provider: EventsProvider = EventsProvider::new();
 
-        let res = provider.specify_event("100", EventType::Local);
+        let res = provider.specify_event("100", EventType::Local, &["UserEvt".into()]);
         assert!(res.is_ok());
 
         let creator = provider.get_event_creator("100").unwrap();
@@ -282,7 +285,7 @@ mod tests {
     fn creating_same_sync_action_n_times_works() {
         let mut provider: EventsProvider = EventsProvider::new();
 
-        let res = provider.specify_event("100", EventType::Local);
+        let res = provider.specify_event("100", EventType::Local, &["UserEvt".into()]);
         assert!(res.is_ok());
 
         let creator = provider.get_event_creator("100").unwrap();
@@ -301,7 +304,7 @@ mod tests {
     fn sync_trigger_local_pair_works() {
         let mut provider: EventsProvider = EventsProvider::new();
 
-        let res = provider.specify_event("100", EventType::Local);
+        let res = provider.specify_event("100", EventType::Local, &["UserEvt".into()]);
         assert!(res.is_ok());
 
         let mut trigger_action = provider.get_event_creator("100").unwrap().borrow_mut().create_trigger().unwrap();
@@ -329,9 +332,9 @@ mod tests {
     fn sync_trigger_local_from_different_tag_does_not_unblock() {
         let mut provider: EventsProvider = EventsProvider::new();
 
-        let mut res = provider.specify_event("100", EventType::Local);
+        let mut res = provider.specify_event("100", EventType::Local, &["UserEvt".into()]);
         assert!(res.is_ok());
-        res = provider.specify_event("101", EventType::Local);
+        res = provider.specify_event("101", EventType::Local, &["UserEvt".into()]);
         assert!(res.is_ok());
 
         let mut trigger_action = provider.get_event_creator("100").unwrap().borrow_mut().create_trigger().unwrap();

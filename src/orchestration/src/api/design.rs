@@ -156,7 +156,10 @@ impl ProgramData {
 }
 
 #[cfg(test)]
+
 mod tests {
+    // Tests are disabled in Miri due to limitations of using OS calls that are done in Iceroxy2 backend.
+    // Currently we do not have any constructor that can inject IPC provider (subject to change in the near future).
 
     use crate::actions::action::UserErrValue;
 

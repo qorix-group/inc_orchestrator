@@ -100,7 +100,10 @@ impl ProgramDatabase {
         ap.design_events
             .insert(DesignEvent::new(tag))
             .ok_or(CommonErrors::NoSpaceLeft)
-            .map(|key| OrchestrationTag::new(tag, key, MapIdentifier::Event, Rc::clone(&self.action_provider)))
+            .map(|key| {
+                trace!("Registered event with tag: {:?}", tag);
+                OrchestrationTag::new(tag, key, MapIdentifier::Event, Rc::clone(&self.action_provider))
+            })
     }
 
     pub fn register_shutdown_event(&mut self, tag: Tag) -> Result<(), CommonErrors> {
@@ -111,6 +114,7 @@ impl ProgramDatabase {
         }
 
         if self.design_shutdown_events.push(DesignEvent::new(tag)) {
+            trace!("Registered shutdown event with tag: {:?}", tag);
             Ok(())
         } else {
             Err(CommonErrors::GenericError)
@@ -243,6 +247,7 @@ impl ProgramDatabase {
                     return Err(CommonErrors::AlreadyDone);
                 }
 
+                trace!("Setting worker id {:?} for invoke action with tag {:?}", worker_id, tag);
                 data.worker_id = Some(worker_id);
 
                 return Ok(());
@@ -291,6 +296,7 @@ impl ProgramDatabase {
             let item = event.find_in_collection(ap.design_events.iter());
 
             if let Some((key, _)) = item {
+                trace!("Event {:?} has been successfully bound", event);
                 ap.design_events.get_mut(key).unwrap().set_creator(Rc::clone(&creator));
             } else {
                 ret = Err(CommonErrors::NotFound)
@@ -302,6 +308,7 @@ impl ProgramDatabase {
 
     pub(crate) fn set_creator_for_shutdown_event(&mut self, creator: EventCreator, shutdown_event: Tag) -> Result<(), CommonErrors> {
         if let Some(design_event) = shutdown_event.find_in_collection(self.design_shutdown_events.iter_mut()) {
+            trace!("Shutdown event {:?} has been successfully bound", shutdown_event);
             design_event.set_creator(Rc::clone(&creator));
             Ok(())
         } else {

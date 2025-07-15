@@ -53,7 +53,7 @@ fn example_component_design() -> Result<Design, CommonErrors> {
 fn main() {
     // Setup any logging framework you want to use.
     let mut logger = TracingLibraryBuilder::new()
-        .global_log_level(Level::DEBUG)
+        .global_log_level(Level::TRACE)
         .enable_tracing(TraceScope::AppScope)
         .enable_logging(true)
         .build();
