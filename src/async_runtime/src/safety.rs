@@ -17,9 +17,9 @@ use crate::{
     futures::reusable_box_future::ReusableBoxFuture,
     scheduler::{context::ctx_get_worker_id, join_handle::JoinHandle},
 };
+use ::core::future::Future;
 use foundation::not_recoverable_error;
 use foundation::prelude::*;
-use std::future::Future;
 
 pub type SafetyResult<T, E> = Result<T, E>;
 

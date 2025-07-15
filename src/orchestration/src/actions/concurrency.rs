@@ -14,6 +14,9 @@
 use super::action::{ActionBaseMeta, ActionResult, ActionTrait, ReusableBoxFutureResult};
 use crate::actions::action::ActionExecError;
 use crate::common::tag::Tag;
+use ::core::future::Future;
+use ::core::pin::Pin;
+use ::core::task::{Context, Poll};
 use async_runtime::futures::reusable_box_future::{ReusableBoxFuture, ReusableBoxFuturePool};
 use async_runtime::futures::{FutureInternalReturn, FutureState};
 use async_runtime::scheduler::join_handle::JoinHandle;
@@ -26,9 +29,6 @@ use foundation::containers::reusable_objects::ReusableObject;
 use foundation::containers::reusable_vec_pool::ReusableVecPool;
 use foundation::not_recoverable_error;
 use foundation::prelude::*;
-use std::future::Future;
-use std::pin::Pin;
-use std::task::{Context, Poll};
 
 /// Builder for constructing a concurrency group of actions to be executed concurrently.
 /// Allows adding multiple branches (actions) and finalizing into a [`Concurrency`] object.
@@ -136,7 +136,7 @@ impl ActionTrait for Concurrency {
         "Concurrency"
     }
 
-    fn dbg_fmt(&self, nest: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn dbg_fmt(&self, nest: usize, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         let indent = " ".repeat(nest);
         writeln!(f, "{}|-{} - {:?}", indent, self.name(), self.base)?;
         self.actions.iter().try_for_each(|x| {
@@ -162,7 +162,7 @@ impl ActionMeta {
 
     /// Takes the future out of the ActionMeta, leaving it empty.
     fn take_future(&mut self) -> Option<ReusableBoxFuture<ActionResult>> {
-        match std::mem::replace(self, ActionMeta::Empty) {
+        match ::core::mem::replace(self, ActionMeta::Empty) {
             ActionMeta::Future(fut) => Some(fut),
             other => {
                 *self = other;
@@ -265,7 +265,7 @@ mod tests {
     use super::*;
     use crate::testing::MockActionBuilder;
     use crate::testing::OrchTestingPoller;
-    use std::task::Poll;
+    use ::core::task::Poll;
     use testing_macros::ensure_clear_mock_runtime;
 
     #[test]

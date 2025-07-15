@@ -37,5 +37,5 @@ pub fn create_arr_storage<Type, U: Fn(usize) -> Type>(size: usize, init: U) -> B
     }
 
     // SAFETY: Create boxed slice from raw parts
-    unsafe { Box::from_raw(std::ptr::slice_from_raw_parts_mut(ptr, size)) }
+    unsafe { Box::from_raw(::core::ptr::slice_from_raw_parts_mut(ptr, size)) }
 }

@@ -11,9 +11,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+use ::core::ops::Deref;
+use ::core::ptr::NonNull;
+
 use std::alloc::{self, dealloc, Layout};
-use std::ops::Deref;
-use std::ptr::NonNull;
 use std::sync::Arc;
 
 use iceoryx2_bb_container::vec::Vec;
@@ -84,8 +85,8 @@ impl<T: ReusableObjectTrait> ReusableObjects<T> {
         match atomic_ref.compare_exchange(
             OBJECT_FREE,
             OBJECT_TAKEN,
-            std::sync::atomic::Ordering::AcqRel,
-            std::sync::atomic::Ordering::Acquire,
+            ::core::sync::atomic::Ordering::AcqRel,
+            ::core::sync::atomic::Ordering::Acquire,
         ) {
             Ok(_) => {}
             Err(_) => return Err(CommonErrors::NoData), // next is not free yet, this is user problem now
@@ -112,7 +113,7 @@ impl<T: ReusableObjectTrait> ReusableObjects<T> {
         }
 
         // SAFETY: Create boxed slice from raw parts
-        unsafe { Box::from_raw(std::ptr::slice_from_raw_parts_mut(ptr, size)) }
+        unsafe { Box::from_raw(::core::ptr::slice_from_raw_parts_mut(ptr, size)) }
     }
 }
 
@@ -155,13 +156,13 @@ impl<T: ReusableObjectTrait> Drop for ReusableObjects<T> {
             match self.states[index].0.compare_exchange(
                 OBJECT_TAKEN,
                 OBJECT_POOL_GONE,
-                std::sync::atomic::Ordering::AcqRel,
-                std::sync::atomic::Ordering::Acquire,
+                ::core::sync::atomic::Ordering::AcqRel,
+                ::core::sync::atomic::Ordering::Acquire,
             ) {
                 Ok(_) => {}
                 Err(actual) => unsafe {
                     assert_eq!(actual, OBJECT_FREE);
-                    std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst); // we will drop the value, so we must sync memory first so we call drop() on current object
+                    std::sync::atomic::fence(::core::sync::atomic::Ordering::SeqCst); // we will drop the value, so we must sync memory first so we call drop() on current object
                     object.drop_in_place();
                     dealloc(object.as_ptr() as *mut u8, Layout::new::<T>());
                 },
@@ -189,8 +190,8 @@ impl<T: ReusableObjectTrait> Drop for ReusableObject<T> {
                 match self.this.state.0.compare_exchange(
                     OBJECT_TAKEN,
                     OBJECT_FREE,
-                    std::sync::atomic::Ordering::AcqRel,
-                    std::sync::atomic::Ordering::Acquire,
+                    ::core::sync::atomic::Ordering::AcqRel,
+                    ::core::sync::atomic::Ordering::Acquire,
                 ) {
                     Ok(_) => {}
 
@@ -273,7 +274,7 @@ mod tests {
     impl ReusableObjectTrait for TestObject {
         fn reusable_clear(&mut self) {
             self.value = 0;
-            self.clear_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.clear_count.fetch_add(1, ::core::sync::atomic::Ordering::Relaxed);
         }
     }
 
@@ -349,7 +350,7 @@ mod tests {
         }
 
         // Check that clear was called once
-        assert_eq!(clear_count.load(std::sync::atomic::Ordering::Relaxed), 1);
+        assert_eq!(clear_count.load(::core::sync::atomic::Ordering::Relaxed), 1);
 
         // Get object again and verify it was cleared
         let obj = pool.next_object().expect("Should get object again");
@@ -415,7 +416,7 @@ mod tests {
         drop(object_holder);
 
         // Verify the object was cleared before being dropped
-        assert_eq!(clear_count.load(std::sync::atomic::Ordering::Relaxed), 1);
+        assert_eq!(clear_count.load(::core::sync::atomic::Ordering::Relaxed), 1);
     }
 
     #[test]
@@ -447,7 +448,7 @@ mod tests {
         drop(obj3);
 
         // Check clear count
-        assert_eq!(clear_count.load(std::sync::atomic::Ordering::Relaxed), 6);
+        assert_eq!(clear_count.load(::core::sync::atomic::Ordering::Relaxed), 6);
     }
 
     // Add a test for zero-sized pool
@@ -473,7 +474,7 @@ mod tests {
 
     use super::*;
 
-    use std::sync::atomic::Ordering;
+    use ::core::sync::atomic::Ordering;
 
     use loom::model::Builder;
 

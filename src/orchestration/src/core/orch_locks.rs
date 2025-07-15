@@ -21,7 +21,7 @@
 // needed until we use it in code
 #![allow(dead_code)]
 
-use std::ops::{Deref, DerefMut};
+use ::core::ops::{Deref, DerefMut};
 
 use foundation::cell::UnsafeCellExt;
 use foundation::{
@@ -53,7 +53,7 @@ impl<T> OrchTryLock<T> {
 
     /// Checks if the lock is currently held.
     pub(crate) fn is_locked(&self) -> bool {
-        self.is_used.load(std::sync::atomic::Ordering::SeqCst)
+        self.is_used.load(::core::sync::atomic::Ordering::SeqCst)
     }
 
     ///
@@ -65,7 +65,12 @@ impl<T> OrchTryLock<T> {
     pub(crate) fn try_lock(&self) -> Result<OrchTryLockGuard<'_, T>, CommonErrors> {
         if self
             .is_used
-            .compare_exchange(false, true, std::sync::atomic::Ordering::SeqCst, std::sync::atomic::Ordering::SeqCst)
+            .compare_exchange(
+                false,
+                true,
+                ::core::sync::atomic::Ordering::SeqCst,
+                ::core::sync::atomic::Ordering::SeqCst,
+            )
             .is_err()
         {
             Err(CommonErrors::AlreadyDone)
@@ -108,7 +113,7 @@ impl<T> DerefMut for OrchTryLockGuard<'_, T> {
 
 impl<T> Drop for OrchTryLockGuard<'_, T> {
     fn drop(&mut self) {
-        self.fake_mtx.is_used.store(false, std::sync::atomic::Ordering::SeqCst);
+        self.fake_mtx.is_used.store(false, ::core::sync::atomic::Ordering::SeqCst);
     }
 }
 

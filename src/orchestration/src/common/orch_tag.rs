@@ -13,8 +13,8 @@
 
 use super::tag::Tag;
 use crate::program_database::ActionProvider;
+use ::core::cell::RefCell;
 use iceoryx2_bb_container::slotmap::SlotMapKey;
-use std::cell::RefCell;
 use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -82,8 +82,8 @@ impl OrchestrationTag {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ::core::cell::RefCell;
     use iceoryx2_bb_container::slotmap::SlotMapKey;
-    use std::cell::RefCell;
 
     #[test]
     fn orchestration_tag_creation() {

@@ -11,8 +11,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+use ::core::{future::Future, marker::PhantomData, task::Waker};
 use foundation::{not_recoverable_error, prelude::*};
-use std::{future::Future, marker::PhantomData, sync::Arc, task::Waker};
+use std::sync::Arc;
 
 use crate::{
     futures::{FutureInternalReturn, FutureState},
@@ -140,7 +141,7 @@ impl<T: Copy, const SIZE: usize> Channel<T, SIZE> {
     }
 
     pub(super) fn sender_dropping(&self) {
-        let prev = self.connected_state.swap(SENDER_GONE, std::sync::atomic::Ordering::SeqCst);
+        let prev = self.connected_state.swap(SENDER_GONE, ::core::sync::atomic::Ordering::SeqCst);
 
         if prev == BOTH_IN {
             // if receiver is still there, notify him
@@ -151,7 +152,7 @@ impl<T: Copy, const SIZE: usize> Channel<T, SIZE> {
     }
 
     pub(super) fn receiver_dropping(&self) {
-        self.connected_state.store(RECV_GONE, std::sync::atomic::Ordering::SeqCst);
+        self.connected_state.store(RECV_GONE, ::core::sync::atomic::Ordering::SeqCst);
         let _ = self.waker_store.take();
     }
 
@@ -164,7 +165,7 @@ impl<T: Copy, const SIZE: usize> Channel<T, SIZE> {
     ///
     pub(crate) fn send(&self, value: &T) -> Result<(), CommonErrors> {
         // if receiver is gone here,
-        if self.connected_state.load(std::sync::atomic::Ordering::Acquire) == RECV_GONE {
+        if self.connected_state.load(::core::sync::atomic::Ordering::Acquire) == RECV_GONE {
             Err(CommonErrors::GenericError)
         } else {
             let res = self.queue.acquire_producer().unwrap().push(value);
@@ -199,7 +200,7 @@ impl<T: Copy, const SIZE: usize> Channel<T, SIZE> {
                     break res;
                 }
 
-                let state = self.connected_state.load(std::sync::atomic::Ordering::Acquire);
+                let state = self.connected_state.load(::core::sync::atomic::Ordering::Acquire);
 
                 // we must recheck queue since if waker was empty, producer could already push something before
                 if self.queue.is_empty() {
@@ -236,7 +237,7 @@ unsafe impl<const SIZE: usize, T: Copy> Send for ReceiverFuture<'_, T, SIZE> {}
 impl<T: Copy, const SIZE: usize> Future for ReceiverFuture<'_, T, SIZE> {
     type Output = Option<T>;
 
-    fn poll(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
+    fn poll(mut self: ::core::pin::Pin<&mut Self>, cx: &mut ::core::task::Context<'_>) -> ::core::task::Poll<Self::Output> {
         let res = match self.state {
             FutureState::New | FutureState::Polled => self.parent.receive(&mut self.consumer, cx.waker().clone()).map_or_else(
                 |e| {

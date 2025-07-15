@@ -13,9 +13,9 @@
 
 use crate::waker::noop_waker;
 
-use std::future::Future;
-use std::pin::Pin;
-use std::task::{Context, Poll, Waker};
+use ::core::future::Future;
+use ::core::pin::Pin;
+use ::core::task::{Context, Poll, Waker};
 
 ///
 /// Helper struct for testing futures
@@ -81,9 +81,9 @@ impl Future for AlwaysPending {
     }
 }
 
-pub fn assert_poll_ready<T: PartialEq + std::fmt::Debug>(res: std::task::Poll<T>, val: T) {
+pub fn assert_poll_ready<T: PartialEq + ::core::fmt::Debug>(res: ::core::task::Poll<T>, val: T) {
     match res {
-        std::task::Poll::Ready(v) => assert_eq!(val, v),
-        std::task::Poll::Pending => panic!("Expected Poll::Ready but got Poll::Pending"),
+        ::core::task::Poll::Ready(v) => assert_eq!(val, v),
+        ::core::task::Poll::Pending => panic!("Expected Poll::Ready but got Poll::Pending"),
     }
 }

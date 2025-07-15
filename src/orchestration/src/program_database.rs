@@ -28,12 +28,11 @@ use foundation::prelude::*;
 use iceoryx2_bb_container::slotmap::{SlotMap, SlotMapKey};
 use std::{
     boxed::Box,
-    cell::RefCell,
-    fmt::Debug,
-    future::Future,
     rc::Rc,
     sync::{Arc, Mutex},
 };
+
+use ::core::{cell::RefCell, fmt::Debug, future::Future};
 
 struct ActionData {
     tag: Tag,
@@ -71,7 +70,7 @@ impl ActionProvider {
 }
 
 impl Debug for ActionProvider {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "ActionProvider")
     }
 }
@@ -342,7 +341,7 @@ mod tests {
         events::events_provider::{EventCreatorTrait, ShutdownNotifier},
         testing::OrchTestingPoller,
     };
-    use std::task::Poll;
+    use ::core::task::Poll;
     use testing_macros::ensure_clear_mock_runtime;
 
     #[test]

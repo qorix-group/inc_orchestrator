@@ -10,10 +10,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
-use std::{
-    sync::{atomic::Ordering, Arc},
-    task::Context,
-};
+use std::sync::{atomic::Ordering, Arc};
+
+use ::core::task::Context;
 
 use foundation::{containers::trigger_queue::TriggerQueue, threading::thread_wait_barrier::ThreadReadyNotifier};
 use iceoryx2_bb_posix::thread::Thread;
@@ -154,7 +153,7 @@ impl WorkerInner {
                 continue;
             }
 
-            match consumer.pop_blocking_with_timeout(std::time::Duration::from_millis(100)) {
+            match consumer.pop_blocking_with_timeout(::core::time::Duration::from_millis(100)) {
                 Ok(task_ref) => {
                     self.local_storage.push(task_ref);
                 }

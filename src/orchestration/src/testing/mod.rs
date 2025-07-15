@@ -129,7 +129,7 @@ impl ActionTrait for MockAction {
         "MockAction"
     }
 
-    fn dbg_fmt(&self, nest: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn dbg_fmt(&self, nest: usize, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         let indent = " ".repeat(nest);
         writeln!(f, "{}|-{}", indent, self.name())
     }
@@ -187,7 +187,7 @@ mod tests {
     use super::*;
     use crate::actions::action::ActionExecError;
 
-    use std::task::Poll;
+    use ::core::task::Poll;
 
     #[test]
     fn with_times_zero_ok() {

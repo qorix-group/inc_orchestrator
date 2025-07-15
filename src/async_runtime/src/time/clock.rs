@@ -11,7 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::{
+use ::core::{
     ops::{Add, Sub},
     time::Duration,
 };
@@ -23,7 +23,7 @@ pub struct Instant(std::time::Instant);
 
 impl Instant {
     /// Returns the duration since the clock started.
-    pub fn elapsed(&self) -> std::time::Duration {
+    pub fn elapsed(&self) -> ::core::time::Duration {
         self.0.elapsed()
     }
 

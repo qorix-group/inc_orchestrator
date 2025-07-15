@@ -12,7 +12,8 @@
 //
 
 #![allow(dead_code)]
-use std::{future::Future, sync::Arc};
+use ::core::future::Future;
+use std::sync::Arc;
 
 use async_runtime::channels::spmc_broadcast::*;
 

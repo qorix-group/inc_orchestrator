@@ -10,8 +10,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
+use ::core::future::Future;
 use iceoryx2_bb_container::vec::Vec;
-use std::future::Future;
 
 use crate::scheduler::execution_engine::{ExecutionEngine, ExecutionEngineBuilder};
 use foundation::containers::growable_vec::GrowableVec;

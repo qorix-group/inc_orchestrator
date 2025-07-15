@@ -28,9 +28,9 @@ pub enum FutureState {
 
 impl FutureState {
     ///
-    /// Assigns a state from `internal` and translate it into a [`std::task::Poll`] so it compatible with trait Future interface
+    /// Assigns a state from `internal` and translate it into a [`::core::task::Poll`] so it compatible with trait Future interface
     ///
-    pub fn assign_and_propagate<T>(&mut self, internal: FutureInternalReturn<T>) -> std::task::Poll<T> {
+    pub fn assign_and_propagate<T>(&mut self, internal: FutureInternalReturn<T>) -> ::core::task::Poll<T> {
         *self = internal.0;
         internal.into()
     }
@@ -71,11 +71,11 @@ impl<T> FutureInternalReturn<T> {
 }
 
 #[allow(clippy::from_over_into)] // Only one direction conversion
-impl<T> Into<std::task::Poll<T>> for FutureInternalReturn<T> {
-    fn into(self) -> std::task::Poll<T> {
+impl<T> Into<::core::task::Poll<T>> for FutureInternalReturn<T> {
+    fn into(self) -> ::core::task::Poll<T> {
         match self.1 {
-            Some(v) => std::task::Poll::Ready(v),
-            None => std::task::Poll::Pending,
+            Some(v) => ::core::task::Poll::Ready(v),
+            None => ::core::task::Poll::Pending,
         }
     }
 }

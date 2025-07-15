@@ -11,7 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::fmt::{Debug, Formatter};
+use ::core::fmt::{Debug, Formatter};
 
 ///
 /// Tag implementation with an 'id' and 'tracing info string'. Supports creation of Tag from &str and String, also from_str_ref().
@@ -98,7 +98,7 @@ impl Into<Tag> for String {
 
 // Implementation of Debug fmt for Tag.
 impl Debug for Tag {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "Tag{{id:{},tracing_str:\"{}\"}}", self.id, self.tracing_str)
     }
 }

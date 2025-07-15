@@ -10,8 +10,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
-#![allow(dead_code)]
-use std::{ops::Deref, sync::Arc, task::Waker};
+
+use ::core::{ops::Deref, task::Waker};
+use std::sync::Arc;
 
 use foundation::prelude::FoundationAtomicU64;
 use foundation::prelude::ScopeGuardBuilder;
@@ -100,7 +101,7 @@ impl Inner {
 
         // This is th last time we promised to wakeup this worker
         let previous_wakeup_time = self.get_last_wakeup_time_for_worker();
-        let global_promis_next_time_wakeup = self.next_promised_wakeup.load(std::sync::atomic::Ordering::Relaxed);
+        let global_promis_next_time_wakeup = self.next_promised_wakeup.load(::core::sync::atomic::Ordering::Relaxed);
 
         if (expire_time_u64 == global_promis_next_time_wakeup) && (previous_wakeup_time != expire_time_u64) {
             debug!("Someone else waiting on timewheel, we will park on cv without timeout");
@@ -145,7 +146,7 @@ impl Inner {
         }
 
         // We sleep to new timeout
-        self.next_promised_wakeup.store(expire_time_u64, std::sync::atomic::Ordering::Relaxed);
+        self.next_promised_wakeup.store(expire_time_u64, ::core::sync::atomic::Ordering::Relaxed);
         self.stash_promised_wakeup_time_for_worker(expire_time_u64);
 
         let wait_result;
@@ -162,7 +163,7 @@ impl Inner {
         if wait_result.timed_out() {
             // We did timeout due to sleep request, so we fullfilled driver promise
             self.clear_last_wakeup_time_for_worker();
-            worker.state.0.store(WORKER_STATE_EXECUTING, std::sync::atomic::Ordering::SeqCst);
+            worker.state.0.store(WORKER_STATE_EXECUTING, ::core::sync::atomic::Ordering::SeqCst);
             scheduler.transition_from_parked(worker_id);
             debug!("Woken up from sleep after timeout");
         }
@@ -174,15 +175,15 @@ impl Inner {
         match worker.state.0.compare_exchange(
             WORKER_STATE_EXECUTING,
             WORKER_STATE_SLEEPING_CV,
-            std::sync::atomic::Ordering::SeqCst,
-            std::sync::atomic::Ordering::SeqCst,
+            ::core::sync::atomic::Ordering::SeqCst,
+            ::core::sync::atomic::Ordering::SeqCst,
         ) {
             Ok(_) => true,
             Err(WORKER_STATE_NOTIFIED) => {
                 // We were notified before, so we shall continue
                 scheduler.transition_from_parked(worker_id);
 
-                worker.state.0.store(WORKER_STATE_EXECUTING, std::sync::atomic::Ordering::SeqCst);
+                worker.state.0.store(WORKER_STATE_EXECUTING, ::core::sync::atomic::Ordering::SeqCst);
                 debug!("Notified while try to sleep, searching again");
                 false
             }
@@ -202,8 +203,8 @@ impl Inner {
         match worker.state.0.compare_exchange(
             WORKER_STATE_NOTIFIED,
             WORKER_STATE_EXECUTING,
-            std::sync::atomic::Ordering::SeqCst,
-            std::sync::atomic::Ordering::SeqCst,
+            ::core::sync::atomic::Ordering::SeqCst,
+            ::core::sync::atomic::Ordering::SeqCst,
         ) {
             Ok(_) => {
                 scheduler.transition_from_parked(worker_id);

@@ -19,15 +19,15 @@ use async_runtime::{
     spawn, spawn_on_dedicated,
 };
 
+use ::core::future::Future;
 use foundation::prelude::*;
-use std::future::Future;
 
 pub struct X {}
 
 impl Future for X {
     type Output = ();
 
-    fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
+    fn poll(self: ::core::pin::Pin<&mut Self>, cx: &mut ::core::task::Context<'_>) -> ::core::task::Poll<Self::Output> {
         cx.waker().wake_by_ref();
 
         cx.waker().wake_by_ref();
@@ -42,7 +42,7 @@ impl Future for X {
 
         cx.waker().wake_by_ref();
 
-        std::task::Poll::Ready(())
+        ::core::task::Poll::Ready(())
     }
 }
 

@@ -15,14 +15,14 @@ use super::task_state::*;
 use crate::core::types::*;
 use crate::scheduler::safety_waker::create_safety_waker;
 use crate::scheduler::scheduler_mt::SchedulerTrait;
+use ::core::future::Future;
+use ::core::mem;
+use ::core::ops::{Deref, DerefMut};
+use ::core::pin::Pin;
 use core::{ptr::NonNull, task::Context, task::Waker};
 use foundation::cell::UnsafeCell;
 use foundation::not_recoverable_error;
 use foundation::prelude::*;
-use std::future::Future;
-use std::mem;
-use std::ops::{Deref, DerefMut};
-use std::pin::Pin;
 
 ///
 /// Table of pointers to access API of generic `AsyncTask` without a need to know it's type along a way
@@ -274,13 +274,13 @@ where
                 TaskStage::InProgress(ref mut future) => {
                     // Lets poll future
                     match future.as_mut().poll(ctx) {
-                        std::task::Poll::Ready(ret) => {
+                        ::core::task::Poll::Ready(ret) => {
                             // Store result, drops the future
                             is_safety_err = safety_checker(&ret);
                             *ref_to_stage = TaskStage::Completed(ret);
                             None // Finish state transition outside cell access
                         }
-                        std::task::Poll::Pending => {
+                        ::core::task::Poll::Pending => {
                             match self.header.state.transition_to_idle() {
                                 TransitionToIdle::Done => Some(TaskPollResult::Done),
                                 TransitionToIdle::Notified => Some(TaskPollResult::Notified),
@@ -512,7 +512,7 @@ impl TaskRef {
     pub(crate) fn new<Task>(arc_task: ArcInternal<Task>) -> Self {
         // Take raw pointer without any borrows
         let val = NonNull::new(ArcInternal::as_ptr(&arc_task) as *mut TaskHeader).unwrap();
-        std::mem::forget(arc_task); // we took over ref count from arg into ourself
+        ::core::mem::forget(arc_task); // we took over ref count from arg into ourself
         Self { header: val }
     }
 
@@ -529,7 +529,7 @@ impl TaskRef {
     ///
     pub(crate) fn into_raw(this: TaskRef) -> *const TaskHeader {
         let ptr = this.header.as_ptr();
-        std::mem::forget(this);
+        ::core::mem::forget(this);
         ptr
     }
 
@@ -609,7 +609,7 @@ impl Drop for TaskRef {
 #[cfg(not(loom))]
 mod tests {
 
-    use std::{
+    use ::core::{
         future::Future,
         ops::{Deref, DerefMut},
     };
@@ -870,8 +870,8 @@ mod tests {
     impl Future for NeverReady {
         type Output = ();
 
-        fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> std::task::Poll<Self::Output> {
-            std::task::Poll::Pending
+        fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> ::core::task::Poll<Self::Output> {
+            ::core::task::Poll::Pending
         }
     }
 

@@ -11,9 +11,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+use ::core::alloc::Layout;
+use ::core::time::Duration;
+use ::core::{ptr::NonNull, task::Waker};
 use std::sync::RwLock;
-use std::time::Duration;
-use std::{alloc::Layout, ptr::NonNull, task::Waker};
 
 use foundation::create_arr_storage;
 use foundation::prelude::{AllocationError, FixedSizePoolAllocator};
@@ -172,12 +173,12 @@ impl Inner {
 
             if let Some(deadline) = precise_deadline {
                 (
-                    self.start_time + std::time::Duration::from_millis(deadline),
+                    self.start_time + ::core::time::Duration::from_millis(deadline),
                     deadline - self.last_check_time,
                 )
             } else {
                 (
-                    self.start_time + std::time::Duration::from_millis(info.deadline),
+                    self.start_time + ::core::time::Duration::from_millis(info.deadline),
                     info.deadline - self.last_check_time,
                 )
             }
@@ -258,7 +259,7 @@ impl Inner {
                 data.data.waker.wake_by_ref();
 
                 unsafe {
-                    std::ptr::drop_in_place(e.as_ptr());
+                    ::core::ptr::drop_in_place(e.as_ptr());
                     self.pool.deallocate(e.cast::<u8>(), Layout::new::<TimeEntry>())
                 };
             } else {
@@ -298,10 +299,10 @@ impl Inner {
         let e = self.pool.allocate(Layout::new::<TimeEntry>())?.cast::<TimeEntry>();
 
         unsafe {
-            std::ptr::write(
+            ::core::ptr::write(
                 e.as_ptr(),
                 TimeEntry {
-                    next: foundation::sync::foundation_atomic::FoundationAtomicPtr::new(std::ptr::null_mut()),
+                    next: foundation::sync::foundation_atomic::FoundationAtomicPtr::new(::core::ptr::null_mut()),
                     data: wheel::TimeoutData { waker, expire_at },
                 },
             );
@@ -329,7 +330,7 @@ impl Drop for Inner {
 
                 for e in iter {
                     unsafe {
-                        std::ptr::drop_in_place(e.as_ptr());
+                        ::core::ptr::drop_in_place(e.as_ptr());
                     }
                 }
             }

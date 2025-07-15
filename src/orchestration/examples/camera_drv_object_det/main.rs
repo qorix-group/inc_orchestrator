@@ -32,7 +32,7 @@ pub async fn timer_input() -> InvokeResult {
     info!("Start of 'timer_input_async' function.");
 
     //sleep for 100ms
-    sleep::sleep(std::time::Duration::from_millis(100)).await;
+    sleep::sleep(::core::time::Duration::from_millis(100)).await;
 
     info!("End of 'timer_input_async' function.");
     Ok(())

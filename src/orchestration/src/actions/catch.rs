@@ -12,7 +12,7 @@
 //
 
 #![allow(dead_code)]
-use std::ops::BitOr;
+use ::core::ops::BitOr;
 use std::sync::{Arc, Mutex};
 
 use async_runtime::futures::reusable_box_future::*;
@@ -277,7 +277,7 @@ impl ActionTrait for Catch {
         "Catch"
     }
 
-    fn dbg_fmt(&self, _nest: usize, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn dbg_fmt(&self, _nest: usize, _f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         todo!()
     }
 }

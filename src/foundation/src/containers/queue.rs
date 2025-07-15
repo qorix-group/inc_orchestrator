@@ -11,8 +11,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+use ::core::mem::{replace, MaybeUninit};
 use iceoryx2_bb_elementary::{owning_pointer::OwningPointer, pointer_trait::PointerTrait};
-use std::mem::{replace, MaybeUninit};
 
 ///
 /// Internal basic implementation of FIFO queue that can be used to implement further advanced queues. The internals are pub(crate) to let build oder containers by this

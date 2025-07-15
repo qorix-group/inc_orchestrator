@@ -11,11 +11,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+use ::core::ptr::NonNull;
+use ::core::sync::atomic::Ordering;
 use foundation::prelude::*;
-use std::ptr::NonNull;
-use std::sync::atomic::Ordering;
 
-use std::task::Waker;
+use ::core::task::Waker;
 
 pub(super) struct TimeoutData {
     pub waker: Waker,
@@ -40,7 +40,7 @@ pub(super) struct TimeEntry {
 impl Default for TimeSlot {
     fn default() -> Self {
         TimeSlot {
-            head: FoundationAtomicPtr::new(std::ptr::null_mut()),
+            head: FoundationAtomicPtr::new(::core::ptr::null_mut()),
         }
     }
 }
@@ -53,10 +53,10 @@ pub(super) struct ExpireInfo {
 
 impl TimeWheel {
     pub(super) fn new(level: u8) -> Self {
-        let mut slots = std::array::from_fn(|_| TimeSlot::default());
+        let mut slots = ::core::array::from_fn(|_| TimeSlot::default());
 
         for slot in &mut slots {
-            slot.head.store(std::ptr::null_mut(), Ordering::Relaxed);
+            slot.head.store(::core::ptr::null_mut(), Ordering::Relaxed);
         }
 
         TimeWheel {
@@ -143,7 +143,7 @@ impl TimeWheel {
 
         self.occupied_slots.fetch_and(!(1 << info.slot_id), Ordering::Relaxed);
 
-        let entries = self.slots[info.slot_id as usize].head.swap(std::ptr::null_mut(), Ordering::Relaxed);
+        let entries = self.slots[info.slot_id as usize].head.swap(::core::ptr::null_mut(), Ordering::Relaxed);
 
         TimeSlotIterator { head: entries }
     }

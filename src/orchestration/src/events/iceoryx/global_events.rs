@@ -17,9 +17,9 @@
 use crate::actions::action::ActionResult;
 use crate::events::event_traits::{IpcProvider, ListenerTrait, NotifierTrait};
 use crate::events::iceoryx::event::Event;
-use std::future::Future;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use ::core::future::Future;
+use ::core::pin::Pin;
+use ::core::task::{Context, Poll};
 
 /// GlobalEvents implements the IpcProvider trait
 pub struct GlobalEvents;

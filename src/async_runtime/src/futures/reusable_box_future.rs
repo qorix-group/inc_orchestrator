@@ -10,8 +10,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
-use std::{
-    alloc::{self, dealloc, Layout},
+use std::alloc::{self, dealloc, Layout};
+
+use ::core::{
     future::Future,
     marker::PhantomPinned,
     ops::{Deref, DerefMut},
@@ -114,8 +115,8 @@ impl<OutType> ReusableBoxFuturePool<OutType> {
         match atomic_ref.compare_exchange(
             FUTURE_FREE,
             FUTURE_TAKEN,
-            std::sync::atomic::Ordering::AcqRel,
-            std::sync::atomic::Ordering::Acquire,
+            ::core::sync::atomic::Ordering::AcqRel,
+            ::core::sync::atomic::Ordering::Acquire,
         ) {
             Ok(_) => {}
             Err(_) => return Err(CommonErrors::NoData), // next is not free yet, this is user problem now
@@ -165,7 +166,7 @@ impl<OutType> ReusableBoxFuturePool<OutType> {
         }
 
         // SAFETY: Create boxed slice from raw parts
-        unsafe { Box::from_raw(std::ptr::slice_from_raw_parts_mut(ptr, size)) }
+        unsafe { Box::from_raw(::core::ptr::slice_from_raw_parts_mut(ptr, size)) }
     }
 }
 
@@ -178,8 +179,8 @@ impl<OutType> Drop for ReusableBoxFuturePool<OutType> {
             match self.states[index].0.compare_exchange(
                 FUTURE_TAKEN,
                 FUTURE_POOL_GONE,
-                std::sync::atomic::Ordering::AcqRel,
-                std::sync::atomic::Ordering::Acquire,
+                ::core::sync::atomic::Ordering::AcqRel,
+                ::core::sync::atomic::Ordering::Acquire,
             ) {
                 Ok(_) => {}
                 Err(actual) => unsafe {
@@ -220,8 +221,8 @@ impl<OutType> Drop for ReusableBoxFuture<OutType> {
                 match self.this.state.0.compare_exchange(
                     FUTURE_TAKEN,
                     FUTURE_FREE,
-                    std::sync::atomic::Ordering::AcqRel,
-                    std::sync::atomic::Ordering::Acquire,
+                    ::core::sync::atomic::Ordering::AcqRel,
+                    ::core::sync::atomic::Ordering::Acquire,
                 ) {
                     Ok(_) => {}
 
@@ -241,7 +242,7 @@ impl<OutType> Drop for ReusableBoxFuture<OutType> {
         let _guard = DropGuard { this: self }; // make sure that after drop, we fire sync logic
 
         unsafe {
-            std::ptr::drop_in_place(self.memory.as_ptr());
+            ::core::ptr::drop_in_place(self.memory.as_ptr());
         }
     }
 }
@@ -275,15 +276,15 @@ mod tests {
 
     impl TestFutureMock {
         fn was_dropped(&self) -> bool {
-            self.dropped.load(std::sync::atomic::Ordering::SeqCst) > 0
+            self.dropped.load(::core::sync::atomic::Ordering::SeqCst) > 0
         }
 
         fn dropped(&self, val: u16) {
-            self.dropped.fetch_add(val, std::sync::atomic::Ordering::SeqCst);
+            self.dropped.fetch_add(val, ::core::sync::atomic::Ordering::SeqCst);
         }
 
         fn get_dropped(&self) -> u16 {
-            self.dropped.load(std::sync::atomic::Ordering::SeqCst)
+            self.dropped.load(::core::sync::atomic::Ordering::SeqCst)
         }
     }
 
@@ -304,8 +305,8 @@ mod tests {
     impl Future for TestFuture {
         type Output = u32;
 
-        fn poll(self: Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
-            std::task::Poll::Ready(1)
+        fn poll(self: Pin<&mut Self>, _cx: &mut ::core::task::Context<'_>) -> ::core::task::Poll<Self::Output> {
+            ::core::task::Poll::Ready(1)
         }
     }
 
@@ -322,8 +323,8 @@ mod tests {
     impl Future for TestFuture2 {
         type Output = u32;
 
-        fn poll(self: Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
-            std::task::Poll::Ready(1)
+        fn poll(self: Pin<&mut Self>, _cx: &mut ::core::task::Context<'_>) -> ::core::task::Poll<Self::Output> {
+            ::core::task::Poll::Ready(1)
         }
     }
 
@@ -340,8 +341,8 @@ mod tests {
     impl Future for TestFuturePanic {
         type Output = u32;
 
-        fn poll(self: Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
-            std::task::Poll::Ready(1)
+        fn poll(self: Pin<&mut Self>, _cx: &mut ::core::task::Context<'_>) -> ::core::task::Poll<Self::Output> {
+            ::core::task::Poll::Ready(1)
         }
     }
 

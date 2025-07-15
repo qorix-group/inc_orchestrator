@@ -22,7 +22,7 @@ fn clone_waker(data: *const ()) -> RawWaker {
 
     let new_waker = task_ref.clone();
 
-    std::mem::forget(task_ref); // We need to make sure the instance from which we clone, is forgotten since we did not consumed it, it was only bring back for a moment to clone
+    ::core::mem::forget(task_ref); // We need to make sure the instance from which we clone, is forgotten since we did not consumed it, it was only bring back for a moment to clone
 
     let raw = TaskRef::into_raw(new_waker);
     RawWaker::new(raw as *const (), &VTABLE)
@@ -43,7 +43,7 @@ fn wake_by_ref(data: *const ()) {
 
     task_ref.schedule();
 
-    std::mem::forget(task_ref); // don't touch refcount from our data since this is done by drop_waker
+    ::core::mem::forget(task_ref); // don't touch refcount from our data since this is done by drop_waker
 }
 
 fn drop_waker(data: *const ()) {
@@ -79,14 +79,14 @@ impl AtomicWakerStore {
     /// Exchange waker and returns previous one
     ///
     pub(crate) fn swap(&self, waker: Option<Waker>) -> Option<Waker> {
-        let mut data = std::ptr::null_mut();
+        let mut data = ::core::ptr::null_mut();
 
         if let Some(task) = waker {
             data = task.data() as *mut TaskHeader;
-            std::mem::forget(task);
+            ::core::mem::forget(task);
         }
 
-        let old = self.data.swap(data, std::sync::atomic::Ordering::AcqRel);
+        let old = self.data.swap(data, ::core::sync::atomic::Ordering::AcqRel);
 
         if old.is_null() {
             None
@@ -115,7 +115,7 @@ impl AtomicWakerStore {
 impl From<Waker> for AtomicWakerStore {
     fn from(value: Waker) -> Self {
         let data = value.data() as *mut TaskHeader;
-        std::mem::forget(value);
+        ::core::mem::forget(value);
         assert!(!data.is_null()); // data cannot be nullptr
 
         Self {
@@ -127,7 +127,7 @@ impl From<Waker> for AtomicWakerStore {
 impl Default for AtomicWakerStore {
     fn default() -> Self {
         Self {
-            data: FoundationAtomicPtr::new(std::ptr::null_mut()),
+            data: FoundationAtomicPtr::new(::core::ptr::null_mut()),
         }
     }
 }

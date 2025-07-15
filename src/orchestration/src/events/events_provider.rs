@@ -10,7 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
-use std::cell::RefCell;
+use ::core::cell::RefCell;
 use std::rc::Rc;
 
 use crate::events::event_traits::{IpcProvider, NotifierTrait};

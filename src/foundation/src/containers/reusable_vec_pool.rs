@@ -26,7 +26,7 @@ pub use iceoryx2_bb_container::vec::Vec;
 /// Each vector is managed by the pool and can be checked out, used, and returned for reuse.
 pub type ReusableVecPool<T> = ReusableObjects<Vec<T>>;
 
-use std::ops::{Index, IndexMut};
+use ::core::ops::{Index, IndexMut};
 
 /// Allows mutable indexing into the pooled vector, e.g. `obj[1] = value;`
 impl<T> IndexMut<usize> for ReusableObject<Vec<T>> {
@@ -73,7 +73,7 @@ impl<T> ReusableObject<Vec<T>> {
     }
 
     /// Returns an iterator over the elements of the pooled vector.
-    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, T> {
+    pub fn iter_mut(&mut self) -> ::core::slice::IterMut<'_, T> {
         unsafe { self.as_inner_mut().iter_mut() }
     }
 }

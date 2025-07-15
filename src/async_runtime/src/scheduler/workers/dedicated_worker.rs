@@ -13,10 +13,9 @@
 use foundation::{
     containers::trigger_queue::TriggerQueueConsumer, prelude::FoundationAtomicBool, threading::thread_wait_barrier::ThreadReadyNotifier,
 };
-use std::{
-    sync::{atomic::Ordering, Arc},
-    task::Context,
-};
+use std::sync::{atomic::Ordering, Arc};
+
+use ::core::task::Context;
 
 use crate::{
     scheduler::{
@@ -161,7 +160,7 @@ impl WorkerInner {
                 continue;
             }
 
-            match self.consumer.pop_blocking_with_timeout(std::time::Duration::from_millis(100)) {
+            match self.consumer.pop_blocking_with_timeout(::core::time::Duration::from_millis(100)) {
                 Ok(task_ref) => {
                     self.local_storage.push(task_ref);
                 }

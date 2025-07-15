@@ -16,7 +16,7 @@ use crate::{actions::invoke::InvokeResult, common::tag::Tag};
 use async_runtime::futures::reusable_box_future::{ReusableBoxFuture, ReusableBoxFuturePool};
 use foundation::prelude::CommonErrors;
 
-use std::{
+use ::core::{
     fmt::{Debug, Formatter},
     ops::Deref,
 };
@@ -98,7 +98,7 @@ pub trait ActionTrait: Send {
     ///
     /// Since we store actions behind dyn ActionTrait, we need an API that we can call from program to print constructed representation
     ///
-    fn dbg_fmt(&self, nest: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
+    fn dbg_fmt(&self, nest: usize, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result;
 }
 
 pub struct ActionBaseMeta {
@@ -107,7 +107,7 @@ pub struct ActionBaseMeta {
 }
 
 impl Debug for ActionBaseMeta {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "{:?}", self.tag)
     }
 }

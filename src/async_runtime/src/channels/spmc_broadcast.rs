@@ -11,7 +11,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::{future::Future, marker::PhantomData, sync::Arc, task::Waker};
+use ::core::{future::Future, marker::PhantomData, task::Waker};
+use std::sync::Arc;
 
 use foundation::{not_recoverable_error, prelude::*};
 
@@ -177,7 +178,7 @@ impl<T: Copy, const SIZE: usize> Channel<T, SIZE> {
     }
 
     fn len(&self) -> u8 {
-        self.next_free_receiver.load(std::sync::atomic::Ordering::Relaxed)
+        self.next_free_receiver.load(::core::sync::atomic::Ordering::Relaxed)
     }
 
     fn receiver_dropping(&self, index: usize) {
@@ -191,7 +192,7 @@ impl<T: Copy, const SIZE: usize> Channel<T, SIZE> {
     }
 
     fn send(&self, value: &T) -> Result<(), CommonErrors> {
-        let len = self.next_free_receiver.load(std::sync::atomic::Ordering::Relaxed) as usize;
+        let len = self.next_free_receiver.load(::core::sync::atomic::Ordering::Relaxed) as usize;
         let mut ret = Ok(());
         let mut i = 0;
 
@@ -223,17 +224,19 @@ impl<T: Copy, const SIZE: usize> Channel<T, SIZE> {
     }
 
     fn subscribe(self: &Arc<Self>) -> Option<Receiver<T, SIZE>> {
-        let mut curr = self.next_free_receiver.load(std::sync::atomic::Ordering::Relaxed);
+        let mut curr = self.next_free_receiver.load(::core::sync::atomic::Ordering::Relaxed);
 
         loop {
             if curr >= self.channels.len() as u8 {
                 return None; // No more receivers can be created
             }
 
-            match self
-                .next_free_receiver
-                .compare_exchange(curr, curr + 1, std::sync::atomic::Ordering::AcqRel, std::sync::atomic::Ordering::Acquire)
-            {
+            match self.next_free_receiver.compare_exchange(
+                curr,
+                curr + 1,
+                ::core::sync::atomic::Ordering::AcqRel,
+                ::core::sync::atomic::Ordering::Acquire,
+            ) {
                 Ok(_) => break,
                 Err(v) => curr = v,
             }
@@ -258,7 +261,7 @@ unsafe impl<T: Copy, const SIZE: usize> Send for ReceiverFuture<'_, T, SIZE> {}
 impl<T: Copy, const SIZE: usize> Future for ReceiverFuture<'_, T, SIZE> {
     type Output = Option<T>;
 
-    fn poll(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
+    fn poll(mut self: ::core::pin::Pin<&mut Self>, cx: &mut ::core::task::Context<'_>) -> ::core::task::Poll<Self::Output> {
         let res = match self.state {
             FutureState::New | FutureState::Polled => self.parent.receive(&mut self.consumer, cx.waker().clone()).map_or_else(
                 |e| {
@@ -657,7 +660,7 @@ mod tests {
 
             assert_poll_ready(res1, input.clone());
             match res2 {
-                std::task::Poll::Pending => {}
+                ::core::task::Poll::Pending => {}
                 _ => assert_poll_ready(res2, input.clone()),
             }
         });

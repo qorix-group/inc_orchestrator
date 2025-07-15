@@ -13,7 +13,7 @@
 
 pub mod prelude;
 
-use std::fmt::Write;
+use ::core::fmt::Write;
 use std::fs::File;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};

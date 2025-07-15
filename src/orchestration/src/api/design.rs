@@ -18,12 +18,11 @@ use crate::{
     program::{Program, ProgramBuilder},
     program_database::ProgramDatabase,
 };
+use ::core::{future::Future, ops::Deref};
+
+use std::sync::{Arc, Mutex};
+
 use foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
-use std::{
-    future::Future,
-    ops::Deref,
-    sync::{Arc, Mutex},
-};
 
 pub type ProgramTag = Tag;
 pub type DesignTag = Tag;

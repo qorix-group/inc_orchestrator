@@ -16,9 +16,9 @@ pub mod poller;
 pub mod prelude;
 pub mod waker;
 
-pub fn assert_poll_ready<T: PartialEq + std::fmt::Debug>(res: std::task::Poll<T>, val: T) {
+pub fn assert_poll_ready<T: PartialEq + ::core::fmt::Debug>(res: ::core::task::Poll<T>, val: T) {
     match res {
-        std::task::Poll::Ready(v) => assert_eq!(val, v),
-        std::task::Poll::Pending => panic!("Shall have Ready value and not Pending"),
+        ::core::task::Poll::Ready(v) => assert_eq!(val, v),
+        ::core::task::Poll::Pending => panic!("Shall have Ready value and not Pending"),
     }
 }
