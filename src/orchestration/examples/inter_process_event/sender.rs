@@ -11,6 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+use ::core::time::Duration;
 use async_runtime::{futures::sleep, runtime::async_runtime::AsyncRuntimeBuilder, scheduler::execution_engine::*};
 use foundation::prelude::*;
 use logging_tracing::{TraceScope, TracingLibraryBuilder};
@@ -19,7 +20,6 @@ use orchestration::{
     common::{tag::Tag, DesignConfig},
     prelude::*,
 };
-use std::time::Duration;
 
 pub fn collision_detection() -> InvokeResult {
     info!("Forward collision is imminent...");

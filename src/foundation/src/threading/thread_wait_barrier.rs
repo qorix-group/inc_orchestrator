@@ -11,10 +11,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::{
-    sync::{Arc, Condvar, Mutex},
-    time::Duration,
-};
+use ::core::time::Duration;
+use std::sync::{Arc, Condvar, Mutex};
 
 use crate::prelude::*;
 
@@ -69,13 +67,17 @@ impl ThreadWaitBarrier {
     pub fn get_notifier(self: &Arc<Self>) -> Option<ThreadReadyNotifier> {
         let new_cnt = self
             .ntf_cnt
-            .fetch_update(std::sync::atomic::Ordering::SeqCst, std::sync::atomic::Ordering::SeqCst, |current| {
-                if current >= self.expected_cnt {
-                    None
-                } else {
-                    Some(current + 1)
-                }
-            })
+            .fetch_update(
+                ::core::sync::atomic::Ordering::SeqCst,
+                ::core::sync::atomic::Ordering::SeqCst,
+                |current| {
+                    if current >= self.expected_cnt {
+                        None
+                    } else {
+                        Some(current + 1)
+                    }
+                },
+            )
             .unwrap_or_else(|e| e);
 
         if new_cnt >= self.expected_cnt {
@@ -110,9 +112,9 @@ impl ThreadWaitBarrier {
 #[cfg(not(loom))]
 mod tests {
     use super::*;
+    use ::core::time::Duration;
     use std::sync::Arc;
     use std::thread;
-    use std::time::Duration;
 
     #[test]
     fn test_thread_wait_barrier_all_threads_ready() {

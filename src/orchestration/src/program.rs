@@ -23,15 +23,16 @@ use crate::{
     common::tag::Tag,
     prelude::{ActionExecError, ActionResult, ActionTrait},
 };
-use async_runtime::scheduler::join_handle::JoinHandle;
-use foundation::prelude::CommonErrors;
-use std::{
+use ::core::{
     fmt::Debug,
     future::Future,
     pin::Pin,
     task::{Context, Poll},
-    time::{Duration, Instant},
+    time::Duration,
 };
+
+use async_runtime::{scheduler::join_handle::JoinHandle, time::clock::Clock};
+use foundation::prelude::CommonErrors;
 use tracing::trace;
 
 #[cfg(not(any(test, feature = "runtime-api-mock")))]
@@ -53,7 +54,7 @@ pub struct Program {
 }
 
 impl Debug for Program {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         writeln!(f, "Program - {}", self.name)?;
         writeln!(f, "Body:")?;
         self.run_action.as_ref().dbg_fmt(1, f)
@@ -155,7 +156,7 @@ impl Program {
         self.run_start_action().await?;
 
         while n.is_none() || iteration < iteration_count {
-            let start_time = Instant::now();
+            let start_time = Clock::now();
 
             let stats = ProgramStats {
                 name: self.name.as_str(),
@@ -190,7 +191,7 @@ impl Program {
             let stats = ProgramStats {
                 name: self.name.as_str(),
                 iteration,
-                iteration_time: Instant::now().duration_since(start_time),
+                iteration_time: Clock::now().duration_since(start_time),
             };
             trace!( meta = ?stats, "Iteration completed");
 

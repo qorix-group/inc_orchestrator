@@ -16,12 +16,12 @@ pub use loom::cell::UnsafeCell;
 
 #[cfg(not(loom))]
 #[derive(Debug)]
-pub struct UnsafeCell<T>(std::cell::UnsafeCell<T>);
+pub struct UnsafeCell<T>(::core::cell::UnsafeCell<T>);
 
 #[cfg(not(loom))]
 impl<T> UnsafeCell<T> {
     pub fn new(data: T) -> UnsafeCell<T> {
-        UnsafeCell(std::cell::UnsafeCell::new(data))
+        UnsafeCell(::core::cell::UnsafeCell::new(data))
     }
 
     pub fn with<R>(&self, f: impl FnOnce(*const T) -> R) -> R {

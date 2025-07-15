@@ -11,7 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::{
+use ::core::{
     alloc::Layout,
     mem::MaybeUninit,
     ops::{Deref, DerefMut},
@@ -81,13 +81,13 @@ impl<T> GrowableVec<T> {
     /// Returns a  slice to the contents of the vector
     pub fn as_slice(&self) -> &[T] {
         let len = self.inner.len();
-        unsafe { std::slice::from_raw_parts(self.inner.as_slice().as_ptr().cast(), len) }
+        unsafe { ::core::slice::from_raw_parts(self.inner.as_slice().as_ptr().cast(), len) }
     }
 
     /// Returns a mutable slice to the contents of the vector
     pub fn as_mut_slice(&mut self) -> &mut [T] {
         let len = self.inner.len();
-        unsafe { std::slice::from_raw_parts_mut(self.inner.as_mut_slice().as_mut_ptr().cast(), len) }
+        unsafe { ::core::slice::from_raw_parts_mut(self.inner.as_mut_slice().as_mut_ptr().cast(), len) }
     }
 
     /// Remove and return last elem in container
@@ -128,7 +128,7 @@ impl<T> GrowableVec<T> {
 
         // Do the copy from source
         unsafe {
-            std::ptr::copy_nonoverlapping(
+            ::core::ptr::copy_nonoverlapping(
                 self.inner.as_slice().as_ptr(),
                 new_container.as_mut_slice().as_mut_ptr(),
                 self.inner.len(),

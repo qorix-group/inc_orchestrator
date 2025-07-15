@@ -17,8 +17,8 @@ use crate::{
     futures::{FutureInternalReturn, FutureState},
     TaskRef,
 };
+use ::core::{future::Future, marker::PhantomData};
 use core::task::Poll;
-use std::{future::Future, marker::PhantomData};
 
 pub type JoinResult<T> = Result<T, CommonErrors>;
 
@@ -63,7 +63,7 @@ impl<T: Send + 'static> Future for JoinHandle<T> {
     ///     - `CommonErrors::OperationAborted` when abort() was called
     ///     - `CommonErrors::Panicked` if future panicked. Currently not yet supported!
     ///
-    fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
+    fn poll(self: ::core::pin::Pin<&mut Self>, cx: &mut ::core::task::Context<'_>) -> Poll<Self::Output> {
         let res: FutureInternalReturn<JoinResult<T>> = match self.state {
             FutureState::New => {
                 let waker = cx.waker();
@@ -117,7 +117,7 @@ impl<T: Send + 'static> Unpin for JoinHandle<T> {}
 #[cfg(test)]
 #[cfg(not(loom))]
 mod tests {
-    use std::task::Context;
+    use ::core::task::Context;
 
     use crate::{
         core::types::{box_future, ArcInternal},
@@ -142,7 +142,7 @@ mod tests {
             let mut poller = TestingFuturePoller::new(handle);
 
             let mut res = poller.poll();
-            assert_eq!(res, std::task::Poll::Pending);
+            assert_eq!(res, ::core::task::Poll::Pending);
 
             {
                 let waker = noop_waker();
@@ -152,7 +152,7 @@ mod tests {
             }
 
             res = poller.poll();
-            assert_eq!(res, std::task::Poll::Ready(Ok(0)));
+            assert_eq!(res, ::core::task::Poll::Ready(Ok(0)));
         }
 
         {
@@ -170,7 +170,7 @@ mod tests {
                 task.poll(&mut cx);
             }
 
-            assert_eq!(poller.poll(), std::task::Poll::Ready(Ok(1234)));
+            assert_eq!(poller.poll(), ::core::task::Poll::Ready(Ok(1234)));
         }
     }
 
@@ -186,12 +186,12 @@ mod tests {
             let mut poller = TestingFuturePoller::new(handle);
 
             let mut res = poller.poll();
-            assert_eq!(res, std::task::Poll::Pending);
+            assert_eq!(res, ::core::task::Poll::Pending);
 
             assert!(task.abort());
 
             res = poller.poll();
-            assert_eq!(res, std::task::Poll::Ready(Err(CommonErrors::OperationAborted)));
+            assert_eq!(res, ::core::task::Poll::Ready(Err(CommonErrors::OperationAborted)));
         }
 
         {
@@ -200,7 +200,7 @@ mod tests {
             let mut poller = TestingFuturePoller::new(handle);
 
             assert!(task.abort());
-            assert_eq!(poller.poll(), std::task::Poll::Ready(Err(CommonErrors::OperationAborted)));
+            assert_eq!(poller.poll(), ::core::task::Poll::Ready(Err(CommonErrors::OperationAborted)));
         }
     }
 
@@ -224,7 +224,7 @@ mod tests {
                 task.poll(&mut cx);
             }
 
-            assert_eq!(poller.poll(), std::task::Poll::Ready(Ok(0)));
+            assert_eq!(poller.poll(), ::core::task::Poll::Ready(Ok(0)));
 
             let _ = poller.poll(); // this shall fail
         }
@@ -253,7 +253,7 @@ mod tests {
             }
 
             assert!(waker_mock.was_waked());
-            assert_eq!(poller.poll(), std::task::Poll::Ready(Ok(0)));
+            assert_eq!(poller.poll(), ::core::task::Poll::Ready(Ok(0)));
         }
     }
 }
@@ -261,7 +261,7 @@ mod tests {
 #[cfg(test)]
 #[cfg(loom)]
 mod tests {
-    use std::task::Context;
+    use ::core::task::Context;
 
     use crate::{
         core::types::{box_future, ArcInternal},

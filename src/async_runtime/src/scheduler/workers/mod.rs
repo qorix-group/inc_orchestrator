@@ -17,8 +17,8 @@ pub mod worker;
 pub mod worker_types;
 
 use crate::scheduler::{workers::worker_types::WorkerId, SchedulerType};
+use ::core::fmt::Debug;
 use iceoryx2_bb_posix::thread::{Thread, ThreadBuilder, ThreadName, ThreadSpawnError};
-use std::fmt::Debug;
 
 #[derive(Default)]
 pub struct ThreadParameters {

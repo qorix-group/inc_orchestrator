@@ -16,14 +16,14 @@ use crate::core::types::FutureBox;
 use crate::futures::reusable_box_future::ReusableBoxFuture;
 use crate::safety::SafetyResult;
 use crate::scheduler::driver::Drivers;
+use ::core::future::Future;
 use core::cell::Cell;
 use core::cell::RefCell;
 use foundation::containers::spmc_queue::BoundProducerConsumer;
 use foundation::not_recoverable_error;
 use foundation::prelude::error;
-use std::future::Future;
 
-use std::pin::Pin;
+use ::core::pin::Pin;
 use std::{rc::Rc, sync::Arc};
 
 use crate::core::types::TaskId;

@@ -16,13 +16,13 @@ use crate::core::types::BoxInternal;
 use crate::core::types::UniqueWorkerId;
 use crate::ctx_get_handler;
 use crate::{scheduler::context::ctx_get_worker_id, TaskRef};
+use ::core::ops::Deref;
 use foundation::containers::trigger_queue::TriggerQueue;
 use foundation::not_recoverable_error;
 use foundation::{
     containers::{mpmc_queue::MpmcQueue, spmc_queue::BoundProducerConsumer, vector_extension::VectorExtension},
     prelude::*,
 };
-use std::ops::Deref;
 use std::sync::Arc;
 
 pub(crate) trait SchedulerTrait {
@@ -109,19 +109,19 @@ impl AsyncScheduler {
     /// Tries to move worker to searching state if conditions are met. No more than half of workers shall be in searching state to avoid too much contention on stealing queue
     ///
     pub(super) fn try_transition_worker_to_searching(&self) -> bool {
-        let searching = self.num_of_searching_workers.load(std::sync::atomic::Ordering::SeqCst);
+        let searching = self.num_of_searching_workers.load(::core::sync::atomic::Ordering::SeqCst);
         let predicted = (searching * SCHEDULER_MAX_SEARCHING_WORKERS_DIVIDER) as usize;
 
         if predicted >= self.worker_access.len() {
             return false;
         }
 
-        self.num_of_searching_workers.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.num_of_searching_workers.fetch_add(1, ::core::sync::atomic::Ordering::SeqCst);
         true
     }
 
     pub(super) fn transition_worker_to_executing(&self) {
-        self.num_of_searching_workers.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+        self.num_of_searching_workers.fetch_sub(1, ::core::sync::atomic::Ordering::SeqCst);
     }
 
     pub(super) fn transition_to_parked(&self, was_searching: bool, index: usize) -> bool {
@@ -130,7 +130,7 @@ impl AsyncScheduler {
         let mut num_of_searching = 2; //2 as false condition
 
         if was_searching {
-            num_of_searching = self.num_of_searching_workers.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+            num_of_searching = self.num_of_searching_workers.fetch_sub(1, ::core::sync::atomic::Ordering::SeqCst);
         }
 
         guard.push(index);
@@ -188,7 +188,7 @@ impl AsyncScheduler {
     // A worker should be notified only if no other workers are already in the searching state.
     //
     fn should_notify_some_worker(&self) -> bool {
-        self.num_of_searching_workers.fetch_sub(0, std::sync::atomic::Ordering::SeqCst) == 0
+        self.num_of_searching_workers.fetch_sub(0, ::core::sync::atomic::Ordering::SeqCst) == 0
     }
 }
 

@@ -20,7 +20,7 @@ fn clone_waker(data: *const ()) -> RawWaker {
 
     let new_waker = task_ref.clone();
 
-    std::mem::forget(task_ref); // We need to make sure the instance from which we clone, is forgotten since we did not consumed it, it was only bring back for a moment to clone
+    ::core::mem::forget(task_ref); // We need to make sure the instance from which we clone, is forgotten since we did not consumed it, it was only bring back for a moment to clone
 
     let raw = TaskRef::into_raw(new_waker);
     RawWaker::new(raw as *const (), &VTABLE)
@@ -41,7 +41,7 @@ fn wake_by_ref(data: *const ()) {
 
     task_ref.schedule_safety();
 
-    std::mem::forget(task_ref); // don't touch refcount from our data since this is done by drop_waker
+    ::core::mem::forget(task_ref); // don't touch refcount from our data since this is done by drop_waker
 }
 
 fn drop_waker(data: *const ()) {
@@ -61,7 +61,7 @@ pub(crate) unsafe fn create_safety_waker(waker: Waker) -> Waker {
     let raw_waker = RawWaker::new(waker.data(), &VTABLE);
 
     // Forget original as we took over the ownership, so ref count
-    std::mem::forget(waker);
+    ::core::mem::forget(waker);
 
     // Convert RawWaker to Waker
     unsafe { Waker::from_raw(raw_waker) }

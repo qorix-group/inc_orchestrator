@@ -41,8 +41,8 @@
 //! This guarantees that when a task is resumed via its `Waker`, it will always continue execution on the same thread
 //! where it was originally spawned, providing strong execution locality guarantees when needed.
 
+use ::core::future::Future;
 use core::types::{box_future, FutureBox};
-use std::future::Future;
 
 use crate::core::types::UniqueWorkerId;
 use foundation::{not_recoverable_error, prelude::*};

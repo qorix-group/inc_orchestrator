@@ -11,8 +11,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+use ::core::task::{RawWaker, RawWakerVTable, Waker};
 use std::sync::Arc;
-use std::task::{RawWaker, RawWakerVTable, Wake, Waker};
+use std::task::Wake;
 
 ///
 /// Helper waker that does not do anything
@@ -27,7 +28,7 @@ pub fn noop_waker() -> Waker {
     }
 
     fn noop_raw_waker() -> RawWaker {
-        RawWaker::new(std::ptr::null(), &NOOP_WAKER_VTABLE)
+        RawWaker::new(::core::ptr::null(), &NOOP_WAKER_VTABLE)
     }
 
     unsafe { Waker::from_raw(noop_raw_waker()) }
@@ -56,7 +57,7 @@ impl TrackableWaker {
     }
 
     pub fn was_waked(&self) -> bool {
-        self.inner.was_waked.load(std::sync::atomic::Ordering::Relaxed)
+        self.inner.was_waked.load(::core::sync::atomic::Ordering::Relaxed)
     }
 
     ///
@@ -80,6 +81,6 @@ struct InnerTrackableWaker {
 
 impl Wake for InnerTrackableWaker {
     fn wake(self: Arc<Self>) {
-        self.was_waked.store(true, std::sync::atomic::Ordering::Relaxed);
+        self.was_waked.store(true, ::core::sync::atomic::Ordering::Relaxed);
     }
 }

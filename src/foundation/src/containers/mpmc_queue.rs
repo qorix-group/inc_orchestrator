@@ -11,7 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::mem::MaybeUninit;
+use ::core::mem::MaybeUninit;
 
 use iceoryx2_bb_elementary::pointer_trait::PointerTrait;
 

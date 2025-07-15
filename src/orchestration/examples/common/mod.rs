@@ -77,7 +77,7 @@ pub async fn test3_async_func() -> InvokeResult {
 
 pub async fn test4_async_func() -> InvokeResult {
     info!("Start of 'test4_async_func' function.");
-    sleep::sleep(std::time::Duration::from_millis(10)).await;
+    sleep::sleep(::core::time::Duration::from_millis(10)).await;
     info!("End of 'test4_async_func' function.");
     Ok(())
 }

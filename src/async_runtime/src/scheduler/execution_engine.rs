@@ -10,8 +10,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
+use ::core::time::Duration;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 use super::scheduler_mt::*;
 use super::task::async_task::TaskRef;
@@ -70,7 +70,7 @@ impl EngineState {
             return Err(RuntimeErrors::NoTaskRunning);
         }
 
-        match std::mem::replace(self, Self::Finished) {
+        match ::core::mem::replace(self, Self::Finished) {
             EngineState::Running(join_handle) => Ok(join_handle),
             _ => not_recoverable_error!("Shall never be here since we checked that state is Running"),
         }
@@ -421,12 +421,12 @@ impl ExecutionEngineBuilder {
 #[allow(unused_imports)]
 mod tests {
     use super::*;
+    use ::core::time::Duration;
     use std::sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     };
     use std::thread;
-    use std::time::Duration;
 
     // used from async_runtime.rs unit test
     impl ExecutionEngine {

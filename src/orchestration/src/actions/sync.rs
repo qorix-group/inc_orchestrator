@@ -80,7 +80,7 @@ impl<T: ListenerTrait + Send> ActionTrait for Sync<T> {
         "Sync"
     }
 
-    fn dbg_fmt(&self, nest: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn dbg_fmt(&self, nest: usize, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         writeln!(f, "{}|-{}", " ".repeat(nest), self.name())
     }
 }

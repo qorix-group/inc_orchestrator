@@ -15,7 +15,7 @@
 use loom::sync::atomic::*;
 
 #[cfg(not(loom))]
-use core::sync::atomic::*;
+use ::core::sync::atomic::*;
 
 /// Behaves like [`sync::atomic::AtomicBool`]
 pub type FoundationAtomicBool = AtomicBool;

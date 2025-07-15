@@ -11,10 +11,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::boxed::Box;
-use std::cell::Cell;
-use std::future::Future;
-use std::pin::Pin;
+use ::core::cell::Cell;
+use ::core::future::Future;
+use ::core::pin::Pin;
 use std::sync::Arc;
 
 // Used to Box Futures

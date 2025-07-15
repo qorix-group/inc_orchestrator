@@ -11,8 +11,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::cell::UnsafeCell;
-use std::ops::{Deref, DerefMut};
+use ::core::cell::UnsafeCell;
+use ::core::ops::{Deref, DerefMut};
 
 use foundation::prelude::FoundationAtomicBool;
 
@@ -35,13 +35,18 @@ impl<T> RuntimeSequentialAccess<T> {
     }
 
     pub fn is_locked(&self) -> bool {
-        self.is_used.load(std::sync::atomic::Ordering::SeqCst)
+        self.is_used.load(::core::sync::atomic::Ordering::SeqCst)
     }
 
     pub fn lock(&self) -> RuntimeSequentialAccessGuard<'_, T> {
         if self
             .is_used
-            .compare_exchange(false, true, std::sync::atomic::Ordering::SeqCst, std::sync::atomic::Ordering::SeqCst)
+            .compare_exchange(
+                false,
+                true,
+                ::core::sync::atomic::Ordering::SeqCst,
+                ::core::sync::atomic::Ordering::SeqCst,
+            )
             .is_err()
         {
             panic!("Trying to take a fake lock in orchestration from owned object while this object is being executed");
@@ -58,7 +63,7 @@ pub struct RuntimeSequentialAccessGuard<'a, T> {
 
 impl<T> Drop for RuntimeSequentialAccessGuard<'_, T> {
     fn drop(&mut self) {
-        self.fake_mtx.is_used.store(false, std::sync::atomic::Ordering::SeqCst);
+        self.fake_mtx.is_used.store(false, ::core::sync::atomic::Ordering::SeqCst);
     }
 }
 

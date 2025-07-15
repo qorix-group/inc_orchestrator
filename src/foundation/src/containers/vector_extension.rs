@@ -49,13 +49,13 @@ impl<T> VectorExtension<T> for Vec<T> {
                 let ptr = self.as_mut_ptr();
 
                 // Read the element to be removed
-                let removed = std::ptr::read(ptr.add(index));
+                let removed = ::core::ptr::read(ptr.add(index));
 
                 // Shift elements left
-                std::ptr::copy(ptr.add(index + 1), ptr.add(index), length - index - 1);
+                ::core::ptr::copy(ptr.add(index + 1), ptr.add(index), length - index - 1);
 
                 // Write the removed element to the last position to avoid dropping of shifted last element which is still valid
-                std::ptr::write(ptr.add(length - 1), removed);
+                ::core::ptr::write(ptr.add(length - 1), removed);
             }
         }
 

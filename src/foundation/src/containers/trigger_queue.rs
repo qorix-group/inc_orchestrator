@@ -52,7 +52,7 @@ impl<T> TriggerQueueConsumer<T> {
     ///
     /// Pops an item from a queue once it's available, otherwise it does block up to `dur`.
     ///
-    pub fn pop_blocking_with_timeout(&self, dur: std::time::Duration) -> Result<T, CommonErrors> {
+    pub fn pop_blocking_with_timeout(&self, dur: ::core::time::Duration) -> Result<T, CommonErrors> {
         self.queue.pop_blocking_with_timeout(dur)
     }
 
@@ -66,7 +66,7 @@ impl<T> TriggerQueueConsumer<T> {
 
 impl<T> Drop for TriggerQueueConsumer<T> {
     fn drop(&mut self) {
-        self.queue.has_consumer.store(false, std::sync::atomic::Ordering::SeqCst);
+        self.queue.has_consumer.store(false, ::core::sync::atomic::Ordering::SeqCst);
     }
 }
 
@@ -94,10 +94,12 @@ impl<T> TriggerQueue<T> {
     /// Returns  consumer if there is non existing already
     ///
     pub fn get_consumer(self: &Arc<Self>) -> Option<TriggerQueueConsumer<T>> {
-        match self
-            .has_consumer
-            .compare_exchange(false, true, std::sync::atomic::Ordering::SeqCst, std::sync::atomic::Ordering::SeqCst)
-        {
+        match self.has_consumer.compare_exchange(
+            false,
+            true,
+            ::core::sync::atomic::Ordering::SeqCst,
+            ::core::sync::atomic::Ordering::SeqCst,
+        ) {
             Ok(_) => Some(TriggerQueueConsumer { queue: self.clone() }),
             Err(_) => None,
         }
@@ -113,7 +115,7 @@ impl<T> TriggerQueue<T> {
             return false;
         }
 
-        if self.state.load(std::sync::atomic::Ordering::Relaxed) {
+        if self.state.load(::core::sync::atomic::Ordering::Relaxed) {
             drop(data);
             self.cv.notify_one();
         }
@@ -142,12 +144,12 @@ impl<T> TriggerQueue<T> {
         }
     }
 
-    fn pop_blocking_with_timeout(&self, dur: std::time::Duration) -> Result<T, CommonErrors> {
+    fn pop_blocking_with_timeout(&self, dur: ::core::time::Duration) -> Result<T, CommonErrors> {
         let data = self.mtx.lock().unwrap();
 
-        self.state.store(true, std::sync::atomic::Ordering::Relaxed);
+        self.state.store(true, ::core::sync::atomic::Ordering::Relaxed);
         let mut res = self.cv.wait_timeout_while(data, dur, |guard| guard.is_empty()).unwrap();
-        self.state.store(false, std::sync::atomic::Ordering::Relaxed);
+        self.state.store(false, ::core::sync::atomic::Ordering::Relaxed);
 
         if res.1.timed_out() {
             Err(CommonErrors::Timeout)

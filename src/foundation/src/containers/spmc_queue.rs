@@ -11,14 +11,14 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+use ::core::cell::UnsafeCell;
+use ::core::marker::PhantomData;
+use ::core::mem::MaybeUninit;
 use std::alloc::{self, Layout}; // TODO: maybe replace this too from iceoryx2
-use std::cell::UnsafeCell;
-use std::marker::PhantomData;
-use std::mem::MaybeUninit;
 use std::sync::Arc;
 
 use crate::prelude::*;
-use std::sync::atomic::Ordering;
+use ::core::sync::atomic::Ordering;
 
 use crate::containers::mpmc_queue::MpmcQueue;
 
@@ -168,7 +168,7 @@ impl<T: Send> SpmcStealQueue<T> {
         Self {
             head: FoundationAtomicU32::new(0),
             tail: FoundationAtomicU64::new(0),
-            data: unsafe { Box::from_raw(std::slice::from_raw_parts_mut(ptr, size as usize)) },
+            data: unsafe { Box::from_raw(::core::slice::from_raw_parts_mut(ptr, size as usize)) },
             access_mask: size - 1,
             has_producer: FoundationAtomicBool::new(false),
             capacity: size,
@@ -333,7 +333,7 @@ impl<T: Send> SpmcStealQueue<T> {
                 let index = (head + num_items as u32) & self.access_mask;
                 unsafe {
                     let entry = self.data[index as usize].get();
-                    std::ptr::copy_nonoverlapping(ptr, entry, 1);
+                    ::core::ptr::copy_nonoverlapping(ptr, entry, 1);
                 }
 
                 num_items += 1;

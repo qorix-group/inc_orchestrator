@@ -173,7 +173,7 @@ impl TaskState {
     /// Return current TaskState wrapped into convenience type. This provides also memory barrier so all threads observes memory correctly
     ///
     pub(crate) fn get(&self) -> TaskStateSnapshot {
-        TaskStateSnapshot(self.s.load(std::sync::atomic::Ordering::SeqCst))
+        TaskStateSnapshot(self.s.load(::core::sync::atomic::Ordering::SeqCst))
     }
 
     ///
@@ -332,14 +332,14 @@ impl TaskState {
     /// Apply value from action and returns value from action
     ///
     fn fetch_update_with_return<T: FnMut(TaskStateSnapshot) -> (Option<TaskStateSnapshot>, U), U>(&self, mut f: T) -> U {
-        let mut val = self.s.load(std::sync::atomic::Ordering::Acquire);
+        let mut val = self.s.load(::core::sync::atomic::Ordering::Acquire);
         loop {
             let (state, ret) = f(TaskStateSnapshot(val));
             match state {
                 Some(s) => {
                     let res = self
                         .s
-                        .compare_exchange(val, s.0, std::sync::atomic::Ordering::AcqRel, std::sync::atomic::Ordering::Acquire);
+                        .compare_exchange(val, s.0, ::core::sync::atomic::Ordering::AcqRel, ::core::sync::atomic::Ordering::Acquire);
 
                     match res {
                         Ok(_) => break ret,

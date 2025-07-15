@@ -12,7 +12,7 @@
 //
 
 use crate::actions::action::ActionResult;
-use std::future::Future;
+use ::core::future::Future;
 
 /// NotifierTrait defines the interface for a notifier that can notify listeners with a value.
 pub trait NotifierTrait {

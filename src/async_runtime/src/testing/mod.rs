@@ -13,7 +13,8 @@
 
 #![allow(dead_code)]
 
-use std::{future::Future, sync::Arc, task::Waker, time::Duration};
+use ::core::{future::Future, task::Waker, time::Duration};
+use std::sync::Arc;
 
 use foundation::prelude::FoundationAtomicU16;
 
@@ -69,21 +70,21 @@ pub struct SchedulerMock {
 
 impl SchedulerMock {
     pub fn safety_spawn_count(&self) -> u16 {
-        self.safety_spawn_count.load(std::sync::atomic::Ordering::Relaxed)
+        self.safety_spawn_count.load(::core::sync::atomic::Ordering::Relaxed)
     }
 
     pub fn spawn_count(&self) -> u16 {
-        self.spawn_count.load(std::sync::atomic::Ordering::Relaxed)
+        self.spawn_count.load(::core::sync::atomic::Ordering::Relaxed)
     }
 }
 
 impl SchedulerTrait for SchedulerMock {
     fn respawn(&self, _: TaskRef) {
-        self.spawn_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.spawn_count.fetch_add(1, ::core::sync::atomic::Ordering::SeqCst);
     }
 
     fn respawn_into_safety(&self, _: TaskRef) {
-        self.safety_spawn_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.safety_spawn_count.fetch_add(1, ::core::sync::atomic::Ordering::SeqCst);
     }
 }
 

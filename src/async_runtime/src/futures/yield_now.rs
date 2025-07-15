@@ -11,9 +11,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::future::Future;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use ::core::future::Future;
+use ::core::pin::Pin;
+use ::core::task::{Context, Poll};
 
 ///
 /// The calling async task gives up for other queued tasks to run and the self is immediately put into notifid state to run.

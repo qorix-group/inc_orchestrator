@@ -13,10 +13,12 @@
 
 use crate::core::types::UniqueWorkerId;
 use crate::scheduler::task::async_task::TaskRef;
+use ::core::ops::Deref;
 use foundation::containers::spmc_queue::*;
 use foundation::prelude::*;
-use std::ops::Deref;
-use std::sync::{atomic::Ordering, Arc};
+use std::sync::Arc;
+
+use ::core::sync::atomic::Ordering;
 
 pub type TaskStealQueue = Arc<SpmcStealQueue<TaskRef>>;
 pub type StealHandle = TaskStealQueue;

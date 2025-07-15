@@ -25,7 +25,7 @@ mod common;
 
 fn example_component_design() -> Result<Design, CommonErrors> {
     let mut design = Design::new("ExampleDesign".into(), DesignConfig::default());
-    let run_tag = design.register_invoke_async("PendingIndefinitely".into(), async || std::future::pending().await)?;
+    let run_tag = design.register_invoke_async("PendingIndefinitely".into(), async || ::core::future::pending().await)?;
     let start_tag = design.register_invoke_fn("StartAction".into(), || {
         info!("Start action executed.");
         Ok(())

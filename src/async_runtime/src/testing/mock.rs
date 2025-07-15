@@ -16,11 +16,11 @@
 use crate::core::types::{box_future, FutureBox, UniqueWorkerId};
 use crate::scheduler::waker::create_waker;
 
-use std::cell::RefCell;
-use std::future::Future;
+use ::core::cell::RefCell;
+use ::core::future::Future;
 
+use ::core::task::Context;
 use std::sync::Arc;
-use std::task::Context;
 
 use crate::futures::reusable_box_future::ReusableBoxFuture;
 
@@ -82,7 +82,7 @@ thread_local! {
     static RUNTIME_MOCK_INSTANCE: RefCell<Option<MockRuntime>> = RefCell::new(None);
 }
 
-static DEV_CODE_ALLOW_ROUTING_OVER_MOCK: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static DEV_CODE_ALLOW_ROUTING_OVER_MOCK: ::core::sync::atomic::AtomicBool = ::core::sync::atomic::AtomicBool::new(false);
 
 pub fn init_runtime_mock() {
     RUNTIME_MOCK_INSTANCE.set(Some(MockRuntime {
@@ -95,7 +95,7 @@ pub fn init_runtime_mock() {
 /// Allows to run development process with RUNTIME MOCK compiled in so it will route to real runtime.
 /// THIS IS ONLY ALLOWED IN DEV CODE, NOT IN PRODUCTION.
 pub unsafe fn allow_routing_over_mock() {
-    DEV_CODE_ALLOW_ROUTING_OVER_MOCK.store(true, std::sync::atomic::Ordering::Relaxed);
+    DEV_CODE_ALLOW_ROUTING_OVER_MOCK.store(true, ::core::sync::atomic::Ordering::Relaxed);
     println!(
         "\n{bar}\n\
      {warn:^80}\n\
@@ -154,7 +154,7 @@ pub fn spawn_from_boxed<T>(boxed: FutureBox<T>) -> JoinHandle<T>
 where
     T: Send + 'static,
 {
-    if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(std::sync::atomic::Ordering::Relaxed) {
+    if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(::core::sync::atomic::Ordering::Relaxed) {
         crate::spawn_from_boxed(boxed)
     } else {
         RUNTIME_MOCK_INSTANCE.with(|instance| {
@@ -179,7 +179,7 @@ pub fn spawn_from_reusable<T>(reusable: ReusableBoxFuture<T>) -> JoinHandle<T>
 where
     T: Send + 'static,
 {
-    if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(std::sync::atomic::Ordering::Relaxed) {
+    if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(::core::sync::atomic::Ordering::Relaxed) {
         crate::spawn_from_reusable(reusable)
     } else {
         RUNTIME_MOCK_INSTANCE.with(|instance| {
@@ -217,7 +217,7 @@ pub fn spawn_from_boxed_on_dedicated<T>(boxed: FutureBox<T>, _worker_id: UniqueW
 where
     T: Send + 'static,
 {
-    if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(std::sync::atomic::Ordering::Relaxed) {
+    if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(::core::sync::atomic::Ordering::Relaxed) {
         crate::spawn_from_boxed_on_dedicated(boxed, _worker_id)
     } else {
         RUNTIME_MOCK_INSTANCE.with(|instance| {
@@ -242,7 +242,7 @@ pub fn spawn_from_reusable_on_dedicated<T>(reusable: ReusableBoxFuture<T>, _work
 where
     T: Send + 'static,
 {
-    if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(std::sync::atomic::Ordering::Relaxed) {
+    if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(::core::sync::atomic::Ordering::Relaxed) {
         crate::spawn_from_reusable_on_dedicated(reusable, _worker_id)
     } else {
         RUNTIME_MOCK_INSTANCE.with(|instance| {
@@ -263,7 +263,7 @@ where
 pub mod safety {
     use super::*;
 
-    use std::future::Future;
+    use ::core::future::Future;
 
     use crate::{
         core::types::{box_future, FutureBox},
@@ -291,7 +291,7 @@ pub mod safety {
         T: Send + 'static,
         E: Send + 'static,
     {
-        if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(std::sync::atomic::Ordering::Relaxed) {
+        if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(::core::sync::atomic::Ordering::Relaxed) {
             crate::safety::spawn_from_boxed(boxed)
         } else {
             RUNTIME_MOCK_INSTANCE.with(|instance| {
@@ -314,7 +314,7 @@ pub mod safety {
         T: Send + 'static,
         E: Send + 'static,
     {
-        if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(std::sync::atomic::Ordering::Relaxed) {
+        if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(::core::sync::atomic::Ordering::Relaxed) {
             crate::safety::spawn_from_reusable(reusable)
         } else {
             RUNTIME_MOCK_INSTANCE.with(|instance| {
@@ -348,7 +348,7 @@ pub mod safety {
         T: Send + 'static,
         E: Send + 'static,
     {
-        if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(std::sync::atomic::Ordering::Relaxed) {
+        if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(::core::sync::atomic::Ordering::Relaxed) {
             crate::safety::spawn_from_boxed_on_dedicated(boxed, _worker_id)
         } else {
             RUNTIME_MOCK_INSTANCE.with(|instance| {
@@ -374,7 +374,7 @@ pub mod safety {
         T: Send + 'static,
         E: Send + 'static,
     {
-        if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(std::sync::atomic::Ordering::Relaxed) {
+        if DEV_CODE_ALLOW_ROUTING_OVER_MOCK.load(::core::sync::atomic::Ordering::Relaxed) {
             crate::safety::spawn_from_reusable_on_dedicated(reusable, _worker_id)
         } else {
             RUNTIME_MOCK_INSTANCE.with(|instance| {

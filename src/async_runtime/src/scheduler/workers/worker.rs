@@ -11,7 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use core::task::Context;
+use ::core::task::Context;
 use std::{rc::Rc, sync::Arc};
 
 use crate::scheduler::{context::ctx_get_drivers, driver::Drivers, scheduler_mt::DedicatedScheduler, waker::create_waker, workers::Thread};
@@ -142,7 +142,7 @@ impl Worker {
             scheduler.worker_access[id]
                 .state
                 .0
-                .store(WORKER_STATE_SHUTTINGDOWN, std::sync::atomic::Ordering::SeqCst);
+                .store(WORKER_STATE_SHUTTINGDOWN, ::core::sync::atomic::Ordering::SeqCst);
 
             // wake up the worker in case it is parked, it then shuts down
             scheduler.notify_worker(self.id.worker_id());
@@ -168,11 +168,11 @@ impl WorkerInner {
         self.own_interactor
             .state
             .0
-            .store(WORKER_STATE_EXECUTING, std::sync::atomic::Ordering::SeqCst);
+            .store(WORKER_STATE_EXECUTING, ::core::sync::atomic::Ordering::SeqCst);
     }
 
     fn run(&mut self) {
-        while self.own_interactor.state.0.load(std::sync::atomic::Ordering::Acquire) != WORKER_STATE_SHUTTINGDOWN {
+        while self.own_interactor.state.0.load(::core::sync::atomic::Ordering::Acquire) != WORKER_STATE_SHUTTINGDOWN {
             let (task_opt, should_notify) = self.try_pick_work();
 
             if let Some(task) = task_opt {
@@ -362,7 +362,7 @@ impl WorkerInner {
 mod tests {
     use crate::scheduler::scheduler_mt::scheduler_new;
     use crate::scheduler::workers::{worker::Worker, worker_types::*};
-    use std::sync::atomic::Ordering;
+    use ::core::sync::atomic::Ordering;
     use std::sync::Arc;
 
     #[test]
@@ -397,13 +397,13 @@ mod tests {
     fn test_worker_stop() {
         use crate::scheduler::driver::Drivers;
         use crate::{box_future, AsyncTask, FoundationAtomicBool, TaskRef};
+        use ::core::time::Duration;
         use foundation::prelude::debug;
         use foundation::threading::thread_wait_barrier::ThreadWaitBarrier;
         use std::sync::Arc;
-        use std::time::Duration;
 
         async fn test_fn(b: Arc<FoundationAtomicBool>) {
-            b.store(true, std::sync::atomic::Ordering::SeqCst);
+            b.store(true, ::core::sync::atomic::Ordering::SeqCst);
         }
 
         let scheduler = Arc::new(crate::scheduler::scheduler_mt::scheduler_new(1, 4));
@@ -443,7 +443,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(100));
 
         assert!(
-            first_task_executed.load(std::sync::atomic::Ordering::SeqCst),
+            first_task_executed.load(::core::sync::atomic::Ordering::SeqCst),
             "First task was not executed while worker was still active"
         );
 
@@ -462,7 +462,7 @@ mod tests {
 
         // The second task should NOT have been executed
         assert!(
-            !second_task_executed.load(std::sync::atomic::Ordering::SeqCst),
+            !second_task_executed.load(::core::sync::atomic::Ordering::SeqCst),
             "Second task was executed even though worker was stopped"
         );
     }

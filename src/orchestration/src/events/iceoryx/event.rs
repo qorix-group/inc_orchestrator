@@ -12,6 +12,8 @@
 //
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
+use ::core::task::Waker;
+use ::core::time::Duration;
 /// ///  IMPORTANT: This is temporary solution for events handling. This will be re-written later and is done to only support basic integration
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 use iceoryx2::port::listener::Listener;
@@ -22,9 +24,7 @@ use libc::{sched_param, sched_setscheduler, SCHED_FIFO};
 use std::collections::HashMap;
 use std::process;
 use std::sync::{LazyLock, Mutex};
-use std::task::Waker;
 use std::thread;
-use std::time::Duration;
 
 use crate::actions::action::{ActionExecError, ActionResult};
 use foundation::prelude::*;

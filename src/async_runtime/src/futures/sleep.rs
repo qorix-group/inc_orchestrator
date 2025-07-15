@@ -11,7 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 use crate::{scheduler::driver::Drivers, time::clock::*};
-use std::{future::Future, task::Waker, time::Duration};
+use ::core::{future::Future, task::Waker, time::Duration};
 
 use foundation::{not_recoverable_error, prelude::error, prelude::CommonErrors};
 
@@ -26,7 +26,7 @@ use crate::{
 /// > ATTENTION: Time is counted from the moment the sleep function is called, not from the moment the future is awaited.
 ///
 #[allow(private_interfaces)]
-pub fn sleep(duration: std::time::Duration) -> Sleep<impl TimerAccessor> {
+pub fn sleep(duration: ::core::time::Duration) -> Sleep<impl TimerAccessor> {
     Sleep::new(duration, Clock::now(), ctx_get_drivers())
 }
 
@@ -52,7 +52,7 @@ impl TimerAccessor for Drivers {
 
 impl<T: TimerAccessor> Sleep<T> {
     /// Creates a new Sleep future that will complete after the specified duration.
-    fn new(duration: std::time::Duration, now: Instant, drivers: T) -> Self {
+    fn new(duration: ::core::time::Duration, now: Instant, drivers: T) -> Self {
         Self {
             state: FutureState::New,
             expire_at: now + duration,
@@ -69,7 +69,7 @@ impl<T: TimerAccessor> Sleep<T> {
 impl<T: TimerAccessor> Future for Sleep<T> {
     type Output = ();
 
-    fn poll(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
+    fn poll(mut self: ::core::pin::Pin<&mut Self>, cx: &mut ::core::task::Context<'_>) -> ::core::task::Poll<Self::Output> {
         let res: FutureInternalReturn<()> = match self.state {
             // We need to round deadline to the nearest millisecond (round up always) to ensure that we are not awaken before the actual deadline.
             FutureState::New => match self.drivers.register(self.rounded_deadline(), cx.waker().clone()) {
@@ -96,7 +96,7 @@ impl<T: TimerAccessor> Future for Sleep<T> {
 #[cfg(test)]
 #[cfg(not(loom))]
 mod tests {
-    use std::cell::RefCell;
+    use ::core::cell::RefCell;
 
     use super::*;
 
