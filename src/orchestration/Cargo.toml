@@ -24,9 +24,8 @@ loom = { version = "0.7", features = ["checkpoint"] }
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [
-    'cfg(orch_tracing)',
     'cfg(loom)',
-    'cfg(feature, values("runtime-api-mock"))',
+    'cfg(feature, values("runtime-api-mock", "orch_tracing"))',
 ] }
 
 [lints.clippy]
@@ -34,8 +33,9 @@ std_instead_of_core = "warn"
 alloc_instead_of_core = "warn"
 
 [features]
-default = ["iceoryx-ipc"]
+default = ["iceoryx-ipc", "orch_tracing"]
 iceoryx-ipc = []
+orch_tracing = []
 
 [[example]]
 name = "inter_process_event_sender"

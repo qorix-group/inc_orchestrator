@@ -36,15 +36,15 @@ impl<T> Deployment<'_, T> {
 
     /// Maps a system events to user events. This means that the specified user events will be treated as global events across all processes.
     pub fn bind_events_as_global(&mut self, system_event: &str, events_to_bind: &[Tag]) -> Result<(), CommonErrors> {
-        let mut ret = Ok(());
+        let mut ret = Err(CommonErrors::NotFound);
 
-        let creator = self.api.events.specify_global_event(system_event)?;
+        let creator = self.api.events.specify_global_event(system_event, events_to_bind)?;
 
         for d in &mut self.api.designs {
-            let _ = d.db.set_creator_for_events(Rc::clone(&creator), events_to_bind).or_else(|e| {
-                ret = Err(e);
-                ret
-            });
+            // This logic allows to report NotFound only if no design has the event.
+            ret =
+                d.db.set_creator_for_events(Rc::clone(&creator), events_to_bind)
+                    .or_else(|e| if e == CommonErrors::NotFound { ret } else { Err(e) })
         }
 
         ret
@@ -52,17 +52,15 @@ impl<T> Deployment<'_, T> {
 
     /// Binds user events to a local event. This means that the specified user events will be treated as local events within the process boundaries.
     pub fn bind_events_as_local(&mut self, events_to_bind: &[Tag]) -> Result<(), CommonErrors> {
-        let mut ret = Ok(());
+        let mut ret = Err(CommonErrors::NotFound);
 
-        let creator = self.api.events.specify_local_event()?;
+        let creator = self.api.events.specify_local_event(events_to_bind)?;
 
         for d in &mut self.api.designs {
-            let _ = d.db.set_creator_for_events(Rc::clone(&creator), events_to_bind).or_else(|e| {
-                // TODO: This returns NotFound if a given event isn't in this particular design. Seems like an error?
-                //       Not all events have to be on all designs.
-                ret = Err(e);
-                ret
-            });
+            // This logic allows to report NotFound only if no design has the event.
+            ret =
+                d.db.set_creator_for_events(Rc::clone(&creator), events_to_bind)
+                    .or_else(|e| if e == CommonErrors::NotFound { ret } else { Err(e) })
         }
 
         ret
@@ -75,13 +73,13 @@ impl<T> Deployment<'_, T> {
     /// * `worker_id` - The unique identifier of the worker to bind the invoke action to.
     ///
     pub fn bind_invoke_to_worker(&mut self, tag: Tag, worker_id: UniqueWorkerId) -> Result<(), CommonErrors> {
-        let mut ret = Ok(());
+        let mut ret = Err(CommonErrors::NotFound);
 
         for d in &mut self.api.designs {
-            let _ = d.db.set_invoke_worker_id(tag, worker_id).or_else(|e| {
-                ret = Err(e);
-                ret
-            });
+            // This logic allows to report NotFound only if no design has the event.
+            ret =
+                d.db.set_invoke_worker_id(tag, worker_id)
+                    .or_else(|e| if e == CommonErrors::NotFound { ret } else { Err(e) })
         }
 
         ret
@@ -89,7 +87,7 @@ impl<T> Deployment<'_, T> {
 
     /// Binds a shutdown event as a global event.
     pub fn bind_shutdown_event_as_global(&mut self, system_event: &str, event: Tag) -> Result<(), CommonErrors> {
-        let creator = self.api.events.specify_global_event(system_event)?;
+        let creator = self.api.events.specify_global_event(system_event, &[event])?;
 
         for design in &mut self.api.designs {
             let _ = design.db.set_creator_for_shutdown_event(Rc::clone(&creator), event);
@@ -100,7 +98,7 @@ impl<T> Deployment<'_, T> {
 
     /// Binds a shutdown event as a local event.
     pub fn bind_shutdown_event_as_local(&mut self, event: Tag) -> Result<(), CommonErrors> {
-        let creator = self.api.events.specify_local_event()?;
+        let creator = self.api.events.specify_local_event(&[event])?;
 
         for design in &mut self.api.designs {
             let _ = design.db.set_creator_for_shutdown_event(Rc::clone(&creator), event);
@@ -146,5 +144,112 @@ impl<T> Deployment<'_, T> {
         } else {
             Err(CommonErrors::NotFound)
         }
+    }
+}
+
+#[cfg(test)]
+#[cfg(not(miri))]
+mod tests {
+    use super::*;
+
+    use crate::common::{tag::Tag, DesignConfig};
+
+    fn setup_api_single_design() -> OrchestrationApi<crate::api::_DesignTag> {
+        let design_tag = Tag::from_str_static("test_design");
+        let params = DesignConfig::default();
+        let design = crate::api::design::Design::new(design_tag, params);
+
+        design.register_event("SomeUserEvent".into()).unwrap();
+
+        let mut api = OrchestrationApi {
+            designs: foundation::containers::growable_vec::GrowableVec::default(),
+            events: crate::events::events_provider::EventsProvider::default(),
+            _p: std::marker::PhantomData,
+        };
+        api.designs.push(design);
+        api.design_done()
+    }
+
+    fn setup_api_multiple_design() -> OrchestrationApi<crate::api::_DesignTag> {
+        let design_tag = Tag::from_str_static("test_design");
+        let params = DesignConfig::default();
+        let design = crate::api::design::Design::new(design_tag, params);
+
+        design.register_event("SomeUserEvent".into()).unwrap();
+
+        let mut api = OrchestrationApi {
+            designs: foundation::containers::growable_vec::GrowableVec::default(),
+            events: crate::events::events_provider::EventsProvider::default(),
+            _p: std::marker::PhantomData,
+        };
+        api.designs.push(design);
+
+        let design = crate::api::design::Design::new(design_tag, params);
+
+        design.register_event("SomeUserEvent2".into()).unwrap();
+
+        api.designs.push(design);
+
+        api.design_done()
+    }
+
+    #[test]
+    fn bind_events_as_global_works() {
+        let mut api = setup_api_single_design();
+        let mut deployment = Deployment::new(&mut api);
+        let tag = Tag::from_str_static("SomeUserEvent");
+        let result = deployment.bind_events_as_global("sys_event", &[tag]);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn bind_non_existing_events_as_global_cause_error() {
+        let mut api = setup_api_multiple_design();
+        let mut deployment = Deployment::new(&mut api);
+        let tag = Tag::from_str_static("SomeUserEventNotExiting");
+        let result = deployment.bind_events_as_global("sys_event", &[tag]);
+
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), CommonErrors::NotFound);
+    }
+
+    #[test]
+    fn bind_existing_events_as_global_in_single_deployment_works() {
+        let mut api = setup_api_multiple_design();
+        let mut deployment = Deployment::new(&mut api);
+        let tag = Tag::from_str_static("SomeUserEvent2");
+        let result = deployment.bind_events_as_global("sys_event", &[tag]);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn bind_events_as_local_works() {
+        let mut api = setup_api_single_design();
+        let mut deployment = Deployment::new(&mut api);
+        let tag = Tag::from_str_static("SomeUserEvent");
+        let result = deployment.bind_events_as_local(&[tag]);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn bind_non_existing_events_as_local_cause_error() {
+        let mut api = setup_api_multiple_design();
+        let mut deployment = Deployment::new(&mut api);
+        let tag = Tag::from_str_static("SomeUserEventNotExiting");
+        let result = deployment.bind_events_as_local(&[tag]);
+
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), CommonErrors::NotFound);
+    }
+
+    #[test]
+    fn bind_existing_events_as_local_in_single_deployment_works() {
+        let mut api = setup_api_multiple_design();
+        let mut deployment = Deployment::new(&mut api);
+        let tag = Tag::from_str_static("SomeUserEvent2");
+        let result = deployment.bind_events_as_local(&[tag]);
+
+        assert!(result.is_ok());
     }
 }

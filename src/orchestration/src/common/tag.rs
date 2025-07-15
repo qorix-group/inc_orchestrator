@@ -22,9 +22,30 @@ pub struct Tag {
     tracing_str: &'static str,
 }
 
+impl Eq for Tag {}
+
+impl PartialEq for Tag {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl PartialOrd for Tag {
+    fn partial_cmp(&self, other: &Self) -> Option<::core::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Tag {
+    fn cmp(&self, other: &Self) -> ::core::cmp::Ordering {
+        self.id.cmp(&other.id)
+    }
+}
+
 impl Tag {
     /// Create Tag from static string.
     pub fn from_str_static(s: &'static str) -> Self {
+        // This do not leak anything so we don't need to keep it in registry
         Self {
             id: Tag::compute_djb2_hash(s),
             tracing_str: s,
@@ -71,12 +92,23 @@ impl Tag {
 /// Create Tag from &str.
 #[allow(clippy::from_over_into)]
 impl Into<Tag> for &str {
+    #[cfg(feature = "orch_tracing")]
+    fn into(self) -> Tag {
+        let mut r = internal::TAG_REGISTRY.lock().unwrap();
+        let id = Tag::compute_djb2_hash(self);
+
+        r.get(id).unwrap_or_else(|| {
+            r.insert_tag(Tag {
+                id,
+                tracing_str: self.to_owned().leak(),
+            })
+        })
+    }
+
+    #[cfg(not(feature = "orch_tracing"))]
     fn into(self) -> Tag {
         Tag {
             id: Tag::compute_djb2_hash(self),
-            #[cfg(orch_tracing)]
-            tracing_str: self.to_owned().leak(),
-            #[cfg(not(orch_tracing))]
             tracing_str: "",
         }
     }
@@ -85,12 +117,23 @@ impl Into<Tag> for &str {
 /// Create Tag from String.
 #[allow(clippy::from_over_into)]
 impl Into<Tag> for String {
+    #[cfg(feature = "orch_tracing")]
+    fn into(self) -> Tag {
+        let mut r = internal::TAG_REGISTRY.lock().unwrap();
+        let id = Tag::compute_djb2_hash(&self);
+
+        r.get(id).unwrap_or_else(|| {
+            r.insert_tag(Tag {
+                id,
+                tracing_str: self.leak(),
+            })
+        })
+    }
+
+    #[cfg(not(feature = "orch_tracing"))]
     fn into(self) -> Tag {
         Tag {
             id: Tag::compute_djb2_hash(&self),
-            #[cfg(orch_tracing)]
-            tracing_str: self.leak(),
-            #[cfg(not(orch_tracing))]
             tracing_str: "",
         }
     }
@@ -99,14 +142,7 @@ impl Into<Tag> for String {
 // Implementation of Debug fmt for Tag.
 impl Debug for Tag {
     fn fmt(&self, f: &mut Formatter<'_>) -> ::core::fmt::Result {
-        write!(f, "Tag{{id:{},tracing_str:\"{}\"}}", self.id, self.tracing_str)
-    }
-}
-
-// Implementation of PartialEq for Tag to compare 'id'.
-impl PartialEq for Tag {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
+        write!(f, "Tag(id:{}, str: {})", self.id, self.tracing_str)
     }
 }
 
@@ -116,14 +152,52 @@ pub trait AsTagTrait {
     fn as_tag(&self) -> &Tag;
 }
 
+#[cfg(feature = "orch_tracing")]
+mod internal {
+    // This is done to not leak strings that are used to build Tags if we already have them leaked once. We
+    // hold reference in Tag to keep it lean and make it easy to disable in code if needed.
+
+    use super::*;
+
+    pub(super) static TAG_REGISTRY: std::sync::Mutex<TagRegistry> = std::sync::Mutex::new(TagRegistry::new());
+
+    pub(super) struct TagRegistry {
+        tags: Vec<Tag>,
+    }
+
+    impl TagRegistry {
+        pub(super) const fn new() -> Self {
+            Self { tags: Vec::new() }
+        }
+
+        pub(super) fn insert_tag(&mut self, value: Tag) -> Tag {
+            match self.tags.binary_search(&value) {
+                Ok(pos) | Err(pos) => {
+                    self.tags.insert(pos, value);
+                    self.tags[pos]
+                }
+            }
+        }
+
+        pub(super) fn get(&mut self, id: u64) -> Option<Tag> {
+            let tag = Tag { id, tracing_str: "" };
+
+            match self.tags.binary_search(&tag) {
+                Ok(pos) => Some(self.tags[pos]),
+                _ => None,
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn assert_tracing_str(ins: &str, _expected: &str) {
-        #[cfg(orch_tracing)]
+        #[cfg(feature = "orch_tracing")]
         assert_eq!(ins, _expected);
-        #[cfg(not(orch_tracing))]
+        #[cfg(not(feature = "orch_tracing"))]
         assert_eq!(ins, "");
     }
 
