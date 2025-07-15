@@ -29,6 +29,10 @@ unexpected_cfgs = { level = "warn", check-cfg = [
     'cfg(feature, values("runtime-api-mock"))',
 ] }
 
+[lints.clippy]
+std_instead_of_core = "warn"
+alloc_instead_of_core = "warn"
+
 [features]
 default = ["iceoryx-ipc"]
 iceoryx-ipc = []
