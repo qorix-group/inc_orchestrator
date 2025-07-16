@@ -6,7 +6,7 @@ use tracing::debug;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Runtime {
-    task_queue_size: usize,
+    task_queue_size: u32,
     workers: usize,
 }
 

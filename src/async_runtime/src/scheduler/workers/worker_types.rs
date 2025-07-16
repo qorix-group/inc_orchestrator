@@ -23,8 +23,8 @@ use ::core::sync::atomic::Ordering;
 pub type TaskStealQueue = Arc<SpmcStealQueue<TaskRef>>;
 pub type StealHandle = TaskStealQueue;
 
-pub fn create_steal_queue(size: usize) -> TaskStealQueue {
-    Arc::new(SpmcStealQueue::new(size as u32))
+pub fn create_steal_queue(size: u32) -> TaskStealQueue {
+    Arc::new(SpmcStealQueue::new(size))
 }
 
 pub(in super::super) const WORKER_STATE_SLEEPING_CV: u8 = 0b00000000;
