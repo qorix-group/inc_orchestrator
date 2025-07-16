@@ -1,7 +1,9 @@
 from datetime import timedelta
 
 import pytest
-from testing_tools.log_container import LogContainer
+from testing_utils import LogContainer
+from cit_scenario import CitScenario
+from typing import Any
 
 BLOCKING_TASK_ID = "blocking_sleep_task"
 BLOCKING_TASK_DELAY_MS = 1000
@@ -9,17 +11,17 @@ BASIC_TASK_A_ID = "basic_task_A"
 BASIC_TASK_B_ID = "basic_task_B"
 
 
-class TestOneTriggerOneSyncTwoPrograms:
+class TestOneTriggerOneSyncTwoPrograms(CitScenario):
     @pytest.fixture(scope="class")
-    def scenario_name(self):
+    def scenario_name(self) -> str:
         return "orchestration.1_trigger_1_sync_2_programs"
 
     @pytest.fixture(scope="class")
-    def test_config(self):
+    def test_config(self) -> dict[str, Any]:
         return {"runtime": {"task_queue_size": 256, "workers": 4}}
 
-    def test_execution_order(self, test_results: LogContainer):
-        results = test_results.get_logs()
+    def test_execution_order(self, logs_info_level: LogContainer):
+        results = logs_info_level.get_logs()
         assert len(results) == 3, "Expected 3 messages in total"
 
         sleep_begin_msg = results.pop(0)
@@ -38,13 +40,13 @@ class TestOneTriggerOneSyncTwoPrograms:
             f"Expected the third message to be {BASIC_TASK_A_ID}"
         )
 
-    def test_execution_delay(self, test_results: LogContainer):
-        sleep_begin_msg = test_results.get_logs_by_field(
+    def test_execution_delay(self, logs_info_level: LogContainer):
+        sleep_begin_msg = logs_info_level.get_logs_by_field(
             "id", BLOCKING_TASK_ID
         ).find_log("location", "begin")
-        sleep_end_msg = test_results.get_logs_by_field("id", BLOCKING_TASK_ID).find_log(
-            "location", "end"
-        )
+        sleep_end_msg = logs_info_level.get_logs_by_field(
+            "id", BLOCKING_TASK_ID
+        ).find_log("location", "end")
 
         assert sleep_end_msg.timestamp - sleep_begin_msg.timestamp >= timedelta(
             milliseconds=BLOCKING_TASK_DELAY_MS
@@ -55,17 +57,17 @@ class TestOneTriggerOneSyncTwoPrograms:
         )
 
 
-class TestOneTriggerTwoSyncsThreePrograms:
+class TestOneTriggerTwoSyncsThreePrograms(CitScenario):
     @pytest.fixture(scope="class")
-    def scenario_name(self):
+    def scenario_name(self) -> str:
         return "orchestration.1_trigger_2_syncs_3_programs"
 
     @pytest.fixture(scope="class")
-    def test_config(self):
+    def test_config(self) -> dict[str, Any]:
         return {"runtime": {"task_queue_size": 256, "workers": 4}}
 
-    def test_execution_order(self, test_results: LogContainer):
-        results = test_results.get_logs()
+    def test_execution_order(self, logs_info_level: LogContainer):
+        results = logs_info_level.get_logs()
         assert len(results) == 4, "Expected 4 messages in total"
 
         sleep_begin_msg = results.pop(0)
@@ -91,13 +93,13 @@ class TestOneTriggerTwoSyncsThreePrograms:
             "Expected the fourth message to be {expected_basic_task_ids}"
         )
 
-    def test_execution_delay(self, test_results: LogContainer):
-        sleep_begin_msg = test_results.get_logs_by_field(
+    def test_execution_delay(self, logs_info_level: LogContainer):
+        sleep_begin_msg = logs_info_level.get_logs_by_field(
             "id", BLOCKING_TASK_ID
         ).find_log("location", "begin")
-        sleep_end_msg = test_results.get_logs_by_field("id", BLOCKING_TASK_ID).find_log(
-            "location", "end"
-        )
+        sleep_end_msg = logs_info_level.get_logs_by_field(
+            "id", BLOCKING_TASK_ID
+        ).find_log("location", "end")
 
         assert sleep_end_msg.timestamp - sleep_begin_msg.timestamp >= timedelta(
             milliseconds=BLOCKING_TASK_DELAY_MS
@@ -110,21 +112,21 @@ class TestOneTriggerTwoSyncsThreePrograms:
 
 class TestTriggerAndSyncInNestedBranches(TestOneTriggerOneSyncTwoPrograms):
     @pytest.fixture(scope="class")
-    def scenario_name(self):
+    def scenario_name(self) -> str:
         return "orchestration.trigger_and_sync_in_nested_branches"
 
 
-class TestTriggerSyncOneAfterAnother:
+class TestTriggerSyncOneAfterAnother(CitScenario):
     @pytest.fixture(scope="class")
-    def scenario_name(self):
+    def scenario_name(self) -> str:
         return "orchestration.trigger_sync_one_after_another"
 
     @pytest.fixture(scope="class")
-    def test_config(self):
+    def test_config(self) -> dict[str, Any]:
         return {"runtime": {"task_queue_size": 256, "workers": 1}}
 
-    def test_execution_order(self, test_results: LogContainer):
-        results = test_results.get_logs()
+    def test_execution_order(self, logs_info_level: LogContainer):
+        results = logs_info_level.get_logs()
         assert len(results) == 2, "Expected 2 messages in total"
 
         basic_task_a_msg = results.pop(0)
