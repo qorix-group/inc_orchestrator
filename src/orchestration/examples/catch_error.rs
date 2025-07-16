@@ -50,13 +50,13 @@ fn catch_error_component_design() -> Result<Design, CommonErrors> {
                                     .with_step(Invoke::from_design("error_after_third_run", &design_instance))
                                     .build(),
                             )
-                            .build(),
+                            .build(&design_instance),
                     )
                     .catch(|e| {
                         // Handle the error, e.g., log it or take some action
                         error!("Caught error: {:?}. This is not recoverable and we will stop execution", e);
                     })
-                    .build(),
+                    .build(&design_instance),
                 )
                 .with_step(Invoke::from_design("test4_sync_func", &design_instance))
                 .with_step(
@@ -69,7 +69,7 @@ fn catch_error_component_design() -> Result<Design, CommonErrors> {
                         info!("Caught error: {:?}. This is catched and we continue executing", e);
                         true
                     })
-                    .build(),
+                    .build(&design_instance),
                 )
                 .build(),
         );

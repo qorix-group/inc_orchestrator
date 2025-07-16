@@ -118,7 +118,7 @@ fn awaited_sequence_design() -> Result<Design, CommonErrors> {
     let evt1 = design.register_event(Tag::from_str_static("Test_Event_1"))?;
 
     // Create a program with actions
-    design.add_program(file!(), move |_design_instance, builder| {
+    design.add_program(file!(), move |design, builder| {
         builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(JustLogAction::new("Action1"))
@@ -133,12 +133,12 @@ fn awaited_sequence_design() -> Result<Design, CommonErrors> {
                         .with_branch(
                             SequenceBuilder::new()
                                 .with_step(JustLogAction::new("Action4"))
-                                .with_step(SyncBuilder::from_tag(&evt1))
-                                .with_step(TriggerBuilder::from_tag(&evt1))
+                                .with_step(SyncBuilder::from_tag(&evt1, design.config()))
+                                .with_step(TriggerBuilder::from_tag(&evt1, design.config()))
                                 .with_step(JustLogAction::new("Action5"))
                                 .build(),
                         )
-                        .build(),
+                        .build(&design),
                 )
                 .with_step(JustLogAction::new("FinishAction"))
                 .build(),

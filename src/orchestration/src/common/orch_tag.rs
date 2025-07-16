@@ -81,13 +81,16 @@ impl OrchestrationTag {
 
 #[cfg(test)]
 mod tests {
+    use crate::common::DesignConfig;
+
     use super::*;
     use ::core::cell::RefCell;
     use iceoryx2_bb_container::slotmap::SlotMapKey;
 
     #[test]
     fn orchestration_tag_creation() {
-        let ap = Rc::new(RefCell::new(ActionProvider::new(4)));
+        let config = DesignConfig::default();
+        let ap = Rc::new(RefCell::new(ActionProvider::new(config)));
         let tag = OrchestrationTag::new(
             Tag::from_str_static("test_tag"),
             SlotMapKey::new(1),

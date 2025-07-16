@@ -13,6 +13,7 @@
 use ::core::cell::RefCell;
 use std::rc::Rc;
 
+use crate::common::DesignConfig;
 use crate::events::event_traits::{IpcProvider, NotifierTrait};
 use crate::events::GlobalEventProvider;
 use crate::prelude::ActionResult;
@@ -134,8 +135,8 @@ impl<N: NotifierTrait> ShutdownNotifier for ShutdownNotifierImpl<N> {
 }
 
 pub(crate) trait EventCreatorTrait {
-    fn create_trigger(&mut self) -> Option<Box<dyn ActionTrait>>;
-    fn create_sync(&mut self) -> Option<Box<dyn ActionTrait>>;
+    fn create_trigger(&mut self, config: &DesignConfig) -> Option<Box<dyn ActionTrait>>;
+    fn create_sync(&mut self, config: &DesignConfig) -> Option<Box<dyn ActionTrait>>;
     fn create_shutdown_notifier(&mut self) -> Option<Box<dyn ShutdownNotifier>>;
 }
 
@@ -144,17 +145,17 @@ struct LocalEventCreator {
 }
 
 impl EventCreatorTrait for LocalEventCreator {
-    fn create_trigger(&mut self) -> Option<Box<dyn ActionTrait>> {
+    fn create_trigger(&mut self, config: &DesignConfig) -> Option<Box<dyn ActionTrait>> {
         let n = self.local_event.get_notifier();
         if n.is_none() {
             debug!("Failed to create Trigger Action, notifier is None. Did you tried to create two notifiers for the same event?");
         }
 
-        Some(Trigger::new(n?) as Box<dyn ActionTrait>)
+        Some(Trigger::new(n?, config.max_concurrent_action_executions) as Box<dyn ActionTrait>)
     }
 
-    fn create_sync(&mut self) -> Option<Box<dyn ActionTrait>> {
-        Some(Sync::new(self.local_event.get_listener()?) as Box<dyn ActionTrait>)
+    fn create_sync(&mut self, config: &DesignConfig) -> Option<Box<dyn ActionTrait>> {
+        Some(Sync::new(self.local_event.get_listener()?, config.max_concurrent_action_executions) as Box<dyn ActionTrait>)
     }
 
     fn create_shutdown_notifier(&mut self) -> Option<Box<dyn ShutdownNotifier>> {
@@ -173,12 +174,18 @@ struct GlobalEventCreator<GlobalProvider: IpcProvider> {
 }
 
 impl<GlobalProvider: IpcProvider> EventCreatorTrait for GlobalEventCreator<GlobalProvider> {
-    fn create_trigger(&mut self) -> Option<Box<dyn ActionTrait>> {
-        Some(Trigger::new(self.global_provider.borrow_mut().get_notifier(self.system_event_name.as_str())?) as Box<dyn ActionTrait>)
+    fn create_trigger(&mut self, config: &DesignConfig) -> Option<Box<dyn ActionTrait>> {
+        Some(Trigger::new(
+            self.global_provider.borrow_mut().get_notifier(self.system_event_name.as_str())?,
+            config.max_concurrent_action_executions,
+        ) as Box<dyn ActionTrait>)
     }
 
-    fn create_sync(&mut self) -> Option<Box<dyn ActionTrait>> {
-        Some(Sync::new(self.global_provider.borrow_mut().get_listener(self.system_event_name.as_str())?) as Box<dyn ActionTrait>)
+    fn create_sync(&mut self, config: &DesignConfig) -> Option<Box<dyn ActionTrait>> {
+        Some(Sync::new(
+            self.global_provider.borrow_mut().get_listener(self.system_event_name.as_str())?,
+            config.max_concurrent_action_executions,
+        ) as Box<dyn ActionTrait>)
     }
 
     fn create_shutdown_notifier(&mut self) -> Option<Box<dyn ShutdownNotifier>> {
@@ -268,6 +275,7 @@ mod tests {
 
     #[test]
     fn creating_same_trigger_action_twice_causes_fail() {
+        let config = DesignConfig::default();
         let mut provider: EventsProvider = EventsProvider::new();
 
         let res = provider.specify_event("100", EventType::Local, &["UserEvt".into()]);
@@ -275,14 +283,15 @@ mod tests {
 
         let creator = provider.get_event_creator("100").unwrap();
 
-        let trigger_action = creator.borrow_mut().create_trigger();
+        let trigger_action = creator.borrow_mut().create_trigger(&config);
 
         assert!(trigger_action.is_some());
-        assert!(creator.borrow_mut().create_trigger().is_none());
+        assert!(creator.borrow_mut().create_trigger(&config).is_none());
     }
 
     #[test]
     fn creating_same_sync_action_n_times_works() {
+        let config = DesignConfig::default();
         let mut provider: EventsProvider = EventsProvider::new();
 
         let res = provider.specify_event("100", EventType::Local, &["UserEvt".into()]);
@@ -290,25 +299,26 @@ mod tests {
 
         let creator = provider.get_event_creator("100").unwrap();
 
-        let mut trigger_action = creator.borrow_mut().create_sync();
+        let mut trigger_action = creator.borrow_mut().create_sync(&config);
         assert!(trigger_action.is_some());
 
-        trigger_action = creator.borrow_mut().create_sync();
+        trigger_action = creator.borrow_mut().create_sync(&config);
         assert!(trigger_action.is_some());
 
-        trigger_action = creator.borrow_mut().create_sync();
+        trigger_action = creator.borrow_mut().create_sync(&config);
         assert!(trigger_action.is_some());
     }
 
     #[test]
     fn sync_trigger_local_pair_works() {
+        let config = DesignConfig::default();
         let mut provider: EventsProvider = EventsProvider::new();
 
         let res = provider.specify_event("100", EventType::Local, &["UserEvt".into()]);
         assert!(res.is_ok());
 
-        let mut trigger_action = provider.get_event_creator("100").unwrap().borrow_mut().create_trigger().unwrap();
-        let mut sync_action = provider.get_event_creator("100").unwrap().borrow_mut().create_sync().unwrap();
+        let mut trigger_action = provider.get_event_creator("100").unwrap().borrow_mut().create_trigger(&config).unwrap();
+        let mut sync_action = provider.get_event_creator("100").unwrap().borrow_mut().create_sync(&config).unwrap();
 
         let trig_f = trigger_action.try_execute().unwrap();
 
@@ -330,6 +340,7 @@ mod tests {
 
     #[test]
     fn sync_trigger_local_from_different_tag_does_not_unblock() {
+        let config = DesignConfig::default();
         let mut provider: EventsProvider = EventsProvider::new();
 
         let mut res = provider.specify_event("100", EventType::Local, &["UserEvt".into()]);
@@ -337,9 +348,9 @@ mod tests {
         res = provider.specify_event("101", EventType::Local, &["UserEvt".into()]);
         assert!(res.is_ok());
 
-        let mut trigger_action = provider.get_event_creator("100").unwrap().borrow_mut().create_trigger().unwrap();
+        let mut trigger_action = provider.get_event_creator("100").unwrap().borrow_mut().create_trigger(&config).unwrap();
 
-        let mut sync_action = provider.get_event_creator("101").unwrap().borrow_mut().create_sync().unwrap();
+        let mut sync_action = provider.get_event_creator("101").unwrap().borrow_mut().create_sync(&config).unwrap();
 
         let trig_f = trigger_action.try_execute().unwrap();
 

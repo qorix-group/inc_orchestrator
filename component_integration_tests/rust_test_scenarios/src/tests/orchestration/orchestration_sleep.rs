@@ -74,27 +74,27 @@ fn sleep_under_load(sleep_duration_ms: u64) -> Result<Design, CommonErrors> {
     let sleep4_tag = design.register_invoke_async("Sleep4".into(), non_blocking_sleep_task!("Sleep4".to_string(), sleep_duration_ms))?;
     let sleep5_tag = design.register_invoke_async("Sleep5".into(), non_blocking_sleep_task!("Sleep5".to_string(), sleep_duration_ms))?;
 
-    design.add_program(file!(), move |_design_instance, builder| {
+    design.add_program(file!(), move |design, builder| {
         builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(JustLogAction::new("StartAction"))
                 .with_step(
                     ConcurrencyBuilder::new()
                         .with_branch(JustLogAction::new("Action1"))
-                        .with_branch(Invoke::from_tag(&sleep1_tag))
-                        .with_branch(Invoke::from_tag(&cpu_tag))
-                        .with_branch(Invoke::from_tag(&sleep2_tag))
-                        .build(),
+                        .with_branch(Invoke::from_tag(&sleep1_tag, design.config()))
+                        .with_branch(Invoke::from_tag(&cpu_tag, design.config()))
+                        .with_branch(Invoke::from_tag(&sleep2_tag, design.config()))
+                        .build(design),
                 )
                 .with_step(JustLogAction::new("IntermediateAction"))
                 .with_step(
                     ConcurrencyBuilder::new()
                         .with_branch(JustLogAction::new("Action2"))
-                        .with_branch(Invoke::from_tag(&sleep3_tag))
-                        .with_branch(Invoke::from_tag(&sleep4_tag))
-                        .build(),
+                        .with_branch(Invoke::from_tag(&sleep3_tag, design.config()))
+                        .with_branch(Invoke::from_tag(&sleep4_tag, design.config()))
+                        .build(design),
                 )
-                .with_step(Invoke::from_tag(&sleep5_tag))
+                .with_step(Invoke::from_tag(&sleep5_tag, design.config()))
                 .with_step(JustLogAction::new("FinishAction"))
                 .build(),
         );

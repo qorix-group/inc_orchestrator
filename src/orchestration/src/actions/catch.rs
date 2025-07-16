@@ -20,6 +20,8 @@ use async_runtime::futures::reusable_box_future::*;
 use foundation::not_recoverable_error;
 use foundation::prelude::*;
 
+use crate::api::design::Design;
+
 use super::action::*;
 
 // Error that will be propagated to user handler
@@ -154,7 +156,7 @@ impl CatchBuilder {
     /// # Panics
     /// Panics if no handler is attached.
     ///
-    pub fn build(mut self) -> Box<Catch> {
+    pub fn build(mut self, design: &Design) -> Box<Catch> {
         assert!(
             !self.handler.is_none(),
             "Catch: No handler provided, this will cause an error in execution."
@@ -166,7 +168,10 @@ impl CatchBuilder {
         Box::new(Catch {
             base: ActionBaseMeta {
                 tag: "orch::internal::catch_action".into(),
-                reusable_future_pool: ReusableBoxFuturePool::new(1, Catch::execute_impl(action, HandlerType::None, self.filters)),
+                reusable_future_pool: ReusableBoxFuturePool::new(
+                    design.config.max_concurrent_action_executions,
+                    Catch::execute_impl(action, HandlerType::None, self.filters),
+                ),
             },
             filters: self.filters,
             action: self.action.take().expect("CatchBuilder: Action must be set before building"),
@@ -294,10 +299,14 @@ mod tests {
         task::Poll,
     };
 
-    use crate::testing::{MockAction, MockActionBuilder, OrchTestingPoller};
+    use crate::{
+        common::DesignConfig,
+        testing::{MockAction, MockActionBuilder, OrchTestingPoller},
+    };
 
     #[test]
     fn non_recoverable_handler_not_called_before_execution() {
+        let design = Design::new("Design".into(), DesignConfig::default());
         let action = Box::new(MockAction::default());
         let builder = CatchBuilder::new(ErrorFilter::UserErrors.into(), action);
 
@@ -308,12 +317,13 @@ mod tests {
             .catch(move |_err| {
                 handler_called_clone.store(true, Ordering::SeqCst);
             })
-            .build();
+            .build(&design);
         assert!(handler_called.load(Ordering::SeqCst) == false); // Handler should not be called during build
     }
 
     #[test]
     fn recoverable_handler_not_called_before_execution() {
+        let design = Design::new("Design".into(), DesignConfig::default());
         let action = Box::new(MockAction::default());
         let builder = CatchBuilder::new(ErrorFilter::UserErrors.into(), action);
 
@@ -325,7 +335,7 @@ mod tests {
                 handler_called_clone.store(true, Ordering::SeqCst);
                 true
             })
-            .build();
+            .build(&design);
         assert!(handler_called.load(Ordering::SeqCst) == false); // Handler should not be called during build
     }
 
@@ -342,14 +352,16 @@ mod tests {
     #[test]
     #[should_panic(expected = "Catch: No handler provided, this will cause an error in execution.")]
     fn no_handler_panic() {
+        let design = Design::new("Design".into(), DesignConfig::default());
         let action = Box::new(MockAction::default());
         let builder = CatchBuilder::new(ErrorFilter::UserErrors.into(), action);
 
-        builder.build(); // This should panic
+        builder.build(&design); // This should panic
     }
 
     #[test]
     fn when_user_action_finished_without_error_catch_returns_ok() {
+        let design = Design::new("Design".into(), DesignConfig::default());
         let action = Box::new(MockAction::default());
         let builder = CatchBuilder::new(ErrorFilter::UserErrors.into(), action);
 
@@ -359,7 +371,7 @@ mod tests {
             .catch(move |_err| {
                 handler_mock.call();
             })
-            .build();
+            .build(&design);
 
         let f = catch.try_execute().unwrap();
 
@@ -370,6 +382,7 @@ mod tests {
 
     #[test]
     fn when_user_action_finished_with_filtered_error_catch_calls_handler() {
+        let design = Design::new("Design".into(), DesignConfig::default());
         let action = Box::new(MockActionBuilder::new().will_once(Err(UserErrValue::from(64).into())).build());
         let builder = CatchBuilder::new(ErrorFilter::UserErrors.into(), action);
 
@@ -379,7 +392,7 @@ mod tests {
             .catch(move |_err| {
                 handler_mock.call();
             })
-            .build();
+            .build(&design);
 
         let f = catch.try_execute().unwrap();
 
@@ -391,6 +404,7 @@ mod tests {
     #[test]
     fn when_user_action_finished_with_not_filtered_error_catch_does_not_call_handler() {
         {
+            let design = Design::new("Design".into(), DesignConfig::default());
             let action = Box::new(MockActionBuilder::new().will_once(Err(ActionExecError::Timeout)).build());
             let builder = CatchBuilder::new(ErrorFilter::UserErrors.into(), action);
 
@@ -400,7 +414,7 @@ mod tests {
                 .catch(move |_err| {
                     handler_mock.call();
                 })
-                .build();
+                .build(&design);
 
             let f = catch.try_execute().unwrap();
 
@@ -410,6 +424,7 @@ mod tests {
         }
 
         {
+            let design = Design::new("Design".into(), DesignConfig::default());
             let action = Box::new(MockActionBuilder::new().will_once(Err(UserErrValue::from(64).into())).build());
             let builder = CatchBuilder::new(ErrorFilter::Timeouts.into(), action);
 
@@ -419,7 +434,7 @@ mod tests {
                 .catch(move |_err| {
                     handler_mock.call();
                 })
-                .build();
+                .build(&design);
 
             let f = catch.try_execute().unwrap();
 
@@ -431,6 +446,7 @@ mod tests {
 
     #[test]
     fn when_action_finished_with_internal_err_error_is_propagated() {
+        let design = Design::new("Design".into(), DesignConfig::default());
         let action = Box::new(MockActionBuilder::new().will_once(Err(ActionExecError::Internal)).build());
         let builder = CatchBuilder::new(ErrorFilter::UserErrors.into(), action);
 
@@ -440,7 +456,7 @@ mod tests {
             .catch(move |_err| {
                 handler_mock.call();
             })
-            .build();
+            .build(&design);
 
         let f = catch.try_execute().unwrap();
 
@@ -451,6 +467,7 @@ mod tests {
 
     #[test]
     fn when_user_action_finished_with_filtered_error_catch_calls_handler_and_continue_execution() {
+        let design = Design::new("Design".into(), DesignConfig::default());
         let action = Box::new(MockActionBuilder::new().will_once(Err(UserErrValue::from(64).into())).build());
         let builder = CatchBuilder::new(ErrorFilter::UserErrors.into(), action);
 
@@ -461,7 +478,7 @@ mod tests {
                 handler_mock.call();
                 true
             })
-            .build();
+            .build(&design);
 
         let f = catch.try_execute().unwrap();
 
@@ -472,6 +489,7 @@ mod tests {
 
     #[test]
     fn when_user_action_finished_with_filtered_error_catch_calls_handler_and_returns_err() {
+        let design = Design::new("Design".into(), DesignConfig::default());
         let action = Box::new(MockActionBuilder::new().will_once(Err(UserErrValue::from(64).into())).build());
         let builder = CatchBuilder::new(ErrorFilter::UserErrors.into(), action);
 
@@ -482,7 +500,7 @@ mod tests {
                 handler_mock.call();
                 false
             })
-            .build();
+            .build(&design);
 
         let f = catch.try_execute().unwrap();
 
