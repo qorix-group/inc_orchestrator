@@ -38,7 +38,7 @@ fn example_component_design() -> Result<Design, CommonErrors> {
                     ConcurrencyBuilder::new()
                         .with_branch(Invoke::from_design("test3_sync_func", &design_instance))
                         .with_branch(Invoke::from_design("test4_sync_func", &design_instance))
-                        .build(),
+                        .build(&design_instance),
                 )
                 .with_step(Invoke::from_design("test4_async_func", &design_instance))
                 .build(),

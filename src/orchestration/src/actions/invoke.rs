@@ -14,7 +14,7 @@
 use super::action::{ActionBaseMeta, ActionExecError, ActionResult, ActionTrait, ReusableBoxFutureResult, UserErrValue};
 use crate::{
     api::design::Design,
-    common::{orch_tag::OrchestrationTag, tag::Tag},
+    common::{orch_tag::OrchestrationTag, tag::Tag, DesignConfig},
 };
 use ::core::future::Future;
 
@@ -37,8 +37,8 @@ pub struct Invoke {}
 
 impl Invoke {
     /// Create an invoke action out of an orchestration tag.
-    pub fn from_tag(tag: &OrchestrationTag) -> Box<dyn ActionTrait> {
-        (*tag.action_provider()).borrow_mut().provide_invoke(*tag.key()).unwrap()
+    pub fn from_tag(tag: &OrchestrationTag, config: &DesignConfig) -> Box<dyn ActionTrait> {
+        (*tag.action_provider()).borrow_mut().provide_invoke(*tag.key(), config).unwrap()
     }
 
     pub fn from_design(name: &str, design: &Design) -> Box<dyn ActionTrait> {
@@ -50,22 +50,25 @@ impl Invoke {
             tag
         );
 
-        Self::from_tag(&tag.unwrap())
+        Self::from_tag(&tag.unwrap(), design.config())
     }
 
-    pub(crate) fn from_fn(tag: Tag, action: InvokeFunctionType, worker_id: Option<UniqueWorkerId>) -> Box<dyn ActionTrait> {
+    pub(crate) fn from_fn(tag: Tag, action: InvokeFunctionType, worker_id: Option<UniqueWorkerId>, config: &DesignConfig) -> Box<dyn ActionTrait> {
         Box::new(InvokeFn {
             action,
-            action_future_pool: ReusableBoxFuturePool::new(8, InvokeFn::action_future(action)),
+            action_future_pool: ReusableBoxFuturePool::new(config.max_concurrent_action_executions, InvokeFn::action_future(action)),
             worker_id,
             base: ActionBaseMeta {
                 tag,
-                reusable_future_pool: ReusableBoxFuturePool::new(8, InvokeFn::spawn_action(InstantOrSpawn::None)),
+                reusable_future_pool: ReusableBoxFuturePool::new(
+                    config.max_concurrent_action_executions,
+                    InvokeFn::spawn_action(InstantOrSpawn::None),
+                ),
             },
         })
     }
 
-    pub(crate) fn from_async<A, F>(tag: Tag, action: A, worker_id: Option<UniqueWorkerId>) -> Box<dyn ActionTrait>
+    pub(crate) fn from_async<A, F>(tag: Tag, action: A, worker_id: Option<UniqueWorkerId>, config: &DesignConfig) -> Box<dyn ActionTrait>
     where
         A: Fn() -> F + 'static + Send,
         F: Future<Output = InvokeResult> + 'static + Send,
@@ -74,11 +77,14 @@ impl Invoke {
 
         Box::new(InvokeAsync {
             action,
-            action_future_pool: ReusableBoxFuturePool::new(8, InvokeAsync::<A, F>::action_future(future)),
+            action_future_pool: ReusableBoxFuturePool::new(config.max_concurrent_action_executions, InvokeAsync::<A, F>::action_future(future)),
             worker_id,
             base: ActionBaseMeta {
                 tag,
-                reusable_future_pool: ReusableBoxFuturePool::new(8, InvokeAsync::<A, F>::spawn_action(InstantOrSpawn::None)),
+                reusable_future_pool: ReusableBoxFuturePool::new(
+                    config.max_concurrent_action_executions,
+                    InvokeAsync::<A, F>::spawn_action(InstantOrSpawn::None),
+                ),
             },
         })
     }
@@ -88,20 +94,33 @@ impl Invoke {
         object: Arc<Mutex<T>>,
         method: fn(&mut T) -> InvokeResult,
         worker_id: Option<UniqueWorkerId>,
+        config: &DesignConfig,
     ) -> Box<dyn ActionTrait> {
         Box::new(InvokeMethod {
             object: Arc::clone(&object),
             method,
-            action_future_pool: ReusableBoxFuturePool::new(8, InvokeMethod::<T>::action_future(Arc::clone(&object), method)),
+            action_future_pool: ReusableBoxFuturePool::new(
+                config.max_concurrent_action_executions,
+                InvokeMethod::<T>::action_future(Arc::clone(&object), method),
+            ),
             worker_id,
             base: ActionBaseMeta {
                 tag,
-                reusable_future_pool: ReusableBoxFuturePool::new(8, InvokeMethod::<T>::spawn_action(InstantOrSpawn::None)),
+                reusable_future_pool: ReusableBoxFuturePool::new(
+                    config.max_concurrent_action_executions,
+                    InvokeMethod::<T>::spawn_action(InstantOrSpawn::None),
+                ),
             },
         })
     }
 
-    pub(crate) fn from_method_async<T, M, F>(tag: Tag, object: Arc<Mutex<T>>, method: M, worker_id: Option<UniqueWorkerId>) -> Box<dyn ActionTrait>
+    pub(crate) fn from_method_async<T, M, F>(
+        tag: Tag,
+        object: Arc<Mutex<T>>,
+        method: M,
+        worker_id: Option<UniqueWorkerId>,
+        config: &DesignConfig,
+    ) -> Box<dyn ActionTrait>
     where
         T: 'static + Send,
         M: Fn(Arc<Mutex<T>>) -> F + 'static + Send,
@@ -112,11 +131,17 @@ impl Invoke {
         Box::new(InvokeMethodAsync {
             object,
             method,
-            action_future_pool: ReusableBoxFuturePool::new(8, InvokeMethodAsync::<T, M, F>::action_future(future)),
+            action_future_pool: ReusableBoxFuturePool::new(
+                config.max_concurrent_action_executions,
+                InvokeMethodAsync::<T, M, F>::action_future(future),
+            ),
             worker_id,
             base: ActionBaseMeta {
                 tag,
-                reusable_future_pool: ReusableBoxFuturePool::new(8, InvokeMethodAsync::<T, M, F>::spawn_action(InstantOrSpawn::None)),
+                reusable_future_pool: ReusableBoxFuturePool::new(
+                    config.max_concurrent_action_executions,
+                    InvokeMethodAsync::<T, M, F>::spawn_action(InstantOrSpawn::None),
+                ),
             },
         })
     }
@@ -380,17 +405,20 @@ where
 #[cfg(test)]
 #[cfg(not(loom))]
 mod tests {
+    use crate::common::DesignConfig;
     use std::sync::{Arc, Mutex};
 
     #[test]
     fn test_fn() {
+        let config = DesignConfig::default();
+
         fn test() -> super::InvokeResult {
             Ok(())
         }
 
         // Capture the same action multiple times.
-        let mut action1 = super::Invoke::from_fn("tag".into(), test, None);
-        let mut action2 = super::Invoke::from_fn("tag".into(), test, None);
+        let mut action1 = super::Invoke::from_fn("tag".into(), test, None, &config);
+        let mut action2 = super::Invoke::from_fn("tag".into(), test, None, &config);
         // Execute the same invoke multiple times.
         assert!(action1.try_execute().is_ok());
         assert!(action1.try_execute().is_ok());
@@ -400,13 +428,15 @@ mod tests {
 
     #[test]
     fn test_async() {
+        let config = DesignConfig::default();
+
         async fn test() -> super::InvokeResult {
             Ok(())
         }
 
         // Capture the same action multiple times.
-        let mut action1 = super::Invoke::from_async("tag".into(), test, None);
-        let mut action2 = super::Invoke::from_async("tag".into(), test, None);
+        let mut action1 = super::Invoke::from_async("tag".into(), test, None, &config);
+        let mut action2 = super::Invoke::from_async("tag".into(), test, None, &config);
         // Execute the same invoke multiple times.
         assert!(action1.try_execute().is_ok());
         assert!(action1.try_execute().is_ok());
@@ -416,6 +446,8 @@ mod tests {
 
     #[test]
     fn test_method() {
+        let config = DesignConfig::default();
+
         struct TestObject {}
 
         impl TestObject {
@@ -427,8 +459,8 @@ mod tests {
         let object = Arc::new(Mutex::new(TestObject {}));
 
         // Capture the same action multiple times.
-        let mut action1 = super::Invoke::from_method("tag".into(), Arc::clone(&object), TestObject::test_method, None);
-        let mut action2 = super::Invoke::from_method("tag".into(), Arc::clone(&object), TestObject::test_method, None);
+        let mut action1 = super::Invoke::from_method("tag".into(), Arc::clone(&object), TestObject::test_method, None, &config);
+        let mut action2 = super::Invoke::from_method("tag".into(), Arc::clone(&object), TestObject::test_method, None, &config);
         // Execute the same invoke multiple times.
         assert!(action1.try_execute().is_ok());
         assert!(action1.try_execute().is_ok());
@@ -438,6 +470,8 @@ mod tests {
 
     #[test]
     fn test_method_async() {
+        let config = DesignConfig::default();
+
         struct TestObject {}
 
         async fn test_method(object: Arc<Mutex<TestObject>>) -> super::InvokeResult {
@@ -449,8 +483,8 @@ mod tests {
         let object = Arc::new(Mutex::new(TestObject {}));
 
         // Capture the same action multiple times.
-        let mut action1 = super::Invoke::from_method_async("tag".into(), Arc::clone(&object), test_method, None);
-        let mut action2 = super::Invoke::from_method_async("tag".into(), Arc::clone(&object), test_method, None);
+        let mut action1 = super::Invoke::from_method_async("tag".into(), Arc::clone(&object), test_method, None, &config);
+        let mut action2 = super::Invoke::from_method_async("tag".into(), Arc::clone(&object), test_method, None, &config);
         // Execute the same invoke multiple times.
         assert!(action1.try_execute().is_ok());
         assert!(action1.try_execute().is_ok());

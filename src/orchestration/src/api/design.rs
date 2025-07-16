@@ -18,26 +18,13 @@ use crate::{
     program::{Program, ProgramBuilder},
     program_database::ProgramDatabase,
 };
-use ::core::{future::Future, ops::Deref};
-
 use ::core::fmt::Debug;
-use std::sync::{Arc, Mutex};
-
+use ::core::future::Future;
 use foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
+use std::sync::{Arc, Mutex};
 
 pub type ProgramTag = Tag;
 pub type DesignTag = Tag;
-
-/// Provides [`DesignConfig`] with is bounded to the `Design` instance.
-pub struct DesignConfigBounded(DesignConfig);
-
-impl Deref for DesignConfigBounded {
-    type Target = DesignConfig;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
 
 ///
 /// Design is a container for Application developer to register all it's components (functions, events, conditions, etc.)
@@ -46,7 +33,7 @@ impl Deref for DesignConfigBounded {
 ///
 pub struct Design {
     id: DesignTag,
-    params: DesignConfig, // TODO: probably remove when we store it in ProgramDatabase
+    pub(crate) config: DesignConfig,
     pub(crate) db: ProgramDatabase,
     programs: GrowableVec<ProgramData>,
 }
@@ -59,24 +46,24 @@ impl Debug for Design {
 
 impl Design {
     /// Creates a new `Design` instance with the given identifier and configuration `parameters`.
-    pub fn new(id: DesignTag, params: DesignConfig) -> Self {
+    pub fn new(id: DesignTag, config: DesignConfig) -> Self {
         const DEFAULT_PROGRAMS_CNT: usize = 1;
         Design {
             id,
-            params,
-            db: ProgramDatabase::new(params),
+            config,
+            db: ProgramDatabase::new(config),
             programs: GrowableVec::new(DEFAULT_PROGRAMS_CNT),
         }
-    }
-
-    /// Returns the configuration parameters for this design.
-    pub fn get_config(&self) -> DesignConfigBounded {
-        DesignConfigBounded(self.params)
     }
 
     /// Returns the unique identifier for this design.
     pub fn id(&self) -> Tag {
         self.id
+    }
+
+    /// Returns the configuration parameters for this design.
+    pub fn config(&self) -> &DesignConfig {
+        &self.config
     }
 
     /// Registers a function as an invoke action.
@@ -175,12 +162,12 @@ mod tests {
     #[test]
     fn design_creation() {
         let id = Tag::from_str_static("design1");
-        let params = DesignConfig::default();
+        let config = DesignConfig::default();
 
-        let design = Design::new(id, params.clone());
+        let design = Design::new(id, config.clone());
 
         assert_eq!(design.id(), id);
-        assert_eq!(*design.get_config(), params);
+        assert_eq!(*design.config(), config);
     }
 
     fn action() -> Result<(), UserErrValue> {
@@ -190,8 +177,8 @@ mod tests {
     #[test]
     fn register_invoke_fn_success() {
         let id = Tag::from_str_static("design1");
-        let params = DesignConfig::default();
-        let design = Design::new(id, params);
+        let config = DesignConfig::default();
+        let design = Design::new(id, config);
 
         let tag = Tag::from_str_static("invoke_fn");
 
@@ -205,8 +192,8 @@ mod tests {
     #[test]
     fn register_invoke_fn_duplicate() {
         let id = Tag::from_str_static("design1");
-        let params = DesignConfig::default();
-        let design = Design::new(id, params);
+        let config = DesignConfig::default();
+        let design = Design::new(id, config);
 
         let tag = Tag::from_str_static("invoke_fn");
 
@@ -223,8 +210,8 @@ mod tests {
     #[test]
     fn get_orchestration_tag_success() {
         let id = Tag::from_str_static("design1");
-        let params = DesignConfig::default();
-        let design = Design::new(id, params);
+        let config = DesignConfig::default();
+        let design = Design::new(id, config);
 
         let tag = Tag::from_str_static("orchestration_tag");
 
@@ -240,8 +227,8 @@ mod tests {
     #[test]
     fn get_orchestration_tag_not_found() {
         let id = Tag::from_str_static("design1");
-        let params = DesignConfig::default();
-        let design = Design::new(id, params);
+        let config = DesignConfig::default();
+        let design = Design::new(id, config);
 
         let tag = Tag::from_str_static("non_existent_tag");
 

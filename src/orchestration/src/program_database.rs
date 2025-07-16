@@ -34,10 +34,12 @@ use std::{
 
 use ::core::{cell::RefCell, fmt::Debug, future::Future};
 
+type ActionGenerator = dyn Fn(Tag, Option<UniqueWorkerId>, &DesignConfig) -> Box<dyn ActionTrait>;
+
 struct ActionData {
     tag: Tag,
     worker_id: Option<UniqueWorkerId>,
-    generator: Box<dyn Fn(Tag, Option<UniqueWorkerId>) -> Box<dyn ActionTrait>>,
+    generator: Box<ActionGenerator>,
 }
 
 pub(crate) struct ActionProvider {
@@ -46,25 +48,25 @@ pub(crate) struct ActionProvider {
 }
 
 impl ActionProvider {
-    pub(crate) fn new(clonable_invokes_capacity: usize) -> Self {
+    pub(crate) fn new(config: DesignConfig) -> Self {
         Self {
-            clonable_invokes: SlotMap::new(clonable_invokes_capacity),
+            clonable_invokes: SlotMap::new(config.db_params.clonable_invokes_capacity),
             design_events: SlotMap::new(DEFAULT_EVENTS_CAPACITY),
         }
     }
 
-    pub(crate) fn provide_invoke(&mut self, key: SlotMapKey) -> Option<Box<dyn ActionTrait>> {
+    pub(crate) fn provide_invoke(&mut self, key: SlotMapKey, config: &DesignConfig) -> Option<Box<dyn ActionTrait>> {
         if let Some(data) = self.clonable_invokes.get(key) {
-            Some((data.generator)(data.tag, data.worker_id))
+            Some((data.generator)(data.tag, data.worker_id, config))
         } else {
             None
         }
     }
 
-    pub(crate) fn provide_event(&mut self, key: SlotMapKey, t: EventActionType) -> Option<Box<dyn ActionTrait>> {
+    pub(crate) fn provide_event(&mut self, key: SlotMapKey, t: EventActionType, config: &DesignConfig) -> Option<Box<dyn ActionTrait>> {
         match t {
-            EventActionType::Trigger => self.design_events.get(key).and_then(|e| e.creator()?.borrow_mut().create_trigger()),
-            EventActionType::Sync => self.design_events.get(key).and_then(|e| e.creator()?.borrow_mut().create_sync()),
+            EventActionType::Trigger => self.design_events.get(key).and_then(|e| e.creator()?.borrow_mut().create_trigger(config)),
+            EventActionType::Sync => self.design_events.get(key).and_then(|e| e.creator()?.borrow_mut().create_sync(config)),
         }
     }
 }
@@ -82,10 +84,10 @@ pub struct ProgramDatabase {
 
 impl ProgramDatabase {
     /// Creates a new instance of `ProgramDatabase`.
-    pub fn new(params: DesignConfig) -> Self {
+    pub fn new(config: DesignConfig) -> Self {
         // TODO: Provider needs to keep DesignConfig probably so tags can have info from it
         Self {
-            action_provider: Rc::new(RefCell::new(ActionProvider::new(params.db_params.clonable_invokes_capacity))),
+            action_provider: Rc::new(RefCell::new(ActionProvider::new(config))),
             design_shutdown_events: GrowableVec::default(),
         }
     }
@@ -129,7 +131,9 @@ impl ProgramDatabase {
             if let Some(key) = ap.clonable_invokes.insert(ActionData {
                 tag,
                 worker_id: None,
-                generator: Box::new(move |tag: Tag, worker_id: Option<UniqueWorkerId>| Invoke::from_fn(tag, action, worker_id)),
+                generator: Box::new(move |tag: Tag, worker_id: Option<UniqueWorkerId>, config: &DesignConfig| {
+                    Invoke::from_fn(tag, action, worker_id, config)
+                }),
             }) {
                 Ok(OrchestrationTag::new(
                     tag,
@@ -157,7 +161,9 @@ impl ProgramDatabase {
             if let Some(key) = ap.clonable_invokes.insert(ActionData {
                 tag,
                 worker_id: None,
-                generator: Box::new(move |tag: Tag, worker_id: Option<UniqueWorkerId>| Invoke::from_async(tag, action.clone(), worker_id)),
+                generator: Box::new(move |tag: Tag, worker_id: Option<UniqueWorkerId>, config: &DesignConfig| {
+                    Invoke::from_async(tag, action.clone(), worker_id, config)
+                }),
             }) {
                 Ok(OrchestrationTag::new(
                     tag,
@@ -186,8 +192,8 @@ impl ProgramDatabase {
             if let Some(key) = ap.clonable_invokes.insert(ActionData {
                 tag,
                 worker_id: None,
-                generator: Box::new(move |tag: Tag, worker_id: Option<UniqueWorkerId>| {
-                    Invoke::from_method(tag, Arc::clone(&object), method, worker_id)
+                generator: Box::new(move |tag: Tag, worker_id: Option<UniqueWorkerId>, config: &DesignConfig| {
+                    Invoke::from_method(tag, Arc::clone(&object), method, worker_id, config)
                 }),
             }) {
                 Ok(OrchestrationTag::new(
@@ -217,8 +223,8 @@ impl ProgramDatabase {
             if let Some(key) = ap.clonable_invokes.insert(ActionData {
                 tag,
                 worker_id: None,
-                generator: Box::new(move |tag: Tag, worker_id: Option<UniqueWorkerId>| {
-                    Invoke::from_method_async(tag, Arc::clone(&object), method.clone(), worker_id)
+                generator: Box::new(move |tag: Tag, worker_id: Option<UniqueWorkerId>, config: &DesignConfig| {
+                    Invoke::from_method_async(tag, Arc::clone(&object), method.clone(), worker_id, config)
                 }),
             }) {
                 Ok(OrchestrationTag::new(
@@ -355,6 +361,7 @@ mod tests {
     #[test]
     fn test_register_invoke_fn() {
         let pd = ProgramDatabase::default();
+        let config = DesignConfig::default();
 
         fn test1() -> InvokeResult {
             Err(0xcafe_u64.into())
@@ -368,18 +375,19 @@ mod tests {
         assert!(pd.register_invoke_fn("tag1".into(), test1).is_err());
         assert!(pd.register_invoke_fn("tag2".into(), test2).is_ok());
 
-        let mut invoke = Invoke::from_tag(&tag);
+        let mut invoke = Invoke::from_tag(&tag, &config);
         let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
         assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xcafe_u64.into()))));
 
         let tag = pd.get_orchestration_tag("tag2".into()).unwrap();
-        let mut invoke = Invoke::from_tag(&tag);
+        let mut invoke = Invoke::from_tag(&tag, &config);
         let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
         assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xbeef_u64.into()))));
     }
 
     #[test]
     fn test_register_invoke_async() {
+        let config = DesignConfig::default();
         let pd = ProgramDatabase::default();
 
         async fn test1() -> InvokeResult {
@@ -394,18 +402,19 @@ mod tests {
         assert!(pd.register_invoke_async("tag1".into(), test1).is_err());
         assert!(pd.register_invoke_async("tag2".into(), test2).is_ok());
 
-        let mut invoke = Invoke::from_tag(&tag);
+        let mut invoke = Invoke::from_tag(&tag, &config);
         let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
         assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xcafe_u64.into()))));
 
         let tag = pd.get_orchestration_tag("tag2".into()).unwrap();
-        let mut invoke = Invoke::from_tag(&tag);
+        let mut invoke = Invoke::from_tag(&tag, &config);
         let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
         assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xbeef_u64.into()))));
     }
 
     #[test]
     fn test_register_invoke_method() {
+        let config = DesignConfig::default();
         let pd = ProgramDatabase::default();
 
         struct Test1 {}
@@ -431,18 +440,19 @@ mod tests {
         assert!(pd.register_invoke_method("tag1".into(), Arc::clone(&obj1), Test1::test1).is_err());
         assert!(pd.register_invoke_method("tag2".into(), Arc::clone(&obj2), Test2::test2).is_ok());
 
-        let mut invoke = Invoke::from_tag(&tag);
+        let mut invoke = Invoke::from_tag(&tag, &config);
         let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
         assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xcafe_u64.into()))));
 
         let tag = pd.get_orchestration_tag("tag2".into()).unwrap();
-        let mut invoke = Invoke::from_tag(&tag);
+        let mut invoke = Invoke::from_tag(&tag, &config);
         let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
         assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xbeef_u64.into()))));
     }
 
     #[test]
     fn test_register_invoke_method_async() {
+        let config = DesignConfig::default();
         let pd = ProgramDatabase::default();
 
         struct Test1 {}
@@ -466,12 +476,12 @@ mod tests {
         assert!(pd.register_invoke_method_async("tag1".into(), Arc::clone(&obj1), test1).is_err());
         assert!(pd.register_invoke_method_async("tag2".into(), Arc::clone(&obj2), test2).is_ok());
 
-        let mut invoke = Invoke::from_tag(&tag);
+        let mut invoke = Invoke::from_tag(&tag, &config);
         let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
         assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xcafe_u64.into()))));
 
         let tag = pd.get_orchestration_tag("tag2".into()).unwrap();
-        let mut invoke = Invoke::from_tag(&tag);
+        let mut invoke = Invoke::from_tag(&tag, &config);
         let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
         assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xbeef_u64.into()))));
     }
@@ -479,6 +489,7 @@ mod tests {
     #[test]
     #[ensure_clear_mock_runtime]
     fn test_invoke_fn_with_worker_id() {
+        let config = DesignConfig::default();
         let mut pd = ProgramDatabase::default();
 
         fn test1() -> InvokeResult {
@@ -487,7 +498,7 @@ mod tests {
 
         let tag = pd.register_invoke_fn("tag1".into(), test1).unwrap();
         assert_eq!(pd.set_invoke_worker_id("tag1".into(), "worker_id".into()), Ok(()));
-        let mut invoke = Invoke::from_tag(&tag);
+        let mut invoke = Invoke::from_tag(&tag, &config);
         let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
 
         // Wait for invoke to schedule the action.
@@ -503,6 +514,7 @@ mod tests {
     #[test]
     #[ensure_clear_mock_runtime]
     fn test_invoke_async_with_worker_id() {
+        let config = DesignConfig::default();
         let mut pd = ProgramDatabase::default();
 
         async fn test1() -> InvokeResult {
@@ -511,7 +523,7 @@ mod tests {
 
         let tag = pd.register_invoke_async("tag1".into(), test1).unwrap();
         assert_eq!(pd.set_invoke_worker_id("tag1".into(), "worker_id".into()), Ok(()));
-        let mut invoke = Invoke::from_tag(&tag);
+        let mut invoke = Invoke::from_tag(&tag, &config);
         let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
 
         // Wait for invoke to schedule the action.
@@ -527,6 +539,7 @@ mod tests {
     #[test]
     #[ensure_clear_mock_runtime]
     fn test_invoke_method_with_worker_id() {
+        let config = DesignConfig::default();
         let mut pd = ProgramDatabase::default();
 
         struct Test1 {}
@@ -541,7 +554,7 @@ mod tests {
             .register_invoke_method("tag1".into(), Arc::new(Mutex::new(Test1 {})), Test1::test1)
             .unwrap();
         assert_eq!(pd.set_invoke_worker_id("tag1".into(), "worker_id".into()), Ok(()));
-        let mut invoke = Invoke::from_tag(&tag);
+        let mut invoke = Invoke::from_tag(&tag, &config);
         let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
 
         // Wait for invoke to schedule the action.
@@ -557,6 +570,7 @@ mod tests {
     #[test]
     #[ensure_clear_mock_runtime]
     fn test_invoke_method_async_with_worker_id() {
+        let config = DesignConfig::default();
         let mut pd = ProgramDatabase::default();
 
         struct Test1 {}
@@ -570,7 +584,7 @@ mod tests {
             .register_invoke_method_async("tag1".into(), Arc::new(Mutex::new(Test1 {})), test1)
             .unwrap();
         assert_eq!(pd.set_invoke_worker_id("tag1".into(), "worker_id".into()), Ok(()));
-        let mut invoke = Invoke::from_tag(&tag);
+        let mut invoke = Invoke::from_tag(&tag, &config);
         let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
 
         // Wait for invoke to schedule the action.
@@ -639,11 +653,11 @@ mod tests {
         struct TestEventCreator {}
 
         impl EventCreatorTrait for TestEventCreator {
-            fn create_trigger(&mut self) -> Option<Box<dyn ActionTrait>> {
+            fn create_trigger(&mut self, _: &DesignConfig) -> Option<Box<dyn ActionTrait>> {
                 todo!()
             }
 
-            fn create_sync(&mut self) -> Option<Box<dyn ActionTrait>> {
+            fn create_sync(&mut self, _: &DesignConfig) -> Option<Box<dyn ActionTrait>> {
                 todo!()
             }
 

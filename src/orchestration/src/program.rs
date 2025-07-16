@@ -115,7 +115,7 @@ impl ProgramBuilder {
         if let Some(shutdown_event) = self.shutdown_event {
             match design.db.get_creator_for_shutdown_event(shutdown_event) {
                 Ok(creator) => {
-                    shutdown_sync = creator.borrow_mut().create_sync();
+                    shutdown_sync = creator.borrow_mut().create_sync(design.config());
                 }
                 Err(CommonErrors::NotFound) => {
                     trace!("Shutdown event {} not found", shutdown_event.tracing_str());
@@ -381,9 +381,9 @@ mod tests {
 
         let mut builder = ProgramBuilder::new("TestBuilder");
         builder
-            .with_start_action(Invoke::from_tag(&start_tag))
-            .with_run_action(Invoke::from_tag(&run_tag))
-            .with_stop_action(Invoke::from_tag(&stop_tag), Duration::from_secs(10));
+            .with_start_action(Invoke::from_tag(&start_tag, design.config()))
+            .with_run_action(Invoke::from_tag(&run_tag, design.config()))
+            .with_stop_action(Invoke::from_tag(&stop_tag, design.config()), Duration::from_secs(10));
 
         let mut program = builder.build(&mut design).unwrap();
         testing::mock::spawn(async move {

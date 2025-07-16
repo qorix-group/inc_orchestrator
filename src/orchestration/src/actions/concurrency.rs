@@ -13,6 +13,7 @@
 
 use super::action::{ActionBaseMeta, ActionResult, ActionTrait, ReusableBoxFutureResult};
 use crate::actions::action::ActionExecError;
+use crate::api::design::Design;
 use crate::common::tag::Tag;
 use ::core::future::Future;
 use ::core::pin::Pin;
@@ -67,9 +68,7 @@ impl ConcurrencyBuilder {
     ///
     /// # Panics
     /// Panics if no branch is added.
-    pub fn build(&mut self) -> Box<Concurrency> {
-        const REUSABLE_OBJECT_POOL_SIZE: usize = 1;
-
+    pub fn build(&mut self, design: &Design) -> Box<Concurrency> {
         let mut actions = self.actions.take().expect("Concurrency requires at least one branch.");
         actions.lock();
         let length = actions.len();
@@ -77,10 +76,10 @@ impl ConcurrencyBuilder {
         Box::new(Concurrency {
             base: ActionBaseMeta {
                 tag: "orch::internal::concurrency".into(),
-                reusable_future_pool: Concurrency::create_reusable_future_pool(REUSABLE_OBJECT_POOL_SIZE),
+                reusable_future_pool: Concurrency::create_reusable_future_pool(design.config.max_concurrent_action_executions),
             },
             actions: actions.into(),
-            futures_vec_pool: ReusableVecPool::<ActionMeta>::new(REUSABLE_OBJECT_POOL_SIZE, |_| Vec::new(length)),
+            futures_vec_pool: ReusableVecPool::<ActionMeta>::new(design.config.max_concurrent_action_executions, |_| Vec::new(length)),
         })
     }
 }
@@ -263,6 +262,7 @@ impl Future for ConcurrencyJoin {
 #[cfg(not(loom))]
 mod tests {
     use super::*;
+    use crate::common::DesignConfig;
     use crate::testing::MockActionBuilder;
     use crate::testing::OrchTestingPoller;
     use ::core::task::Poll;
@@ -274,9 +274,10 @@ mod tests {
         let mock1 = MockActionBuilder::new().build();
         let mock2 = MockActionBuilder::new().build();
         // Create a concurrency builder using new() and add two branches.
+        let design = Design::new("Design".into(), DesignConfig::default());
         let mut concurrency_builder = ConcurrencyBuilder::new();
         concurrency_builder.with_branch(Box::new(mock1)).with_branch(Box::new(mock2));
-        let concurrency = concurrency_builder.build();
+        let concurrency = concurrency_builder.build(&design);
         assert_eq!(concurrency.actions.len(), 2);
         assert_eq!(concurrency.name(), "Concurrency");
     }
@@ -285,9 +286,10 @@ mod tests {
     fn concurrency_builder_using_default() {
         let mock1 = MockActionBuilder::new().build();
         // Create a concurrency builder using default() and add one branch.
+        let design = Design::new("Design".into(), DesignConfig::default());
         let mut concurrency_builder = ConcurrencyBuilder::default();
         concurrency_builder.with_branch(Box::new(mock1));
-        let concurrency = concurrency_builder.build();
+        let concurrency = concurrency_builder.build(&design);
         assert_eq!(concurrency.actions.len(), 1);
         assert_eq!(concurrency.name(), "Concurrency");
     }
@@ -295,8 +297,9 @@ mod tests {
     #[test]
     #[should_panic(expected = "Concurrency requires at least one branch.")]
     fn concurrency_builder_panics_with_no_branch() {
+        let design = Design::new("Design".into(), DesignConfig::default());
         let mut concurrency_builder = ConcurrencyBuilder::new();
-        let _ = concurrency_builder.build();
+        let _ = concurrency_builder.build(&design);
     }
 
     #[test]
@@ -305,9 +308,10 @@ mod tests {
         let mock1 = MockActionBuilder::new().will_once(Ok(())).build();
         let mock2 = MockActionBuilder::new().will_once(Ok(())).build();
 
+        let design = Design::new("Design".into(), DesignConfig::default());
         let mut concurrency_builder = ConcurrencyBuilder::new();
         concurrency_builder.with_branch(Box::new(mock1)).with_branch(Box::new(mock2));
-        let mut concurrency = concurrency_builder.build();
+        let mut concurrency = concurrency_builder.build(&design);
 
         let mut poller = OrchTestingPoller::new(concurrency.try_execute().unwrap());
         // Call the poll function to spawn all the actions to execute concurrently and wait for them to complete.
@@ -329,9 +333,10 @@ mod tests {
     fn concurrency_execute_err_action() {
         let mock1 = MockActionBuilder::new().will_once(Err(ActionExecError::NonRecoverableFailure)).build();
 
+        let design = Design::new("Design".into(), DesignConfig::default());
         let mut concurrency_builder = ConcurrencyBuilder::new();
         concurrency_builder.with_branch(Box::new(mock1));
-        let mut concurrency = concurrency_builder.build();
+        let mut concurrency = concurrency_builder.build(&design);
 
         let mut poller = OrchTestingPoller::new(concurrency.try_execute().unwrap());
         // Call the poll function to spawn all the actions to execute concurrently and wait for them to complete.
@@ -357,6 +362,7 @@ mod tests {
         let mock4 = MockActionBuilder::new().will_once(Err(ActionExecError::NonRecoverableFailure)).build();
         let mock5 = MockActionBuilder::new().will_once(Ok(())).build();
 
+        let design = Design::new("Design".into(), DesignConfig::default());
         let mut concurrency_builder = ConcurrencyBuilder::new();
         concurrency_builder
             .with_branch(Box::new(mock1))
@@ -364,7 +370,7 @@ mod tests {
             .with_branch(Box::new(mock3))
             .with_branch(Box::new(mock4))
             .with_branch(Box::new(mock5));
-        let mut concurrency = concurrency_builder.build();
+        let mut concurrency = concurrency_builder.build(&design);
 
         let mut poller = OrchTestingPoller::new(concurrency.try_execute().unwrap());
         // Call the poll function to spawn all the actions to execute concurrently and wait for them to complete.
@@ -387,9 +393,10 @@ mod tests {
         let mock1 = MockActionBuilder::new().will_once(Ok(())).build();
         let mock2 = MockActionBuilder::new().will_once(Ok(())).build();
 
+        let design = Design::new("Design".into(), DesignConfig::default());
         let mut concurrency_builder = ConcurrencyBuilder::new();
         concurrency_builder.with_branch(Box::new(mock1)).with_branch(Box::new(mock2));
-        let mut concurrency = concurrency_builder.build();
+        let mut concurrency = concurrency_builder.build(&design);
 
         let mut poller = OrchTestingPoller::new(concurrency.try_execute().unwrap());
         // Call the poll function to spawn all the actions to execute concurrently and wait for them to complete.
@@ -416,9 +423,10 @@ mod tests {
         let mock1 = MockActionBuilder::new().will_once(Ok(())).build();
         let mock2 = MockActionBuilder::new().will_once(Ok(())).build();
 
+        let design = Design::new("Design".into(), DesignConfig::default());
         let mut concurrency_builder = ConcurrencyBuilder::new();
         concurrency_builder.with_branch(Box::new(mock1)).with_branch(Box::new(mock2));
-        let mut concurrency = concurrency_builder.build();
+        let mut concurrency = concurrency_builder.build(&design);
 
         let mut poller = OrchTestingPoller::new(concurrency.try_execute().unwrap());
         // Call the poll function to spawn all the actions to execute concurrently and wait for them to complete.
@@ -444,9 +452,10 @@ mod tests {
         let mock1 = MockActionBuilder::new().times(2).build();
         let mock2 = MockActionBuilder::new().times(2).build();
 
+        let design = Design::new("Design".into(), DesignConfig::default());
         let mut concurrency_builder = ConcurrencyBuilder::new();
         concurrency_builder.with_branch(Box::new(mock1)).with_branch(Box::new(mock2));
-        let mut concurrency = concurrency_builder.build();
+        let mut concurrency = concurrency_builder.build(&design);
 
         // Execute the concurrency twice to ensure it can handle multiple executions correctly.
         // This is to test that the futures are reset and can be reused.
@@ -476,9 +485,10 @@ mod tests {
             .will_once(Ok(()))
             .build();
 
+        let design = Design::new("Design".into(), DesignConfig::default());
         let mut concurrency_builder = ConcurrencyBuilder::new();
         concurrency_builder.with_branch(Box::new(mock1)).with_branch(Box::new(mock2));
-        let mut concurrency = concurrency_builder.build();
+        let mut concurrency = concurrency_builder.build(&design);
 
         // Execute the concurrency twice to ensure it can handle multiple executions correctly.
         // This is to test that the futures are reset and can be reused.

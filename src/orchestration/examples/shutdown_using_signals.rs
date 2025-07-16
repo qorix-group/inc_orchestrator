@@ -30,8 +30,10 @@ fn example_component_design() -> Result<Design, CommonErrors> {
     let t1 = design.register_invoke_async("PendingIndefinitely".into(), async || future::pending().await)?;
     design.register_shutdown_event("ShutdownEvent".into())?;
 
-    design.add_program("ExampleDesignProgram", move |_design, builder| {
-        builder.with_run_action(Invoke::from_tag(&t1)).with_shutdown_event("ShutdownEvent".into());
+    design.add_program("ExampleDesignProgram", move |design, builder| {
+        builder
+            .with_run_action(Invoke::from_tag(&t1, design.config()))
+            .with_shutdown_event("ShutdownEvent".into());
 
         Ok(())
     });

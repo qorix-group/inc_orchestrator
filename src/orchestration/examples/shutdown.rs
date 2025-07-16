@@ -37,11 +37,11 @@ fn example_component_design() -> Result<Design, CommonErrors> {
 
     design.register_shutdown_event("ExampleShutdown".into())?;
 
-    design.add_program("ExampleDesignProgram", move |_design, builder| {
+    design.add_program("ExampleDesignProgram", move |design, builder| {
         builder
-            .with_run_action(Invoke::from_tag(&run_tag))
-            .with_start_action(Invoke::from_tag(&start_tag))
-            .with_stop_action(Invoke::from_tag(&stop_tag), Duration::from_secs(5))
+            .with_run_action(Invoke::from_tag(&run_tag, design.config()))
+            .with_start_action(Invoke::from_tag(&start_tag, design.config()))
+            .with_stop_action(Invoke::from_tag(&stop_tag, design.config()), Duration::from_secs(5))
             .with_shutdown_event("ExampleShutdown".into());
 
         Ok(())
