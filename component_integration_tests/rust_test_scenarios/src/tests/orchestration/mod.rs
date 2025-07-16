@@ -1,6 +1,7 @@
 use crate::internals::scenario::{ScenarioGroup, ScenarioGroupImpl};
 use orchestration_concurrency::{MultipleConcurrency, NestedConcurrency, SingleConcurrency};
 use orchestration_sequence::{AwaitSequence, NestedSequence, SingleSequence};
+use orchestration_sleep::SleepUnderLoad;
 use orchestration_trigger_sync::{
     OneTriggerOneSyncTwoPrograms, OneTriggerTwoSyncsThreePrograms, TriggerAndSyncInNestedBranches, TriggerSyncOneAfterAnother,
 };
@@ -10,9 +11,6 @@ use orchestration::{common::tag::Tag, prelude::*};
 
 use tracing::info;
 
-pub mod orchestration_sequence;
-pub mod orchestration_trigger_sync;
-
 macro_rules! generic_test_func {
     ($name:expr) => {
         || generic_test_sync_func($name)
@@ -20,6 +18,9 @@ macro_rules! generic_test_func {
 }
 #[macro_use]
 pub mod orchestration_concurrency;
+pub mod orchestration_sequence;
+pub mod orchestration_sleep;
+pub mod orchestration_trigger_sync;
 
 pub struct OrchestrationScenarioGroup {
     group: ScenarioGroupImpl,
@@ -52,6 +53,8 @@ impl ScenarioGroup for OrchestrationScenarioGroup {
         self.group.add_scenario(Box::new(OneTriggerTwoSyncsThreePrograms));
         self.group.add_scenario(Box::new(TriggerAndSyncInNestedBranches));
         self.group.add_scenario(Box::new(TriggerSyncOneAfterAnother));
+        // Sleep scenarios
+        self.group.add_scenario(Box::new(SleepUnderLoad));
     }
 }
 
