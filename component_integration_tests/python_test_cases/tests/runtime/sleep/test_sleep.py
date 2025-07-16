@@ -1,7 +1,8 @@
 import math
-
+from typing import Any
 import pytest
-from testing_tools import LogContainer
+from testing_utils import LogContainer
+from cit_scenario import CitScenario
 
 
 # Due to OS related condition variable wait behavior including scheduling, thread priority,
@@ -19,13 +20,13 @@ def get_threshold_ms(expected_sleep_ms: int) -> int:
         return math.ceil(expected_sleep_ms * 5)
 
 
-class TestSingleSleep:
+class TestSingleSleep(CitScenario):
     @pytest.fixture(scope="class")
-    def scenario_name(self):
+    def scenario_name(self) -> str:
         return "runtime.sleep.basic"
 
     @pytest.fixture(scope="class")
-    def test_config(self):
+    def test_config(self) -> dict[str, Any]:
         return {
             "runtime": {"workers": 1, "task_queue_size": 256},
             "test": {
@@ -37,20 +38,26 @@ class TestSingleSleep:
             },
         }
 
-    def test_completeness(self, test_config, test_results: LogContainer):
+    def test_completeness(
+        self, test_config: dict[str, Any], logs_info_level: LogContainer
+    ):
         task_id = test_config["test"]["non_blocking_sleep_tasks"][0]["id"]
 
-        assert test_results[0].id == task_id and test_results[0].location == "begin"
-        assert test_results[1].id == task_id and test_results[1].location == "end"
+        assert (
+            logs_info_level[0].id == task_id and logs_info_level[0].location == "begin"
+        )
+        assert logs_info_level[1].id == task_id and logs_info_level[1].location == "end"
 
-    def test_sleep_duration(self, test_config, test_results: LogContainer):
+    def test_sleep_duration(
+        self, test_config: dict[str, Any], logs_info_level: LogContainer
+    ):
         expected_sleep_ms = test_config["test"]["non_blocking_sleep_tasks"][0][
             "delay_ms"
         ]
         threshold_ms = get_threshold_ms(expected_sleep_ms)
 
         sleep_duration_ms = (
-            test_results[1].timestamp - test_results[0].timestamp
+            logs_info_level[1].timestamp - logs_info_level[0].timestamp
         ).total_seconds() * 1000
 
         assert (
@@ -61,13 +68,13 @@ class TestSingleSleep:
         )
 
 
-class TestZeroSleep:
+class TestZeroSleep(CitScenario):
     @pytest.fixture(scope="class")
-    def scenario_name(self):
+    def scenario_name(self) -> str:
         return "runtime.sleep.basic"
 
     @pytest.fixture(scope="class")
-    def test_config(self):
+    def test_config(self) -> dict[str, Any]:
         return {
             "runtime": {"workers": 1, "task_queue_size": 256},
             "test": {
@@ -79,10 +86,12 @@ class TestZeroSleep:
             },
         }
 
-    def test_sleep_duration(self, test_config, test_results: LogContainer):
+    def test_sleep_duration(
+        self, test_config: dict[str, Any], logs_info_level: LogContainer
+    ):
         task_id = test_config["test"]["non_blocking_sleep_tasks"][0]["id"]
 
-        entries = test_results.get_logs_by_field(field="id", pattern=task_id)
+        entries = logs_info_level.get_logs_by_field(field="id", pattern=task_id)
         assert len(entries) == 2, "Expected two entries for the task."
 
         begin_entry = entries[0]
@@ -98,13 +107,13 @@ class TestZeroSleep:
         )
 
 
-class TestMultipleSleepsWithRegularTasks:
+class TestMultipleSleepsWithRegularTasks(CitScenario):
     @pytest.fixture(scope="class")
-    def scenario_name(self):
+    def scenario_name(self) -> str:
         return "runtime.sleep.basic"
 
     @pytest.fixture(scope="class")
-    def test_config(self):
+    def test_config(self) -> dict[str, Any]:
         return {
             "runtime": {"workers": 1, "task_queue_size": 256},
             "test": {
@@ -122,8 +131,10 @@ class TestMultipleSleepsWithRegularTasks:
             },
         }
 
-    def test_task_completeness(self, test_config, test_results: LogContainer):
-        non_blocking_sleep_tasks = test_results.get_logs_by_field(
+    def test_task_completeness(
+        self, test_config: dict[str, Any], logs_info_level: LogContainer
+    ):
+        non_blocking_sleep_tasks = logs_info_level.get_logs_by_field(
             field="id", pattern="non_blocking_sleep*"
         )
 
@@ -141,16 +152,18 @@ class TestMultipleSleepsWithRegularTasks:
             "Not all non-blocking sleep tasks finished."
         )
 
-        non_sleep_tasks = test_results.get_logs_by_field(
+        non_sleep_tasks = logs_info_level.get_logs_by_field(
             field="id", pattern="non_sleep*"
         )
         assert len(non_sleep_tasks) == len(test_config["test"]["non_sleep_tasks"]), (
             "Not all non-sleep tasks executed."
         )
 
-    def test_sleep_duration(self, test_config, test_results: LogContainer):
+    def test_sleep_duration(
+        self, test_config: dict[str, Any], logs_info_level: LogContainer
+    ):
         for task in test_config["test"]["non_blocking_sleep_tasks"]:
-            entries = test_results.get_logs_by_field(field="id", pattern=task["id"])
+            entries = logs_info_level.get_logs_by_field(field="id", pattern=task["id"])
             assert len(entries) == 2, "Expected two entries for the task."
 
             begin_entry = entries[0]
@@ -177,7 +190,7 @@ class TestMultipleSleepsWithRegularTasksForManyWorkers(
     TestMultipleSleepsWithRegularTasks
 ):
     @pytest.fixture(scope="class")
-    def test_config(self):
+    def test_config(self) -> dict[str, Any]:
         return {
             "runtime": {"workers": 4, "task_queue_size": 256},
             "test": {
@@ -196,13 +209,13 @@ class TestMultipleSleepsWithRegularTasksForManyWorkers(
         }
 
 
-class TestMultipleSleepsWithBlockedWorkers:
+class TestMultipleSleepsWithBlockedWorkers(CitScenario):
     @pytest.fixture(scope="class")
-    def scenario_name(self):
+    def scenario_name(self) -> str:
         return "runtime.sleep.basic"
 
     @pytest.fixture(scope="class")
-    def test_config(self):
+    def test_config(self) -> dict[str, Any]:
         return {
             "runtime": {"workers": 4, "task_queue_size": 256},
             "test": {
@@ -224,31 +237,35 @@ class TestMultipleSleepsWithBlockedWorkers:
             },
         }
 
-    def test_task_completeness(self, test_config, test_results: LogContainer):
-        non_blocking_sleep_tasks = test_results.get_logs_by_field(
+    def test_task_completeness(
+        self, test_config: dict[str, Any], logs_info_level: LogContainer
+    ):
+        non_blocking_sleep_tasks = logs_info_level.get_logs_by_field(
             field="id", pattern="non_blocking_sleep*"
         )
         assert len(non_blocking_sleep_tasks) == len(
             test_config["test"]["non_blocking_sleep_tasks"] * 2  # For begin and end
         ), "Not all non-blocking sleep tasks executed."
 
-        blocking_sleep_tasks = test_results.get_logs_by_field(
+        blocking_sleep_tasks = logs_info_level.get_logs_by_field(
             field="id", pattern="^blocking_sleep*"
         )
         assert len(blocking_sleep_tasks) == len(
             test_config["test"]["blocking_sleep_tasks"] * 2  # For begin and end
         ), "Not all blocking sleep tasks executed."
 
-        non_sleep_tasks = test_results.get_logs_by_field(
+        non_sleep_tasks = logs_info_level.get_logs_by_field(
             field="id", pattern="non_sleep*"
         )
         assert len(non_sleep_tasks) == len(test_config["test"]["non_sleep_tasks"]), (
             "Not all non-sleep tasks executed."
         )
 
-    def test_sleep_duration(self, test_config, test_results: LogContainer):
+    def test_sleep_duration(
+        self, test_config: dict[str, Any], logs_info_level: LogContainer
+    ):
         for task in test_config["test"]["non_blocking_sleep_tasks"]:
-            entries = test_results.get_logs_by_field(field="id", pattern=task["id"])
+            entries = logs_info_level.get_logs_by_field(field="id", pattern=task["id"])
             assert len(entries) == 2, "Expected two entries for the task."
 
             begin_entry = entries[0]
@@ -271,10 +288,10 @@ class TestMultipleSleepsWithBlockedWorkers:
             )
 
     def test_blocking_sleeps_finished_last(
-        self, test_config, test_results: LogContainer
+        self, test_config: dict[str, Any], logs_info_level: LogContainer
     ):
         blocking_task_count = len(test_config["test"]["blocking_sleep_tasks"])
-        for task in test_results[-blocking_task_count:]:
+        for task in logs_info_level[-blocking_task_count:]:
             assert task.id.startswith("blocking_sleep") and task.location == "end", (
                 f"Blocking sleep task {task.id} did not finish as one of last {blocking_task_count}."
             )

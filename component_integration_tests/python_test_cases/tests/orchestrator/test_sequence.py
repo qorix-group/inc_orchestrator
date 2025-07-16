@@ -1,20 +1,28 @@
 import pytest
-from testing_tools.log_container import LogContainer
+from testing_utils import LogContainer
+from cit_scenario import CitScenario
+from typing import Any
 
 
-class TestSingleSequence1W256Q:
+class TestSingleSequence1W256Q(CitScenario):
     @pytest.fixture(scope="class")
-    def scenario_name(self):
+    def scenario_name(self) -> str:
         return "orchestration.single_sequence"
 
     @pytest.fixture(scope="class")
-    def test_config(self):
+    def test_config(self) -> dict[str, Any]:
         return {"runtime": {"task_queue_size": 256, "workers": 1}}
 
-    def test_execution_order_one_branch(self, test_results: LogContainer):
-        action1 = test_results.find_log(field="message", pattern="Action1 was executed")
-        action2 = test_results.find_log(field="message", pattern="Action2 was executed")
-        action3 = test_results.find_log(field="message", pattern="Action3 was executed")
+    def test_execution_order_one_branch(self, logs_info_level: LogContainer):
+        action1 = logs_info_level.find_log(
+            field="message", pattern="Action1 was executed"
+        )
+        action2 = logs_info_level.find_log(
+            field="message", pattern="Action2 was executed"
+        )
+        action3 = logs_info_level.find_log(
+            field="message", pattern="Action3 was executed"
+        )
         # Assert that execution_order is chronological by timestamp
         assert action1.timestamp < action2.timestamp < action3.timestamp, (
             "Actions were not executed in the expected order: Action1, Action2, Action3"
@@ -23,30 +31,30 @@ class TestSingleSequence1W256Q:
 
 class TestSingleSequence2W256Q(TestSingleSequence1W256Q):
     @pytest.fixture(scope="class")
-    def test_config(self):
+    def test_config(self) -> dict[str, Any]:
         return {"runtime": {"task_queue_size": 256, "workers": 2}}
 
 
-class TestNestedSequence1W256Q:
+class TestNestedSequence1W256Q(CitScenario):
     @pytest.fixture(scope="class")
-    def scenario_name(self):
+    def scenario_name(self) -> str:
         return "orchestration.nested_sequence"
 
     @pytest.fixture(scope="class")
-    def test_config(self):
+    def test_config(self) -> dict[str, Any]:
         return {"runtime": {"task_queue_size": 256, "workers": 1}}
 
-    def test_outer_sequence_executed(self, test_results: LogContainer):
-        assert test_results.contains_log(field="message", pattern="OuterAction*"), (
+    def test_outer_sequence_executed(self, logs_info_level: LogContainer):
+        assert logs_info_level.contains_log(field="message", pattern="OuterAction*"), (
             "OuterAction was not executed as expected"
         )
 
-    def test_inner_sequence_executed(self, test_results: LogContainer):
-        assert test_results.contains_log(field="message", pattern="InnerAction*"), (
+    def test_inner_sequence_executed(self, logs_info_level: LogContainer):
+        assert logs_info_level.contains_log(field="message", pattern="InnerAction*"), (
             "InnerAction was not executed as expected"
         )
 
-    def test_execution_order_sequence_in_sequence(self, test_results: LogContainer):
+    def test_execution_order_sequence_in_sequence(self, logs_info_level: LogContainer):
         expected_order = [
             "OuterAction1 was executed",
             "InnerAction1 was executed",
@@ -55,7 +63,7 @@ class TestNestedSequence1W256Q:
         ]
         execution_order = [
             log.message
-            for log in test_results.get_logs_by_field(
+            for log in logs_info_level.get_logs_by_field(
                 field="message", pattern="was executed"
             )
         ]
@@ -66,5 +74,5 @@ class TestNestedSequence1W256Q:
 
 class TestNestedSequence2W256Q(TestNestedSequence1W256Q):
     @pytest.fixture(scope="class")
-    def test_config(self):
+    def test_config(self) -> dict[str, Any]:
         return {"runtime": {"task_queue_size": 256, "workers": 2}}

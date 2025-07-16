@@ -1,50 +1,58 @@
 import pytest
-from testing_tools import LogContainer
+from testing_utils import LogContainer
+from cit_scenario import CitScenario
+from typing import Any
 
 
-class TestRuntimeOneWorkerOneTask:
+class TestRuntimeOneWorkerOneTask(CitScenario):
     @pytest.fixture(scope="class")
-    def scenario_name(self):
+    def scenario_name(self) -> str:
         return "runtime.worker.basic"
 
     @pytest.fixture(scope="class")
-    def test_config(self):
+    def test_config(self) -> dict[str, Any]:
         return {
             "runtime": {"workers": 1, "task_queue_size": 256},
             "test": {"tasks": ["task_1"]},
         }
 
-    def test_if_task_executed(self, test_config, test_results: LogContainer):
+    def test_if_task_executed(
+        self, test_config: dict[str, Any], logs_info_level: LogContainer
+    ):
         task_name = test_config["test"]["tasks"][0]
-        assert test_results.contains_id(task_name), f"Task {task_name} was not executed"
+        assert logs_info_level.contains_id(task_name), (
+            f"Task {task_name} was not executed"
+        )
 
 
 class TestRuntimeTwoWorkersOneTask(TestRuntimeOneWorkerOneTask):
     @pytest.fixture(scope="class")
-    def test_config(self):
+    def test_config(self) -> dict[str, Any]:
         return {
             "runtime": {"workers": 2, "task_queue_size": 256},
             "test": {"tasks": ["task_1"]},
         }
 
 
-class TestRuntimeOneWorkerManyTasks:
+class TestRuntimeOneWorkerManyTasks(CitScenario):
     @pytest.fixture(scope="class")
-    def scenario_name(self):
+    def scenario_name(self) -> str:
         return "runtime.worker.basic"
 
     @pytest.fixture(scope="class")
-    def test_config(self):
+    def test_config(self) -> dict[str, Any]:
         return {
             "runtime": {"workers": 1, "task_queue_size": 256},
             "test": {"tasks": [f"task_{ndx}" for ndx in range(1, 101)]},
         }
 
-    def test_if_all_tasks_executed(self, test_config, test_results: LogContainer):
+    def test_if_all_tasks_executed(
+        self, test_config: dict[str, Any], logs_info_level: LogContainer
+    ):
         all_expected_set = set(test_config["test"]["tasks"])
         expected_len = len(all_expected_set)
 
-        all_executed_set = set(result.id for result in test_results)
+        all_executed_set = set(result.id for result in logs_info_level)
         executed_len = len(all_executed_set)
 
         assert expected_len == executed_len, (
@@ -57,7 +65,7 @@ class TestRuntimeOneWorkerManyTasks:
 
 class TestRuntimeTwoWorkersEvenTasks(TestRuntimeOneWorkerManyTasks):
     @pytest.fixture(scope="class")
-    def test_config(self):
+    def test_config(self) -> dict[str, Any]:
         return {
             "runtime": {"workers": 2, "task_queue_size": 256},
             "test": {"tasks": [f"task_{ndx}" for ndx in range(1, 11)]},
@@ -66,7 +74,7 @@ class TestRuntimeTwoWorkersEvenTasks(TestRuntimeOneWorkerManyTasks):
 
 class TestRuntimeTwoWorkersOddTasks(TestRuntimeOneWorkerManyTasks):
     @pytest.fixture(scope="class")
-    def test_config(self):
+    def test_config(self) -> dict[str, Any]:
         return {
             "runtime": {"workers": 2, "task_queue_size": 256},
             "test": {"tasks": [f"task_{ndx}" for ndx in range(1, 10)]},
@@ -75,7 +83,7 @@ class TestRuntimeTwoWorkersOddTasks(TestRuntimeOneWorkerManyTasks):
 
 class TestRuntimeThreeWorkersEvenTasks(TestRuntimeOneWorkerManyTasks):
     @pytest.fixture(scope="class")
-    def test_config(self):
+    def test_config(self) -> dict[str, Any]:
         return {
             "runtime": {"workers": 3, "task_queue_size": 256},
             "test": {"tasks": [f"task_{ndx}" for ndx in range(1, 11)]},
@@ -84,7 +92,7 @@ class TestRuntimeThreeWorkersEvenTasks(TestRuntimeOneWorkerManyTasks):
 
 class TestRuntimeThreeWorkersOddTasks(TestRuntimeOneWorkerManyTasks):
     @pytest.fixture(scope="class")
-    def test_config(self):
+    def test_config(self) -> dict[str, Any]:
         return {
             "runtime": {"workers": 3, "task_queue_size": 256},
             "test": {"tasks": [f"task_{ndx}" for ndx in range(1, 10)]},
