@@ -1,3 +1,4 @@
+pub mod execution_engine;
 pub mod sleep;
 pub mod worker;
 
@@ -21,6 +22,7 @@ impl ScenarioGroup for RuntimeScenarioGroup {
     }
 
     fn init(&mut self) -> () {
+        self.group.add_group(Box::new(execution_engine::ExecutionEngineScenarioGroup::new()));
         self.group.add_group(Box::new(sleep::SleepScenarioGroup::new()));
         self.group.add_group(Box::new(worker::WorkerScenarioGroup::new()));
     }
