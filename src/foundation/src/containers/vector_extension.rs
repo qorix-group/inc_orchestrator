@@ -18,10 +18,6 @@ pub trait VectorExtension<T> {
     /// Removes the element at the specified index by swapping it with the last element
     /// and then popping the last element. If the index is out of bounds, it returns `None`.
     fn swap_remove(&mut self, index: usize) -> Option<T>;
-
-    /// Removes the element at the specified index by shifting elements to the left.
-    /// If the index is out of bounds, it returns `None`.
-    fn remove(&mut self, index: usize) -> Option<T>;
 }
 
 impl<T> VectorExtension<T> for Vec<T> {
@@ -34,32 +30,6 @@ impl<T> VectorExtension<T> for Vec<T> {
             self.swap(index, length - 1);
         }
 
-        self.pop()
-    }
-
-    fn remove(&mut self, index: usize) -> Option<T> {
-        let length = self.len();
-        if index >= length {
-            return None;
-        } else if index < length - 1 {
-            // SAFETY: We are manually handling the memory and ensuring that we do not
-            // read or write out of bounds.
-            unsafe {
-                // Get a raw pointer to the vector's buffer
-                let ptr = self.as_mut_ptr();
-
-                // Read the element to be removed
-                let removed = ::core::ptr::read(ptr.add(index));
-
-                // Shift elements left
-                ::core::ptr::copy(ptr.add(index + 1), ptr.add(index), length - index - 1);
-
-                // Write the removed element to the last position to avoid dropping of shifted last element which is still valid
-                ::core::ptr::write(ptr.add(length - 1), removed);
-            }
-        }
-
-        // Remove the element at the end
         self.pop()
     }
 }
@@ -127,66 +97,6 @@ mod tests {
             vec.push(i);
         }
         assert_eq!(vec.swap_remove(VEC_SIZE), None); // This should return None
-    }
-
-    #[test]
-    fn remove_mid_element() {
-        const VEC_SIZE: usize = 10;
-        let mut vec = Vec::new(VEC_SIZE);
-        for i in 0..VEC_SIZE {
-            vec.push(i);
-        }
-
-        // removes the element at index 5 and shifts elements to the left
-        assert_eq!(vec.remove(5).unwrap(), 5);
-        assert_eq!(vec[4], 4); // not affected
-        assert_eq!(vec[5], 6); // shifted left
-        assert_eq!(vec[8], 9);
-        assert_eq!(vec.len(), VEC_SIZE - 1); // length is reduced by 1
-    }
-
-    #[test]
-    fn remove_first_element() {
-        const VEC_SIZE: usize = 10;
-        let mut vec = Vec::new(VEC_SIZE);
-        for i in 0..VEC_SIZE {
-            vec.push(i);
-        }
-        assert_eq!(vec.remove(0).unwrap(), 0);
-        assert_eq!(vec[0], 1);
-        assert_eq!(vec[8], 9);
-        assert_eq!(vec.len(), VEC_SIZE - 1);
-    }
-
-    #[test]
-    fn remove_last_element() {
-        const VEC_SIZE: usize = 10;
-        let mut vec = Vec::new(VEC_SIZE);
-        for i in 0..VEC_SIZE {
-            vec.push(i);
-        }
-        assert_eq!(vec.remove(VEC_SIZE - 1).unwrap(), 9);
-        assert_eq!(vec[0], 0);
-        assert_eq!(vec[8], 8);
-        assert_eq!(vec.len(), VEC_SIZE - 1);
-    }
-
-    #[test]
-    fn remove_vec_with_one_element() {
-        let mut vec = Vec::new(1);
-        vec.push(100);
-        assert_eq!(vec.remove(0).unwrap(), 100);
-        assert_eq!(vec.len(), 0);
-    }
-
-    #[test]
-    fn remove_out_of_bounds() {
-        const VEC_SIZE: usize = 10;
-        let mut vec = Vec::new(VEC_SIZE);
-        for i in 0..VEC_SIZE {
-            vec.push(i);
-        }
-        assert_eq!(vec.remove(VEC_SIZE), None); // This should return None
     }
 
     #[test]

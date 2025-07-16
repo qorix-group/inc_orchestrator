@@ -30,7 +30,7 @@ use crate::actions::action::{ActionExecError, ActionResult};
 use foundation::prelude::*;
 
 static EVENT_OBJ: LazyLock<Mutex<Event>> = LazyLock::new(|| {
-    let mut evts: HashMap<usize, (Listener<ipc::Service>, Option<Waker>, bool)> = HashMap::new();
+    let mut evts: HashMap<usize, (Listener<ipc_threadsafe::Service>, Option<Waker>, bool)> = HashMap::new();
     // The internal event name shall be unique within the system. Otherwise, when two or more processes running, the trigger will be delivered to all.
     let internal_event_name = "qorix_internal_waker_".to_string() + &process::id().to_string();
 
@@ -40,9 +40,9 @@ static EVENT_OBJ: LazyLock<Mutex<Event>> = LazyLock::new(|| {
         config
     };
 
-    Node::<ipc::Service>::cleanup_dead_nodes(&config);
-    Node::<ipc::Service>::list(&config, |node_state| {
-        if let NodeState::<ipc::Service>::Dead(view) = node_state {
+    Node::<ipc_threadsafe::Service>::cleanup_dead_nodes(&config);
+    Node::<ipc_threadsafe::Service>::list(&config, |node_state| {
+        if let NodeState::<ipc_threadsafe::Service>::Dead(view) = node_state {
             if let Err(e) = view.remove_stale_resources() {
                 error!("Failed to clean iceoryx2 resources: {:?}", e);
             }
@@ -52,7 +52,11 @@ static EVENT_OBJ: LazyLock<Mutex<Event>> = LazyLock::new(|| {
     .expect("failed clenup node stall state");
 
     let name = NodeName::new(&format!("orch_node_{}", process::id())).expect("Broken node name");
-    let node = NodeBuilder::new().name(&name).config(&config).create::<ipc::Service>().unwrap();
+    let node = NodeBuilder::new()
+        .name(&name)
+        .config(&config)
+        .create::<ipc_threadsafe::Service>()
+        .unwrap();
 
     let internal_notifier = node
         .service_builder(&internal_event_name.as_str().try_into().unwrap())
@@ -83,11 +87,11 @@ static EVENT_OBJ: LazyLock<Mutex<Event>> = LazyLock::new(|| {
 });
 
 pub struct Event {
-    service_node: Node<ipc::Service>,
+    service_node: Node<ipc_threadsafe::Service>,
     // Hash Map: event name (for debugging/logging), waker, bool flag to indicate whether event was received already. It is updated by polling thread.
-    events: HashMap<usize, (Listener<ipc::Service>, Option<Waker>, bool)>,
-    internal_notifier: Notifier<ipc::Service>,
-    notifiers: HashMap<String, Notifier<ipc::Service>>,
+    events: HashMap<usize, (Listener<ipc_threadsafe::Service>, Option<Waker>, bool)>,
+    internal_notifier: Notifier<ipc_threadsafe::Service>,
+    notifiers: HashMap<String, Notifier<ipc_threadsafe::Service>>,
 }
 
 /// Singleton Event
