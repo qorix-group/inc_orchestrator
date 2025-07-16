@@ -254,7 +254,7 @@ impl SchedulerTrait for DedicatedSchedulerLocalInner {
 }
 
 #[cfg(test)]
-pub(crate) fn scheduler_new(workers_cnt: usize, local_queue_size: usize) -> AsyncScheduler {
+pub(crate) fn scheduler_new(workers_cnt: usize, local_queue_size: u32) -> AsyncScheduler {
     // artificially construct a scheduler
     let mut worker_interactors = BoxInternal::<[WorkerInteractor]>::new_uninit_slice(workers_cnt);
     let mut queues: Vec<TaskStealQueue> = Vec::new(workers_cnt);

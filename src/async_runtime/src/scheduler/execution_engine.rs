@@ -49,6 +49,8 @@ impl JoinHandle {
     }
 }
 
+const MAX_NUM_OF_WORKERS: usize = 128;
+
 enum EngineState {
     Starting,
     Running(JoinHandle),
@@ -250,7 +252,7 @@ impl Drop for ExecutionEngine {
 
 pub struct ExecutionEngineBuilder {
     async_workers_cnt: usize,
-    queue_size: usize,
+    queue_size: u32,
     thread_params: ThreadParameters,
 
     dedicated_workers_ids: GrowableVec<UniqueWorkerId>,
@@ -275,9 +277,16 @@ impl ExecutionEngineBuilder {
     }
 
     ///
-    /// Will create engine with `cnt` async workers
+    /// Will create engine with `cnt` async workers. It has to be in range [1, 128]
     ///
     pub fn workers(mut self, cnt: usize) -> Self {
+        assert!(
+            cnt > 0 && cnt <= MAX_NUM_OF_WORKERS,
+            "Cannot create engine with {} workers. Min is 1 and max is {}",
+            cnt,
+            MAX_NUM_OF_WORKERS
+        );
+
         self.async_workers_cnt = cnt;
         self
     }
@@ -286,8 +295,8 @@ impl ExecutionEngineBuilder {
     /// Configure queue size with `size` for each async worker.
     /// >ATTENTION: `size` has to be power of two
     ///
-    pub fn task_queue_size(mut self, size: usize) -> Self {
-        assert!(size.is_power_of_two(), "Task queue size must be power of two");
+    pub fn task_queue_size(mut self, size: u32) -> Self {
+        assert!(size.is_power_of_two(), "Task queue size ({}) must be power of two", size);
         self.queue_size = size;
         self
     }
@@ -310,7 +319,8 @@ impl ExecutionEngineBuilder {
         self
     }
 
-    /// Configures the stack size for the async workers.
+    /// Configures the stack size for the async workers. Min is `Limit::MinStackSizeOfThread.value()`
+    /// which is OS and platform dependent.
     pub fn thread_stack_size(mut self, thread_stack_size: u64) -> Self {
         self.thread_params.stack_size = Some(thread_stack_size);
         self
@@ -394,7 +404,7 @@ impl ExecutionEngineBuilder {
             unsafe {
                 dedicated_queues[i]
                     .as_mut_ptr()
-                    .write((real_id, Arc::new(TriggerQueue::new(self.queue_size))));
+                    .write((real_id, Arc::new(TriggerQueue::new(self.queue_size as usize))));
             }
         }
 
@@ -422,11 +432,14 @@ impl ExecutionEngineBuilder {
 mod tests {
     use super::*;
     use ::core::time::Duration;
-    use std::sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
+    use std::{future, thread};
+    use std::{
+        panic,
+        sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        },
     };
-    use std::thread;
 
     // used from async_runtime.rs unit test
     impl ExecutionEngine {
@@ -437,6 +450,63 @@ mod tests {
 
     fn create_engine(workers: usize) -> ExecutionEngine {
         ExecutionEngineBuilder::new().workers(workers).task_queue_size(8).build()
+    }
+
+    #[test]
+    fn create_with_wrong_task_queue_size_fails() {
+        let mut result1 = panic::catch_unwind(|| {
+            ExecutionEngineBuilder::new().task_queue_size(0).build();
+        });
+
+        assert!(result1.is_err());
+
+        result1 = panic::catch_unwind(|| {
+            ExecutionEngineBuilder::new().task_queue_size(123).build();
+        });
+
+        assert!(result1.is_err());
+
+        result1 = panic::catch_unwind(|| {
+            ExecutionEngineBuilder::new().task_queue_size(546456).build();
+        });
+
+        assert!(result1.is_err());
+
+        result1 = panic::catch_unwind(|| {
+            ExecutionEngineBuilder::new().task_queue_size(2_u32.pow(31) - 1).build();
+        });
+
+        assert!(result1.is_err());
+    }
+
+    #[test]
+    fn create_with_correct_task_queue_size_works() {
+        ExecutionEngineBuilder::new().task_queue_size(2).build();
+        ExecutionEngineBuilder::new().task_queue_size(8).build();
+        ExecutionEngineBuilder::new().task_queue_size(2_u32.pow(5)).build();
+        ExecutionEngineBuilder::new().task_queue_size(2_u32.pow(20)).build();
+    }
+
+    #[test]
+    fn create_with_correct_num_of_workers() {
+        ExecutionEngineBuilder::new().workers(1).build();
+        ExecutionEngineBuilder::new().workers(MAX_NUM_OF_WORKERS).build();
+        ExecutionEngineBuilder::new().workers(MAX_NUM_OF_WORKERS - 1).build();
+    }
+
+    #[test]
+    fn create_with_wrong_num_of_workers_fails() {
+        let mut result1 = panic::catch_unwind(|| {
+            ExecutionEngineBuilder::new().workers(0).build();
+        });
+
+        assert!(result1.is_err());
+
+        result1 = panic::catch_unwind(|| {
+            ExecutionEngineBuilder::new().workers(12345).build();
+        });
+
+        assert!(result1.is_err());
     }
 
     #[test]
