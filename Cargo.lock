@@ -400,6 +400,7 @@ dependencies = [
  "iceoryx2-bb-container",
  "iceoryx2-bb-derive-macros",
  "iceoryx2-bb-elementary",
+ "iceoryx2-bb-elementary-traits",
  "iceoryx2-bb-lock-free",
  "iceoryx2-bb-memory",
  "iceoryx2-bb-posix",
@@ -563,12 +564,13 @@ dependencies = [
 
 [[package]]
 name = "iceoryx2"
-version = "0.5.0"
-source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-682-vec-fix-miri#dbbea33604bde9966c04b4a358e4c839cbf13811"
+version = "0.6.1"
+source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-875-base-string-fix-miri#249533c4c218b7fe91ff26b601b7977407bd418e"
 dependencies = [
  "iceoryx2-bb-container",
  "iceoryx2-bb-derive-macros",
  "iceoryx2-bb-elementary",
+ "iceoryx2-bb-elementary-traits",
  "iceoryx2-bb-lock-free",
  "iceoryx2-bb-log",
  "iceoryx2-bb-memory",
@@ -583,11 +585,12 @@ dependencies = [
 
 [[package]]
 name = "iceoryx2-bb-container"
-version = "0.5.0"
-source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-682-vec-fix-miri#dbbea33604bde9966c04b4a358e4c839cbf13811"
+version = "0.6.1"
+source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-875-base-string-fix-miri#249533c4c218b7fe91ff26b601b7977407bd418e"
 dependencies = [
  "iceoryx2-bb-derive-macros",
  "iceoryx2-bb-elementary",
+ "iceoryx2-bb-elementary-traits",
  "iceoryx2-bb-log",
  "iceoryx2-pal-concurrency-sync",
  "serde",
@@ -595,10 +598,11 @@ dependencies = [
 
 [[package]]
 name = "iceoryx2-bb-derive-macros"
-version = "0.5.0"
-source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-682-vec-fix-miri#dbbea33604bde9966c04b4a358e4c839cbf13811"
+version = "0.6.1"
+source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-875-base-string-fix-miri#249533c4c218b7fe91ff26b601b7977407bd418e"
 dependencies = [
  "iceoryx2-bb-elementary",
+ "iceoryx2-bb-elementary-traits",
  "proc-macro2",
  "quote",
  "syn",
@@ -606,37 +610,47 @@ dependencies = [
 
 [[package]]
 name = "iceoryx2-bb-elementary"
-version = "0.5.0"
-source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-682-vec-fix-miri#dbbea33604bde9966c04b4a358e4c839cbf13811"
+version = "0.6.1"
+source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-875-base-string-fix-miri#249533c4c218b7fe91ff26b601b7977407bd418e"
+dependencies = [
+ "iceoryx2-bb-elementary-traits",
+ "iceoryx2-pal-concurrency-sync",
+]
+
+[[package]]
+name = "iceoryx2-bb-elementary-traits"
+version = "0.6.1"
+source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-875-base-string-fix-miri#249533c4c218b7fe91ff26b601b7977407bd418e"
 dependencies = [
  "iceoryx2-pal-concurrency-sync",
 ]
 
 [[package]]
 name = "iceoryx2-bb-lock-free"
-version = "0.5.0"
-source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-682-vec-fix-miri#dbbea33604bde9966c04b4a358e4c839cbf13811"
+version = "0.6.1"
+source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-875-base-string-fix-miri#249533c4c218b7fe91ff26b601b7977407bd418e"
 dependencies = [
  "iceoryx2-bb-elementary",
+ "iceoryx2-bb-elementary-traits",
  "iceoryx2-bb-log",
  "iceoryx2-pal-concurrency-sync",
 ]
 
 [[package]]
 name = "iceoryx2-bb-log"
-version = "0.5.0"
-source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-682-vec-fix-miri#dbbea33604bde9966c04b4a358e4c839cbf13811"
+version = "0.6.1"
+source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-875-base-string-fix-miri#249533c4c218b7fe91ff26b601b7977407bd418e"
 dependencies = [
  "iceoryx2-pal-concurrency-sync",
- "termsize",
 ]
 
 [[package]]
 name = "iceoryx2-bb-memory"
-version = "0.5.0"
-source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-682-vec-fix-miri#dbbea33604bde9966c04b4a358e4c839cbf13811"
+version = "0.6.1"
+source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-875-base-string-fix-miri#249533c4c218b7fe91ff26b601b7977407bd418e"
 dependencies = [
  "iceoryx2-bb-elementary",
+ "iceoryx2-bb-elementary-traits",
  "iceoryx2-bb-lock-free",
  "iceoryx2-bb-log",
  "iceoryx2-bb-posix",
@@ -645,13 +659,14 @@ dependencies = [
 
 [[package]]
 name = "iceoryx2-bb-posix"
-version = "0.5.0"
-source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-682-vec-fix-miri#dbbea33604bde9966c04b4a358e4c839cbf13811"
+version = "0.6.1"
+source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-875-base-string-fix-miri#249533c4c218b7fe91ff26b601b7977407bd418e"
 dependencies = [
  "enum-iterator",
  "iceoryx2-bb-container",
  "iceoryx2-bb-derive-macros",
  "iceoryx2-bb-elementary",
+ "iceoryx2-bb-elementary-traits",
  "iceoryx2-bb-log",
  "iceoryx2-bb-system-types",
  "iceoryx2-pal-concurrency-sync",
@@ -664,11 +679,13 @@ dependencies = [
 
 [[package]]
 name = "iceoryx2-bb-system-types"
-version = "0.5.0"
-source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-682-vec-fix-miri#dbbea33604bde9966c04b4a358e4c839cbf13811"
+version = "0.6.1"
+source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-875-base-string-fix-miri#249533c4c218b7fe91ff26b601b7977407bd418e"
 dependencies = [
  "iceoryx2-bb-container",
+ "iceoryx2-bb-derive-macros",
  "iceoryx2-bb-elementary",
+ "iceoryx2-bb-elementary-traits",
  "iceoryx2-bb-log",
  "iceoryx2-pal-configuration",
  "iceoryx2-pal-posix",
@@ -677,33 +694,36 @@ dependencies = [
 
 [[package]]
 name = "iceoryx2-bb-testing"
-version = "0.5.0"
-source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-682-vec-fix-miri#dbbea33604bde9966c04b4a358e4c839cbf13811"
+version = "0.6.1"
+source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-875-base-string-fix-miri#249533c4c218b7fe91ff26b601b7977407bd418e"
 dependencies = [
- "iceoryx2-bb-derive-macros",
- "iceoryx2-bb-elementary",
+ "iceoryx2-bb-elementary-traits",
  "iceoryx2-pal-configuration",
+ "iceoryx2-pal-testing",
 ]
 
 [[package]]
 name = "iceoryx2-bb-threadsafe"
-version = "0.5.0"
-source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-682-vec-fix-miri#dbbea33604bde9966c04b4a358e4c839cbf13811"
+version = "0.6.1"
+source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-875-base-string-fix-miri#249533c4c218b7fe91ff26b601b7977407bd418e"
 dependencies = [
  "iceoryx2-bb-container",
  "iceoryx2-bb-elementary",
+ "iceoryx2-bb-elementary-traits",
  "iceoryx2-bb-log",
  "iceoryx2-bb-posix",
 ]
 
 [[package]]
 name = "iceoryx2-cal"
-version = "0.5.0"
-source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-682-vec-fix-miri#dbbea33604bde9966c04b4a358e4c839cbf13811"
+version = "0.6.1"
+source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-875-base-string-fix-miri#249533c4c218b7fe91ff26b601b7977407bd418e"
 dependencies = [
  "cdr",
  "iceoryx2-bb-container",
+ "iceoryx2-bb-derive-macros",
  "iceoryx2-bb-elementary",
+ "iceoryx2-bb-elementary-traits",
  "iceoryx2-bb-lock-free",
  "iceoryx2-bb-log",
  "iceoryx2-bb-memory",
@@ -719,18 +739,18 @@ dependencies = [
 
 [[package]]
 name = "iceoryx2-pal-concurrency-sync"
-version = "0.5.0"
-source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-682-vec-fix-miri#dbbea33604bde9966c04b4a358e4c839cbf13811"
+version = "0.6.1"
+source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-875-base-string-fix-miri#249533c4c218b7fe91ff26b601b7977407bd418e"
 
 [[package]]
 name = "iceoryx2-pal-configuration"
-version = "0.5.0"
-source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-682-vec-fix-miri#dbbea33604bde9966c04b4a358e4c839cbf13811"
+version = "0.6.1"
+source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-875-base-string-fix-miri#249533c4c218b7fe91ff26b601b7977407bd418e"
 
 [[package]]
 name = "iceoryx2-pal-posix"
-version = "0.5.0"
-source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-682-vec-fix-miri#dbbea33604bde9966c04b4a358e4c839cbf13811"
+version = "0.6.1"
+source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-875-base-string-fix-miri#249533c4c218b7fe91ff26b601b7977407bd418e"
 dependencies = [
  "bindgen",
  "cc",
@@ -739,6 +759,14 @@ dependencies = [
  "lazy_static",
  "libc",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "iceoryx2-pal-testing"
+version = "0.6.1"
+source = "git+https://github.com/qorix-group/iceoryx2.git?branch=iox2-875-base-string-fix-miri#249533c4c218b7fe91ff26b601b7977407bd418e"
+dependencies = [
+ "iceoryx2-pal-configuration",
 ]
 
 [[package]]
@@ -1350,16 +1378,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06794f8f6c5c898b3275aebefa6b8a1cb24cd2c6c79397ab15774837a0bc5755"
 dependencies = [
  "winapi-util",
-]
-
-[[package]]
-name = "termsize"
-version = "0.1.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f11ff5c25c172608d5b85e2fb43ee9a6d683a7f4ab7f96ae07b3d8b590368fd"
-dependencies = [
- "libc",
- "winapi",
 ]
 
 [[package]]

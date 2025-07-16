@@ -13,7 +13,7 @@
 
 use ::core::mem::MaybeUninit;
 
-use iceoryx2_bb_elementary::pointer_trait::PointerTrait;
+use iceoryx2_bb_elementary_traits::pointer_trait::PointerTrait;
 
 use super::queue::Queue;
 
