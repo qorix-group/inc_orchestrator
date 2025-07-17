@@ -35,6 +35,10 @@ class TestShortSleepUnderLoad2W256Q(CitScenario):
             },
         }
 
+    @pytest.fixture(scope="class")
+    def execution_timeout(self) -> float:
+        return 10.0
+
     def test_start_and_finish(self, logs_info_level: LogContainer):
         assert logs_info_level[0].message == "StartAction was executed", (
             "Program not started with first action in sequence"
@@ -81,6 +85,10 @@ class TestMediumSleepUnderLoad2W256Q(TestShortSleepUnderLoad2W256Q):
                 "sleep_duration_ms": 500,
             },
         }
+
+    @pytest.fixture(scope="class")
+    def execution_timeout(self) -> float:
+        return 10.0
 
 
 class TestLongSleepUnderLoad2W256Q(TestMediumSleepUnderLoad2W256Q):

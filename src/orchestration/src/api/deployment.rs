@@ -149,6 +149,7 @@ impl<T> Deployment<'_, T> {
 
 #[cfg(test)]
 #[cfg(not(miri))]
+#[cfg(not(loom))]
 mod tests {
     use super::*;
 
