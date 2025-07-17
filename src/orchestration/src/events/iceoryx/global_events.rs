@@ -11,6 +11,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+use foundation::prelude::trace;
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 /// IMPORTANT: This is temporary solution for iceoryx integration. This will be re-written later.
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,6 +64,7 @@ pub struct IpcNotifier {
 impl IpcNotifier {
     async fn trigger_async(event_name: String) -> ActionResult {
         let result = Event::get_instance().lock().unwrap().trigger_event(event_name.as_str());
+        trace!("GlobalNotifier: triggered event: {}", event_name);
         result
     }
 }
@@ -93,6 +96,7 @@ impl IpcListener {
                 let waker_clone = cx.waker().clone();
                 let event_received = Event::get_instance().lock().unwrap().wake_on_event(self.listener, waker_clone);
                 if event_received {
+                    trace!("GlobalListener: received event for listener: {}", self.listener);
                     Poll::Ready(())
                 } else {
                     Poll::Pending

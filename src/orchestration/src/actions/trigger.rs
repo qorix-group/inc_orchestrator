@@ -46,8 +46,8 @@ impl TriggerBuilder {
         let tag = design.get_orchestration_tag(name.into());
         assert!(
             tag.is_ok(),
-            "Failed to create Trigger Action with name '{}', design/deployment errors where not handled properly before or You passing wrong name.",
-            name
+            "Failed to create Trigger Action with name '{}', design({:?})/deployment errors where not handled properly before or You passing wrong name.",
+            name, design
         );
 
         Self::from_tag(&tag.unwrap())

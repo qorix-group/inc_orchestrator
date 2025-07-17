@@ -21,6 +21,7 @@
 use crate::{
     api::design::Design,
     common::tag::Tag,
+    core::metering::{MeterTrait, NoneMeter},
     prelude::{ActionExecError, ActionResult, ActionTrait},
 };
 use ::core::{
@@ -136,17 +137,58 @@ impl ProgramBuilder {
 }
 
 impl Program {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
     /// Execute the run action in an infinite loop.
     pub async fn run(&mut self) -> ActionResult {
-        self.internal_run(None).await
+        self.internal_run::<NoneMeter>(None, None).await
     }
 
     /// Execute the run action a given number of times.
     pub async fn run_n(&mut self, n: usize) -> ActionResult {
-        self.internal_run(Some(n)).await
+        self.internal_run::<NoneMeter>(Some(n), None).await
     }
 
-    async fn internal_run(&mut self, n: Option<usize>) -> ActionResult {
+    /// Execute the run action in an infinite loop using `T` to measure the time taken for each iteration.
+    pub async fn run_metered<T: MeterTrait>(&mut self) -> ActionResult {
+        self.internal_run::<T>(None, None).await
+    }
+
+    /// Execute the run action a given number of times using `T` to measure the time taken for each iteration.
+    pub async fn run_n_metered<T: MeterTrait>(&mut self, n: usize) -> ActionResult {
+        self.internal_run::<T>(Some(n), None).await
+    }
+
+    /// Execute the run action a given number of times with a specified cycle duration.
+    /// `cycle` is the time the whole iteration should take (execution + wait time).
+    /// ATTENTION: Currently this is `dev` feature that does BLOCKING sleep
+    pub async fn run_n_cycle(&mut self, n: usize, cycle: Duration) -> ActionResult {
+        self.internal_run::<NoneMeter>(Some(n), Some(cycle)).await
+    }
+
+    /// Execute the run action with a specified cycle duration. `cycle` is the time the whole iteration should take (execution + wait time).
+    /// ATTENTION: Currently this is `dev` feature that does BLOCKING sleep
+    pub async fn run_cycle(&mut self, cycle: Duration) -> ActionResult {
+        self.internal_run::<NoneMeter>(None, Some(cycle)).await
+    }
+
+    /// Execute the run action a given number of times with a specified cycle duration using `T` to measure the time taken for each iteration.
+    /// `cycle` is the time the whole iteration should take (execution + wait time).
+    /// ATTENTION: Currently this is `dev` feature that does BLOCKING sleep
+    pub async fn run_n_cycle_metered<T: MeterTrait>(&mut self, n: usize, cycle: Duration) -> ActionResult {
+        self.internal_run::<T>(Some(n), Some(cycle)).await
+    }
+
+    /// Execute the run action with a specified cycle duration using `T` to measure the time taken for each iteration.
+    /// `cycle` is the time the whole iteration should take (execution + wait time).
+    /// ATTENTION: Currently this is `dev` feature that does BLOCKING sleep
+    pub async fn run_cycle_metered<T: MeterTrait>(&mut self, cycle: Duration) -> ActionResult {
+        self.internal_run::<T>(None, Some(cycle)).await
+    }
+
+    async fn internal_run<T: MeterTrait>(&mut self, n: Option<usize>, cycle: Option<Duration>) -> ActionResult {
         let iteration_count: usize = n.unwrap_or_default();
         let mut iteration = 0_usize;
         let mut shutdown_handle = self.create_shutdown_handle()?;
@@ -154,15 +196,10 @@ impl Program {
         // Stop execution if the start action is present and results in an error.
         self.run_start_action().await?;
 
+        let mut meter: T = T::new(self.name.as_str().into());
+
         while n.is_none() || iteration < iteration_count {
             let start_time = Clock::now();
-
-            let stats = ProgramStats {
-                name: self.name.as_str(),
-                iteration,
-                iteration_time: Duration::ZERO,
-            };
-            trace!(meta = ?stats, "Iteration started");
 
             let run_future = self.run_action.as_mut().try_execute();
             if run_future.is_err() {
@@ -187,12 +224,15 @@ impl Program {
                 }
             };
 
-            let stats = ProgramStats {
-                name: self.name.as_str(),
-                iteration,
-                iteration_time: Clock::now().duration_since(start_time),
-            };
-            trace!( meta = ?stats, "Iteration completed");
+            let iteration_duration = start_time.elapsed();
+
+            meter.meter(&iteration_duration, ("iteration", iteration));
+
+            if let Some(cycle_duration) = cycle {
+                if iteration_duration < cycle_duration {
+                    std::thread::sleep(cycle_duration - iteration_duration);
+                }
+            }
 
             iteration += 1;
         }
@@ -276,14 +316,6 @@ impl Future for JoinEither<'_> {
 
         Poll::Pending
     }
-}
-
-#[derive(Debug)]
-#[allow(dead_code)]
-struct ProgramStats<'a> {
-    name: &'a str,
-    iteration: usize,
-    iteration_time: Duration,
 }
 
 #[cfg(test)]
