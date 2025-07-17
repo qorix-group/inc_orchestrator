@@ -60,12 +60,22 @@ pub struct UniqueWorkerId(u64);
 #[allow(clippy::from_over_into)]
 impl Into<UniqueWorkerId> for &str {
     fn into(self) -> UniqueWorkerId {
-        // TODO: for now use DJB2 hash
-        let mut hash: u64 = 5381;
-        for byte in self.bytes() {
-            hash = (hash.wrapping_shl(5)).wrapping_add(hash).wrapping_add(byte as u64);
-        }
-
-        UniqueWorkerId(hash)
+        UniqueWorkerId(compute_hash(self))
     }
+}
+
+#[allow(clippy::from_over_into)]
+impl Into<UniqueWorkerId> for String {
+    fn into(self) -> UniqueWorkerId {
+        UniqueWorkerId(compute_hash(&self))
+    }
+}
+
+fn compute_hash(data: &str) -> u64 {
+    // TODO: for now use DJB2 hash
+    let mut hash: u64 = 5381;
+    for byte in data.bytes() {
+        hash = (hash.wrapping_shl(5)).wrapping_add(hash).wrapping_add(byte as u64);
+    }
+    hash
 }

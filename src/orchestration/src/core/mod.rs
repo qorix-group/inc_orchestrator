@@ -11,5 +11,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+pub mod metering;
 pub mod orch_locks;
 pub mod runtime_seq_acc;

@@ -254,7 +254,7 @@ impl ProgramDatabase {
             }
         }
 
-        Err(CommonErrors::NoData)
+        Err(CommonErrors::NotFound)
     }
 
     /// Returns an `OrchestrationTag` for an action previously registered with the given tag.

@@ -20,6 +20,7 @@ use crate::{
 };
 use ::core::{future::Future, ops::Deref};
 
+use ::core::fmt::Debug;
 use std::sync::{Arc, Mutex};
 
 use foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
@@ -48,6 +49,12 @@ pub struct Design {
     params: DesignConfig, // TODO: probably remove when we store it in ProgramDatabase
     pub(crate) db: ProgramDatabase,
     programs: GrowableVec<ProgramData>,
+}
+
+impl Debug for Design {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("Design").field("id", &self.id).finish()
+    }
 }
 
 impl Design {
