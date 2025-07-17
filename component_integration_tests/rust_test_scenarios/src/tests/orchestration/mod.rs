@@ -5,7 +5,13 @@ use orchestration_sleep::SleepUnderLoad;
 use orchestration_trigger_sync::{
     OneTriggerOneSyncTwoPrograms, OneTriggerTwoSyncsThreePrograms, TriggerAndSyncInNestedBranches, TriggerSyncOneAfterAnother,
 };
+use orchestration_user_error_catch::{
+    CatchConcurrencyUserError, CatchDoubleMixedUserError, CatchDoubleRecoverableUserError, CatchNestedConcurrencyUserError,
+    CatchNestedSequenceUserError, CatchSequenceUserError, DoubleCatchSequence,
+};
 use test_scenarios_rust::scenario::{ScenarioGroup, ScenarioGroupImpl};
+
+use orchestration_double_handler_catch::{CatchDoubleDiffHandlerError, CatchDoubleSameHandlerError};
 
 use async_runtime::futures::reusable_box_future::ReusableBoxFuturePool;
 use orchestration::{common::tag::Tag, prelude::*};
@@ -13,6 +19,7 @@ use orchestration::{common::tag::Tag, prelude::*};
 use orchestration_shutdown::{GetAllShutdowns, OneProgramNotShut, SingleProgramSingleShutdown, TwoProgramsSingleShutdown, TwoProgramsTwoShutdowns};
 use tracing::info;
 
+pub mod orchestration_user_error_catch;
 macro_rules! generic_test_func {
     ($name:expr) => {
         || generic_test_sync_func($name)
@@ -20,6 +27,7 @@ macro_rules! generic_test_func {
 }
 #[macro_use]
 mod orchestration_concurrency;
+mod orchestration_double_handler_catch;
 mod orchestration_sequence;
 mod orchestration_shutdown;
 mod orchestration_sleep;
@@ -51,6 +59,16 @@ pub fn orchestration_scenario_group() -> Box<dyn ScenarioGroup> {
             Box::new(GetAllShutdowns),
             Box::new(OneProgramNotShut),
             Box::new(ShutdownBeforeStart),
+            // Catch scenarios
+            Box::new(CatchSequenceUserError),
+            Box::new(CatchNestedSequenceUserError),
+            Box::new(CatchConcurrencyUserError),
+            Box::new(CatchDoubleRecoverableUserError),
+            Box::new(CatchDoubleMixedUserError),
+            Box::new(CatchDoubleSameHandlerError),
+            Box::new(CatchDoubleDiffHandlerError),
+            Box::new(CatchNestedConcurrencyUserError),
+            Box::new(DoubleCatchSequence),
         ],
         vec![],
     ))

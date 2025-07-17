@@ -38,7 +38,8 @@
                 "--input",
                 "${input:inputArg}"
             ],
-            "cwd": "${workspaceFolder}/component_integration_tests/rust_test_scenarios"
+            "cwd": "${workspaceFolder}/component_integration_tests/rust_test_scenarios",
+            "console": "integratedTerminal"
         },
     ]
 }
