@@ -42,11 +42,11 @@ class TestOneTriggerOneSyncTwoPrograms(CitScenario):
 
     def test_execution_delay(self, logs_info_level: LogContainer):
         sleep_begin_msg = logs_info_level.get_logs_by_field(
-            "id", BLOCKING_TASK_ID
-        ).find_log("location", "begin")
+            "id", value=BLOCKING_TASK_ID
+        ).find_log("location", pattern="begin")
         sleep_end_msg = logs_info_level.get_logs_by_field(
-            "id", BLOCKING_TASK_ID
-        ).find_log("location", "end")
+            "id", value=BLOCKING_TASK_ID
+        ).find_log("location", pattern="end")
 
         assert sleep_end_msg.timestamp - sleep_begin_msg.timestamp >= timedelta(
             milliseconds=BLOCKING_TASK_DELAY_MS
@@ -95,11 +95,11 @@ class TestOneTriggerTwoSyncsThreePrograms(CitScenario):
 
     def test_execution_delay(self, logs_info_level: LogContainer):
         sleep_begin_msg = logs_info_level.get_logs_by_field(
-            "id", BLOCKING_TASK_ID
-        ).find_log("location", "begin")
+            "id", value=BLOCKING_TASK_ID
+        ).find_log("location", pattern="begin")
         sleep_end_msg = logs_info_level.get_logs_by_field(
-            "id", BLOCKING_TASK_ID
-        ).find_log("location", "end")
+            "id", value=BLOCKING_TASK_ID
+        ).find_log("location", pattern="end")
 
         assert sleep_end_msg.timestamp - sleep_begin_msg.timestamp >= timedelta(
             milliseconds=BLOCKING_TASK_DELAY_MS

@@ -20,7 +20,7 @@ class TestRuntimeOneWorkerOneTask(CitScenario):
         self, test_config: dict[str, Any], logs_info_level: LogContainer
     ):
         task_name = test_config["test"]["tasks"][0]
-        assert logs_info_level.contains_id(task_name), (
+        assert logs_info_level.contains_log("id", value=task_name), (
             f"Task {task_name} was not executed"
         )
 
