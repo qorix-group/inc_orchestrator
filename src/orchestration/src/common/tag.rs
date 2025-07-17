@@ -172,7 +172,8 @@ mod internal {
 
         pub(super) fn insert_tag(&mut self, value: Tag) -> Tag {
             match self.tags.binary_search(&value) {
-                Ok(pos) | Err(pos) => {
+                Ok(pos) => self.tags[pos],
+                Err(pos) => {
                     self.tags.insert(pos, value);
                     self.tags[pos]
                 }
