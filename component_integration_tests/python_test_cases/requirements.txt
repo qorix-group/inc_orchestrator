@@ -9,4 +9,4 @@ pytest-env==1.1.5
 pytest-html==4.1.1
 pytest-metadata==3.1.1
 pytest-repeat==0.9.4
-testing-utils @ git+https://github.com/qorix-group/testing_tools.git@v0.1.0
+testing-utils @ git+https://github.com/qorix-group/testing_tools.git@v0.1.1
