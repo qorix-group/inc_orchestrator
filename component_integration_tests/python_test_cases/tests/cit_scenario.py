@@ -37,7 +37,7 @@ class CitScenario(Scenario):
         logs_bin : LogContainer
             Logs with messages generated strictly by the tested code.
         """
-        return logs_bin.get_logs_by_field(field="level", pattern="INFO")
+        return logs_bin.get_logs_by_field(field="level", value="INFO")
 
     @pytest.fixture(scope="function", autouse=True)
     def print_to_report(

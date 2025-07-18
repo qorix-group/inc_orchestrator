@@ -35,23 +35,23 @@ class TestSingleConcurrency1W256Q(CitScenario):
     ):
         # Check if all branches in Concurrency were executed before next Sequence step
         finish_action = logs_info_level.find_log(
-            field="message", pattern="FinishAction was executed"
+            field="message", value="FinishAction was executed"
         )
 
         end_fun_1 = logs_info_level.find_log(
-            field="message", pattern="End of 'Function1' function"
+            field="message", value="End of 'Function1' function"
         )
         assert end_fun_1.timestamp < finish_action.timestamp, (
             "Function1 execution should be finished before FinishAction was executed"
         )
         end_fun_2 = logs_info_level.find_log(
-            field="message", pattern="End of 'Function2' function"
+            field="message", value="End of 'Function2' function"
         )
         assert end_fun_2.timestamp < finish_action.timestamp, (
             "Function2 execution should be finished before FinishAction was executed"
         )
         end_fun_3 = logs_info_level.find_log(
-            field="message", pattern="End of 'Function3' function"
+            field="message", value="End of 'Function3' function"
         )
 
         assert end_fun_3.timestamp < finish_action.timestamp, (
@@ -79,23 +79,23 @@ class TestMultipleConcurrency1W256Q(CitScenario):
     ):
         # Check if all branches in Concurrency1 were executed before FinishAction
         finish_action = logs_info_level.find_log(
-            field="message", pattern="FinishAction was executed"
+            field="message", value="FinishAction was executed"
         )
 
         end_fun_1 = logs_info_level.find_log(
-            field="message", pattern="End of 'Function1' function"
+            field="message", value="End of 'Function1' function"
         )
         assert end_fun_1.timestamp < finish_action.timestamp, (
             "Function1 execution should be finished before FinishAction was executed"
         )
         end_fun_2 = logs_info_level.find_log(
-            field="message", pattern="End of 'Function2' function"
+            field="message", value="End of 'Function2' function"
         )
         assert end_fun_2.timestamp < finish_action.timestamp, (
             "Function2 execution should be finished before FinishAction was executed"
         )
         end_fun_3 = logs_info_level.find_log(
-            field="message", pattern="End of 'Function3' function"
+            field="message", value="End of 'Function3' function"
         )
 
         assert end_fun_3.timestamp < finish_action.timestamp, (
@@ -113,19 +113,19 @@ class TestMultipleConcurrency1W256Q(CitScenario):
         concurrency2_start = functions_starts_from_concurrency2[0]
 
         end_fun_1 = logs_info_level.find_log(
-            field="message", pattern="End of 'Function1' function"
+            field="message", value="End of 'Function1' function"
         )
         assert end_fun_1.timestamp < concurrency2_start.timestamp, (
             "Function1 execution from Concurrency1 block should be finished before Concurrency2 was started"
         )
         end_fun_2 = logs_info_level.find_log(
-            field="message", pattern="End of 'Function2' function"
+            field="message", value="End of 'Function2' function"
         )
         assert end_fun_2.timestamp < concurrency2_start.timestamp, (
             "Function2 execution from Concurrency1 block should be finished before Concurrency2 was started"
         )
         end_fun_3 = logs_info_level.find_log(
-            field="message", pattern="End of 'Function3' function"
+            field="message", value="End of 'Function3' function"
         )
 
         assert end_fun_3.timestamp < concurrency2_start.timestamp, (
@@ -137,23 +137,23 @@ class TestMultipleConcurrency1W256Q(CitScenario):
     ):
         # Check if all branches in Concurrency2 were executed before FinishAction
         finish_action = logs_info_level.find_log(
-            field="message", pattern="FinishAction was executed"
+            field="message", value="FinishAction was executed"
         )
 
         end_fun_4 = logs_info_level.find_log(
-            field="message", pattern="End of 'Function4' function"
+            field="message", value="End of 'Function4' function"
         )
         assert end_fun_4.timestamp < finish_action.timestamp, (
             "Function4 execution should be finished before FinishAction was executed"
         )
         end_fun_5 = logs_info_level.find_log(
-            field="message", pattern="End of 'Function5' function"
+            field="message", value="End of 'Function5' function"
         )
         assert end_fun_5.timestamp < finish_action.timestamp, (
             "Function5 execution should be finished before FinishAction was executed"
         )
         end_fun_6 = logs_info_level.find_log(
-            field="message", pattern="End of 'Function6' function"
+            field="message", value="End of 'Function6' function"
         )
 
         assert end_fun_6.timestamp < finish_action.timestamp, (
@@ -175,7 +175,7 @@ class TestMultipleConcurrency1W256Q(CitScenario):
 
         # IntermediateAction should be executed after Concurrency1
         intermediate_action = logs_info_level.find_log(
-            field="message", pattern="IntermediateAction was executed"
+            field="message", value="IntermediateAction was executed"
         )
 
         assert (
@@ -189,7 +189,7 @@ class TestMultipleConcurrency1W256Q(CitScenario):
     def test_concurrency2_execution_order(self, logs_info_level: LogContainer):
         # IntermediateAction should be executed after Concurrency1
         intermediate_action = logs_info_level.find_log(
-            field="message", pattern="IntermediateAction was executed"
+            field="message", value="IntermediateAction was executed"
         )
         # Find all functions starts from Concurrency2 and pick the first one by timestamp
         functions_starts_from_concurrency2 = logs_info_level.get_logs_by_field(
@@ -204,7 +204,7 @@ class TestMultipleConcurrency1W256Q(CitScenario):
 
         # FinishActrion should be executed after Concurrency2
         finish_action = logs_info_level.find_log(
-            field="message", pattern="FinishAction was executed"
+            field="message", value="FinishAction was executed"
         )
 
         assert (
@@ -243,7 +243,7 @@ class TestNestedConcurrency1W256Q(CitScenario):
     ):
         # Check if all branches in InnerConcurrency were executed before FinishAction
         finish_action = logs_info_level.find_log(
-            field="message", pattern="FinishAction was executed"
+            field="message", value="FinishAction was executed"
         )
 
         functions_end_from_inner_concurrency = logs_info_level.get_logs_by_field(
@@ -259,7 +259,7 @@ class TestNestedConcurrency1W256Q(CitScenario):
     ):
         # Check if all branches in OuterConcurrency were executed before FinishAction
         finish_action = logs_info_level.find_log(
-            field="message", pattern="FinishAction was executed"
+            field="message", value="FinishAction was executed"
         )
 
         functions_end_from_outer_concurrency = logs_info_level.get_logs_by_field(

@@ -15,12 +15,12 @@ class TestOnlyShutdown1W2Q(CitScenario):
 
     def test_engine_start_executed(self, logs_info_level: LogContainer):
         assert logs_info_level.contains_log(
-            field="message", pattern="Program entered engine"
+            field="message", value="Program entered engine"
         ), "Program did not start as expected, no AsyncRuntime created"
 
     def test_shutdown_action_executed(self, logs_info_level: LogContainer):
         assert logs_info_level.contains_log(
-            field="message", pattern="Program execution finished"
+            field="message", value="Program execution finished"
         ), "Program did not start as expected, no AsyncRuntime created"
 
     def test_no_actions_executed(self, logs_info_level: LogContainer):
