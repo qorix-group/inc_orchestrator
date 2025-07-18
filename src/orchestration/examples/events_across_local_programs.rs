@@ -88,12 +88,13 @@ fn main() {
         .expect("Failed to specify event");
 
     // Create programs
-    let mut programs = orch.create_programs().unwrap();
+    let mut program_manager = orch.into_program_manager().unwrap();
+    let mut programs = program_manager.get_programs();
 
     // Put programs into runtime and run them
     let _ = runtime.block_on(async move {
-        let mut program1 = programs.programs.pop().unwrap();
-        let mut program2 = programs.programs.pop().unwrap();
+        let mut program1 = programs.pop().unwrap();
+        let mut program2 = programs.pop().unwrap();
 
         let h1 = async_runtime::spawn(async move {
             let _ = program1.run_n(3).await;

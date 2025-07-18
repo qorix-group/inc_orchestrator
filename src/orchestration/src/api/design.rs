@@ -13,6 +13,7 @@
 
 use crate::{
     actions::invoke,
+    api::ShutdownEvent,
     common::{orch_tag::OrchestrationTag, tag::Tag, DesignConfig},
     prelude::InvokeResult,
     program::{Program, ProgramBuilder},
@@ -105,11 +106,6 @@ impl Design {
         self.db.register_event(tag)
     }
 
-    /// Registers a shutdown event in the design.
-    pub fn register_shutdown_event(&mut self, tag: Tag) -> Result<(), CommonErrors> {
-        self.db.register_shutdown_event(tag)
-    }
-
     /// Fetches an [`OrchestrationTag`] for a given tag, which can be used to reference the orchestration in programs.
     pub fn get_orchestration_tag(&self, tag: Tag) -> Result<OrchestrationTag, CommonErrors> {
         self.db.get_orchestration_tag(tag)
@@ -127,14 +123,18 @@ impl Design {
         !self.programs.is_empty()
     }
 
-    pub(super) fn get_programs(mut self, mut container: GrowableVec<Program>) -> Result<GrowableVec<Program>, CommonErrors> {
+    pub(super) fn into_programs(
+        mut self,
+        shutdown_events: &GrowableVec<ShutdownEvent>,
+        container: &mut GrowableVec<Program>,
+    ) -> Result<(), CommonErrors> {
         while let Some(program_data) = self.programs.pop() {
             let mut builder = ProgramBuilder::new(program_data.0);
             (program_data.1)(&mut self, &mut builder)?;
-            container.push(builder.build(&mut self)?);
+            container.push(builder.build(shutdown_events, self.config())?);
         }
 
-        Ok(container)
+        Ok(())
     }
 }
 

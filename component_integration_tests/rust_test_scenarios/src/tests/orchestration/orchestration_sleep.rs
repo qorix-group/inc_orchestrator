@@ -118,10 +118,11 @@ impl Scenario for SleepUnderLoad {
 
         let orch = Orchestration::new().add_design(design).design_done();
 
-        let mut programs: orchestration::api::OrchProgramManager = orch.create_programs().unwrap();
+        let mut program_manager: orchestration::api::OrchProgramManager = orch.into_program_manager().unwrap();
+        let mut programs = program_manager.get_programs();
 
         let _ = rt.block_on(async move {
-            let _ = programs.programs.pop().unwrap().run_n(1).await;
+            let _ = programs.pop().unwrap().run_n(1).await;
             Ok(0)
         });
         Ok(())

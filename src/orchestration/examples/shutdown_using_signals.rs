@@ -28,7 +28,6 @@ use signal_handler::SignalHandler;
 fn example_component_design() -> Result<Design, CommonErrors> {
     let mut design = Design::new("ExampleDesign".into(), DesignConfig::default());
     let t1 = design.register_invoke_async("PendingIndefinitely".into(), async || future::pending().await)?;
-    design.register_shutdown_event("ShutdownEvent".into())?;
 
     design.add_program("ExampleDesignProgram", move |design, builder| {
         builder
@@ -66,14 +65,14 @@ fn main() {
         .bind_shutdown_event_as_local("ShutdownEvent".into())
         .expect("Failed to bind shutdown event");
 
+    // Create program
+    let mut program_manager = orch.into_program_manager().unwrap();
+    let mut programs = program_manager.get_programs();
+    let mut program = programs.pop().unwrap();
     // Get shutdown notifier to shutdown the program when shutdown is requested
-    let mut shutdown_notifier = deployment
+    let mut shutdown_notifier = program_manager
         .get_shutdown_notifier("ShutdownEvent".into())
         .expect("Failed to get shutdown notifier");
-
-    // Create program
-    let mut programs = orch.create_programs().unwrap();
-    let mut program = programs.programs.pop().unwrap();
 
     // Register signal handlers for SIGINT and SIGTERM
     unsafe { SignalHandler::get_instance().register_signal_handlers() };

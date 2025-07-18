@@ -23,7 +23,6 @@ use crate::{
     events::events_provider::EventCreator,
 };
 use async_runtime::core::types::UniqueWorkerId;
-use foundation::containers::growable_vec::GrowableVec;
 use foundation::prelude::*;
 use iceoryx2_bb_container::slotmap::{SlotMap, SlotMapKey};
 use std::{
@@ -79,23 +78,20 @@ impl Debug for ActionProvider {
 
 pub struct ProgramDatabase {
     action_provider: Rc<RefCell<ActionProvider>>,
-    design_shutdown_events: GrowableVec<DesignEvent>,
 }
 
 impl ProgramDatabase {
     /// Creates a new instance of `ProgramDatabase`.
     pub fn new(config: DesignConfig) -> Self {
-        // TODO: Provider needs to keep DesignConfig probably so tags can have info from it
         Self {
             action_provider: Rc::new(RefCell::new(ActionProvider::new(config))),
-            design_shutdown_events: GrowableVec::default(),
         }
     }
 
     pub fn register_event(&self, tag: Tag) -> Result<OrchestrationTag, CommonErrors> {
         let mut ap = self.action_provider.borrow_mut();
 
-        if tag.is_in_collection(ap.design_events.iter()) || tag.is_in_collection(self.design_shutdown_events.iter()) {
+        if tag.is_in_collection(ap.design_events.iter()) {
             return Err(CommonErrors::AlreadyDone);
         }
 
@@ -106,21 +102,6 @@ impl ProgramDatabase {
                 trace!("Registered event with tag: {:?}", tag);
                 OrchestrationTag::new(tag, key, MapIdentifier::Event, Rc::clone(&self.action_provider))
             })
-    }
-
-    pub fn register_shutdown_event(&mut self, tag: Tag) -> Result<(), CommonErrors> {
-        let ap = self.action_provider.borrow_mut();
-
-        if tag.is_in_collection(ap.design_events.iter()) || tag.is_in_collection(self.design_shutdown_events.iter()) {
-            return Err(CommonErrors::AlreadyDone);
-        }
-
-        if self.design_shutdown_events.push(DesignEvent::new(tag)) {
-            trace!("Registered shutdown event with tag: {:?}", tag);
-            Ok(())
-        } else {
-            Err(CommonErrors::GenericError)
-        }
     }
 
     /// Registers a function as an invoke action that can be created multiple times.
@@ -310,26 +291,6 @@ impl ProgramDatabase {
         }
 
         ret
-    }
-
-    pub(crate) fn set_creator_for_shutdown_event(&mut self, creator: EventCreator, shutdown_event: Tag) -> Result<(), CommonErrors> {
-        if let Some(design_event) = shutdown_event.find_in_collection(self.design_shutdown_events.iter_mut()) {
-            trace!("Shutdown event {:?} has been successfully bound", shutdown_event);
-            design_event.set_creator(Rc::clone(&creator));
-            Ok(())
-        } else {
-            Err(CommonErrors::NotFound)
-        }
-    }
-
-    pub(crate) fn get_creator_for_shutdown_event(&self, shutdown_event: Tag) -> Result<EventCreator, CommonErrors> {
-        if let Some(design_event) = shutdown_event.find_in_collection(self.design_shutdown_events.iter()) {
-            if let Some(creator) = design_event.creator() {
-                return Ok(creator);
-            }
-        }
-
-        Err(CommonErrors::NotFound)
     }
 }
 

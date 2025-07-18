@@ -16,21 +16,20 @@ use std::rc::Rc;
 use crate::{
     api::{
         design::{Design, DesignTag},
-        OrchestrationApi,
+        OrchestrationApi, _DesignTag,
     },
     common::tag::Tag,
-    events::events_provider::ShutdownNotifier,
     program::ProgramBuilder,
 };
 use async_runtime::core::types::UniqueWorkerId;
 use foundation::prelude::CommonErrors;
 
-pub struct Deployment<'a, T> {
-    api: &'a mut OrchestrationApi<T>,
+pub struct Deployment<'a> {
+    api: &'a mut OrchestrationApi<_DesignTag>,
 }
 
-impl<T> Deployment<'_, T> {
-    pub fn new(api: &mut OrchestrationApi<T>) -> Deployment<'_, T> {
+impl Deployment<'_> {
+    pub fn new(api: &mut OrchestrationApi<_DesignTag>) -> Deployment<'_> {
         Deployment { api }
     }
 
@@ -88,37 +87,13 @@ impl<T> Deployment<'_, T> {
     /// Binds a shutdown event as a global event.
     pub fn bind_shutdown_event_as_global(&mut self, system_event: &str, event: Tag) -> Result<(), CommonErrors> {
         let creator = self.api.events.specify_global_event(system_event, &[event])?;
-
-        for design in &mut self.api.designs {
-            let _ = design.db.set_creator_for_shutdown_event(Rc::clone(&creator), event);
-        }
-
-        Ok(())
+        self.api.register_shutdown_event(event, creator)
     }
 
     /// Binds a shutdown event as a local event.
     pub fn bind_shutdown_event_as_local(&mut self, event: Tag) -> Result<(), CommonErrors> {
         let creator = self.api.events.specify_local_event(&[event])?;
-
-        for design in &mut self.api.designs {
-            let _ = design.db.set_creator_for_shutdown_event(Rc::clone(&creator), event);
-        }
-
-        Ok(())
-    }
-
-    /// Retrieve a shutdown notifier for the given event.
-    pub fn get_shutdown_notifier(&self, event: Tag) -> Result<Box<dyn ShutdownNotifier>, CommonErrors> {
-        // All designs share a creator for the same event, so return the first found.
-        for design in &self.api.designs {
-            if let Ok(creator) = design.db.get_creator_for_shutdown_event(event) {
-                if let Some(shutdown_notifier) = creator.borrow_mut().create_shutdown_notifier() {
-                    return Ok(shutdown_notifier);
-                }
-            }
-        }
-
-        Err(CommonErrors::NotFound)
+        self.api.register_shutdown_event(event, creator)
     }
 
     /// Adds a program to the design. The program is created using the provided closure, which receives a mutable reference to the design.
@@ -152,8 +127,8 @@ impl<T> Deployment<'_, T> {
 #[cfg(not(loom))]
 mod tests {
     use super::*;
-
-    use crate::common::{tag::Tag, DesignConfig};
+    use crate::common::DesignConfig;
+    use foundation::containers::growable_vec::GrowableVec;
 
     fn setup_api_single_design() -> OrchestrationApi<crate::api::_DesignTag> {
         let design_tag = Tag::from_str_static("test_design");
@@ -165,6 +140,7 @@ mod tests {
         let mut api = OrchestrationApi {
             designs: foundation::containers::growable_vec::GrowableVec::default(),
             events: crate::events::events_provider::EventsProvider::default(),
+            shutdown_events: GrowableVec::default(),
             _p: std::marker::PhantomData,
         };
         api.designs.push(design);
@@ -181,6 +157,7 @@ mod tests {
         let mut api = OrchestrationApi {
             designs: foundation::containers::growable_vec::GrowableVec::default(),
             events: crate::events::events_provider::EventsProvider::default(),
+            shutdown_events: GrowableVec::default(),
             _p: std::marker::PhantomData,
         };
         api.designs.push(design);
