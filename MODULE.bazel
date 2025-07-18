@@ -83,6 +83,7 @@ crate.from_cargo(
         "//src/testing_macros:Cargo.toml",
         "//:src/xtask/Cargo.toml",
         "//component_integration_tests/rust_test_scenarios:Cargo.toml",
+        "//src/orchestration/examples/camera_drv_object_det:Cargo.toml",
     ],
 )
 use_repo(crate, "crates")
