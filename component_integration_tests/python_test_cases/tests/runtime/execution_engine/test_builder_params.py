@@ -4,15 +4,7 @@ import psutil
 import pytest
 
 from testing_utils import ScenarioResult
-from cit_scenario import CitScenario
-
-
-def _check_log(text: str, expected_line: str) -> bool:
-    """
-    Check if expected line occurred in provided text.
-    """
-    lines = text.strip().split("\n")
-    return any(line == expected_line for line in lines)
+from cit_scenario import CitScenario, ResultCode
 
 
 # region task_queue_size
@@ -50,7 +42,7 @@ class TestTaskQueueSize_Valid(TestTaskQueueSize):
         return queue_size
 
     def test_valid(self, results: ScenarioResult) -> None:
-        assert results.return_code == 0
+        assert results.return_code == ResultCode.SUCCESS
 
 
 class TestTaskQueueSize_Invalid(TestTaskQueueSize):
@@ -62,11 +54,9 @@ class TestTaskQueueSize_Invalid(TestTaskQueueSize):
         return True
 
     def test_invalid(self, results: ScenarioResult, queue_size: int) -> None:
-        assert results.return_code == 101
+        assert results.return_code == ResultCode.PANIC
         assert results.stderr is not None
-        assert _check_log(
-            results.stderr, f"Task queue size ({queue_size}) must be power of two"
-        )
+        assert f"Task queue size ({queue_size}) must be power of two" in results.stderr
 
 
 # endregion
@@ -95,7 +85,7 @@ class TestWorkers_Valid(TestWorkers):
         return request.param
 
     def test_valid(self, results: ScenarioResult) -> None:
-        assert results.return_code == 0
+        assert results.return_code == ResultCode.SUCCESS
 
 
 class TestWorkers_Invalid(TestWorkers):
@@ -107,11 +97,11 @@ class TestWorkers_Invalid(TestWorkers):
         return True
 
     def test_invalid(self, results: ScenarioResult, workers: int) -> None:
-        assert results.return_code == 101
+        assert results.return_code == ResultCode.PANIC
         assert results.stderr is not None
-        assert _check_log(
-            results.stderr,
-            f"Cannot create engine with {workers} workers. Min is 1 and max is 128",
+        assert (
+            f"Cannot create engine with {workers} workers. Min is 1 and max is 128"
+            in results.stderr
         )
 
 
@@ -136,7 +126,7 @@ class TestThreadPriority(CitScenario):
         }
 
     def test_valid(self, results: ScenarioResult) -> None:
-        assert results.return_code == 0
+        assert results.return_code == ResultCode.SUCCESS
 
 
 # endregion
@@ -160,7 +150,7 @@ class TestThreadAffinity(CitScenario):
         }
 
     def test_valid(self, results: ScenarioResult) -> None:
-        assert results.return_code == 0
+        assert results.return_code == ResultCode.SUCCESS
 
 
 # endregion
@@ -194,11 +184,17 @@ class TestThreadStackSize_Valid(TestThreadStackSize):
         return request.param
 
     def test_valid(self, results: ScenarioResult) -> None:
-        assert results.return_code == 0
+        assert results.return_code == ResultCode.SUCCESS
 
 
 class TestThreadStackSize_TooSmall(TestThreadStackSize):
-    @pytest.fixture(scope="class", params=[0, 1024 * 8])
+    # Tested stack size values are lower than platform-specific limit:
+    # 'iceoryx2_bb_posix::system_configuration::Limit::MinStackSizeOfThread'.
+    #
+    # NOTE: it is possible to set stack size over the limit, but too small for requested work.
+    # This will cause SIGSEGV due to stack overflow. This is not a bug.
+
+    @pytest.fixture(scope="class", params=[0, 8192])
     def thread_stack_size(self, request: pytest.FixtureRequest) -> int:
         return request.param
 
@@ -206,11 +202,12 @@ class TestThreadStackSize_TooSmall(TestThreadStackSize):
         return True
 
     def test_invalid(self, results: ScenarioResult) -> None:
-        assert results.return_code == -9
+        # SIGKILL is sent during thread construction.
+        assert results.return_code == ResultCode.SIGKILL
         assert results.stderr is not None
-        assert _check_log(
-            results.stderr,
-            "called `Result::unwrap()` on an `Err` value: StackSizeTooSmall",
+        assert (
+            "called `Result::unwrap()` on an `Err` value: StackSizeTooSmall"
+            in results.stderr
         )
 
 

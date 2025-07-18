@@ -8,6 +8,16 @@ from pytest import FixtureRequest
 from testing_utils import Scenario, LogContainer
 
 
+class ResultCode:
+    """
+    Test scenario exit codes.
+    """
+
+    SUCCESS = 0
+    PANIC = 101
+    SIGKILL = -9
+
+
 class CitScenario(Scenario):
     """
     CIT test scenario definition.
