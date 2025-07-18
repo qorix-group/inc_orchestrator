@@ -12,6 +12,7 @@
 //
 
 pub mod camera_driver;
+pub mod ffi;
 pub mod object_detection;
 
 use camera_driver::CameraDriver;

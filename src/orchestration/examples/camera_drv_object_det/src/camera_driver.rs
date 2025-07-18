@@ -22,16 +22,22 @@ impl CameraDriver {
 
     pub fn read_input(&mut self) -> InvokeResult {
         info!("read_input start");
+        // Reading logic here
+        info!("read_input end");
         Ok(())
     }
 
     pub fn process(&mut self) -> InvokeResult {
         info!("process start");
+        // Processing logic here
+        info!("process end");
         Ok(())
     }
 
     pub fn write_output(&mut self) -> InvokeResult {
         info!("write_output start");
+        // Writing logic here
+        info!("write_output end");
         Ok(())
     }
 }

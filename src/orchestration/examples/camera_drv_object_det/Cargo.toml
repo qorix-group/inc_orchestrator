@@ -1,0 +1,13 @@
+[package]
+name = "camera_drv_object_det"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+orchestration.workspace = true
+async_runtime.workspace = true
+foundation.workspace = true
+logging_tracing.workspace = true
+
+[build-dependencies]
+cc = "1.2.30"

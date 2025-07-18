@@ -79,14 +79,3 @@ rust_binary(
     visibility = ["//visibility:public"],
     deps = _EXAMPLE_DEPS,
 )
-
-rust_binary(
-    name = "camera_drv_object_det",
-    srcs = [
-        "examples/camera_drv_object_det/camera_driver.rs",
-        "examples/camera_drv_object_det/main.rs",
-        "examples/camera_drv_object_det/object_detection.rs",
-    ] + glob(["examples/common/**/*.rs"]),
-    visibility = ["//visibility:public"],
-    deps = _EXAMPLE_DEPS,
-)
