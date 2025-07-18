@@ -1,0 +1,36 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "inputs": [
+        {
+            "id": "userArgs",
+            "type": "promptString",
+            "description": "Enter program arguments for --name (space-separated)"
+        }
+    ],
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug Rust Component Integration Tests Scenarios",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=rust_test_scenarios",
+                    "--package=rust_test_scenarios"
+                ],
+                "filter": {
+                    "name": "rust_test_scenarios",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "--name",
+                "${input:userArgs}"
+            ],
+            "cwd": "${workspaceFolder}/component_integration_tests/rust_test_scenarios"
+        },
+    ]
+}

@@ -41,3 +41,5 @@ Test Scenario can be run also directly using binary instead of `cargo run`. Targ
 ```bash
 ./target/debug/rust_test_scenarios --name orchestration.single_sequence <<< '{"runtime": {"task_queue_size": 256, "workers": 1}}'
 ```
+## Debugging
+User needs to have [lldb extension](https://marketplace.visualstudio.com/items?itemName=vadimcn.vscode-lldb) installed. For debugging scenarios use [Debug Rust Component Integration Tests Scenarios](../../.vscode/launch.json), set breakpoint and run debugging in [main.rs](src/main.rs) file. In the prompt enter name of the test scenario e.g. `orchestration.single_sequence`. Press ENTER in the console for the default test input unless there is a need for a specific one.
