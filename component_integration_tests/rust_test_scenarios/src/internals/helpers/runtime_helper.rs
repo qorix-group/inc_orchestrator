@@ -20,10 +20,7 @@ impl Runtime {
     }
 
     pub fn build(&self) -> AsyncRuntime {
-        debug!(
-            "Creating AsyncRuntime with {} queue size and {} workers",
-            self.task_queue_size, self.workers
-        );
+        debug!("Creating AsyncRuntime with: {:?}", self);
         let mut execution_engine_builder = ExecutionEngineBuilder::new().task_queue_size(self.task_queue_size).workers(self.workers);
         if let Some(thread_priority) = self.thread_priority {
             execution_engine_builder = execution_engine_builder.thread_priority(thread_priority);
