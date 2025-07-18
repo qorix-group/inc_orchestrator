@@ -55,7 +55,7 @@ class TestShortSleepUnderLoad2W256Q(CitScenario):
     ):
         [sleep_start, sleep_finish] = logs_info_level.get_logs_by_field(
             field="id",
-            pattern=sleep_name,
+            value=sleep_name,
         )
         sleep_duration_ms = (
             sleep_finish.timestamp - sleep_start.timestamp

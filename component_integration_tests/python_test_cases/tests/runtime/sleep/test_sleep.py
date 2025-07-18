@@ -91,7 +91,7 @@ class TestZeroSleep(CitScenario):
     ):
         task_id = test_config["test"]["non_blocking_sleep_tasks"][0]["id"]
 
-        entries = logs_info_level.get_logs_by_field(field="id", pattern=task_id)
+        entries = logs_info_level.get_logs_by_field(field="id", value=task_id)
         assert len(entries) == 2, "Expected two entries for the task."
 
         begin_entry = entries[0]
@@ -139,14 +139,14 @@ class TestMultipleSleepsWithRegularTasks(CitScenario):
         )
 
         begin_tasks = non_blocking_sleep_tasks.get_logs_by_field(
-            field="location", pattern="begin"
+            field="location", value="begin"
         )
         assert len(begin_tasks) == len(
             test_config["test"]["non_blocking_sleep_tasks"]
         ), "Not all non-blocking sleep tasks started."
 
         end_tasks = non_blocking_sleep_tasks.get_logs_by_field(
-            field="location", pattern="end"
+            field="location", value="end"
         )
         assert len(end_tasks) == len(test_config["test"]["non_blocking_sleep_tasks"]), (
             "Not all non-blocking sleep tasks finished."
@@ -163,7 +163,7 @@ class TestMultipleSleepsWithRegularTasks(CitScenario):
         self, test_config: dict[str, Any], logs_info_level: LogContainer
     ):
         for task in test_config["test"]["non_blocking_sleep_tasks"]:
-            entries = logs_info_level.get_logs_by_field(field="id", pattern=task["id"])
+            entries = logs_info_level.get_logs_by_field(field="id", value=task["id"])
             assert len(entries) == 2, "Expected two entries for the task."
 
             begin_entry = entries[0]
@@ -265,7 +265,7 @@ class TestMultipleSleepsWithBlockedWorkers(CitScenario):
         self, test_config: dict[str, Any], logs_info_level: LogContainer
     ):
         for task in test_config["test"]["non_blocking_sleep_tasks"]:
-            entries = logs_info_level.get_logs_by_field(field="id", pattern=task["id"])
+            entries = logs_info_level.get_logs_by_field(field="id", value=task["id"])
             assert len(entries) == 2, "Expected two entries for the task."
 
             begin_entry = entries[0]

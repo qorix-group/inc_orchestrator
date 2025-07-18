@@ -15,13 +15,13 @@ class TestSingleSequence1W256Q(CitScenario):
 
     def test_execution_order_one_branch(self, logs_info_level: LogContainer):
         action1 = logs_info_level.find_log(
-            field="message", pattern="Action1 was executed"
+            field="message", value="Action1 was executed"
         )
         action2 = logs_info_level.find_log(
-            field="message", pattern="Action2 was executed"
+            field="message", value="Action2 was executed"
         )
         action3 = logs_info_level.find_log(
-            field="message", pattern="Action3 was executed"
+            field="message", value="Action3 was executed"
         )
         # Assert that execution_order is chronological by timestamp
         assert action1.timestamp < action2.timestamp < action3.timestamp, (
