@@ -2,7 +2,9 @@ import json
 from pathlib import Path
 
 import pytest
-from testing_utils import select_bin_path, cargo_build
+from testing_utils import cargo_build, select_bin_path
+
+FAILED_CONFIGS = []
 
 
 # Cmdline options
@@ -59,25 +61,26 @@ def pytest_sessionstart(session):
 
 def pytest_html_report_title(report):
     # Change report title
-    # report.title = "Report1"
-    ...
+    report.title = "Component Integration Tests Report"
 
 
 def pytest_html_results_table_header(cells):
     # Create additional table headers
-    cells.insert(3, "<th>Test Case Name</th>")
-    cells.insert(2, "<th>Description</th>")
     cells.insert(1, "<th>Test Input</th>")
+    cells.insert(2, "<th>Description</th>")
+    cells.insert(3, "<th>Test Scenario Name</th>")
+    cells.insert(4, "<th>Test Scenario Command</th>")
 
 
 def pytest_html_results_table_row(report, cells):
     # Create additional table columns with TC __doc__ and execution date
-    cells.insert(3, f"<td><pre>{report.tc}</pre></td>")
-    cells.insert(2, f"<td><pre>{report.description}</pre></td>")
     cells.insert(
         1,
         f'<td><pre style="white-space:pre-wrap;word-wrap:break-word">{json.dumps(report.input)}</pre></td>',
     )
+    cells.insert(2, f"<td><pre>{report.description}</pre></td>")
+    cells.insert(3, f"<td><pre>{report.scenario}</pre></td>")
+    cells.insert(4, f"<td><pre>{report.command}</pre></td>")
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -86,5 +89,29 @@ def pytest_runtest_makereport(item, call):
     outcome = yield
     report = outcome.get_result()
     report.description = str(item.function.__doc__)
-    report.tc = item.funcargs.get("scenario_name", "")
+    report.scenario = item.funcargs.get("scenario_name", "")
     report.input = item.funcargs.get("test_config", "")
+    report.command = f"cargo run --manifest-path component_integration_tests/rust_test_scenarios/Cargo.toml -- --name {report.scenario} <<< '{json.dumps(report.input)}'"
+    # Store failed command for printing in summary
+    if report.failed:
+        FAILED_CONFIGS.append(
+            {
+                "nodeid": report.nodeid,
+                "command": report.command,
+            }
+        )
+
+
+def pytest_terminal_summary(terminalreporter):
+    if not FAILED_CONFIGS:
+        return
+    # Print failed scenarios info
+    terminalreporter.write_sep("=", "Failed tests reproduction info")
+    terminalreporter.write_line(
+        "Run failed scenarios from the repo root working directory\n"
+    )
+
+    for entry in FAILED_CONFIGS:
+        terminalreporter.write_line(
+            f"{entry['nodeid']} | Run command:\n{entry['command']}\n"
+        )
