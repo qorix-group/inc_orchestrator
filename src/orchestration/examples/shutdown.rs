@@ -35,8 +35,6 @@ fn example_component_design() -> Result<Design, CommonErrors> {
         Ok(())
     })?;
 
-    design.register_shutdown_event("ExampleShutdown".into())?;
-
     design.add_program("ExampleDesignProgram", move |design, builder| {
         builder
             .with_run_action(Invoke::from_tag(&run_tag, design.config()))
@@ -76,13 +74,13 @@ fn main() {
         .bind_shutdown_event_as_local("ExampleShutdown".into())
         .expect("Failed to bind shutdown event");
 
-    let mut shutdown = deployment
+    // Create program
+    let mut program_manager = orch.into_program_manager().unwrap();
+    let mut programs = program_manager.get_programs();
+    let mut program = programs.pop().unwrap();
+    let mut shutdown = program_manager
         .get_shutdown_notifier("ExampleShutdown".into())
         .expect("Failed to get shutdown notifier");
-
-    // Create program
-    let mut programs = orch.create_programs().unwrap();
-    let mut program = programs.programs.pop().unwrap();
 
     // Put programs into runtime and run them
     let _ = runtime.spawn(async move {

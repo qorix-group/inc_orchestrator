@@ -99,11 +99,12 @@ fn main() {
         .design_done();
 
     // Create programs
-    let mut programs = orch.create_programs().unwrap();
+    let mut program_manager = orch.into_program_manager().unwrap();
+    let mut programs = program_manager.get_programs();
 
     // Put programs into runtime and run them
     let _ = runtime.block_on(async move {
-        let res = programs.programs.pop().unwrap().run().await;
+        let res = programs.pop().unwrap().run().await;
         info!("Program finished running with {:?}.", res);
         Ok(0)
     });

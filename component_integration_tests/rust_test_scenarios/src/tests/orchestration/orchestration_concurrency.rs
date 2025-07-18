@@ -53,11 +53,12 @@ impl Scenario for SingleConcurrency {
             .design_done();
 
         // Create programs
-        let mut programs = orch.create_programs().unwrap();
+        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut programs = program_manager.get_programs();
 
         // Put programs into runtime and run them
         let _ = rt.block_on(async move {
-            let _ = programs.programs.pop().unwrap().run_n(1).await;
+            let _ = programs.pop().unwrap().run_n(1).await;
             info!("Program finished running.");
             Ok(0)
         });
@@ -121,11 +122,12 @@ impl Scenario for MultipleConcurrency {
             .design_done();
 
         // Create programs
-        let mut programs = orch.create_programs().unwrap();
+        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut programs = program_manager.get_programs();
 
         // Put programs into runtime and run them
         let _ = rt.block_on(async move {
-            let _ = programs.programs.pop().unwrap().run_n(1).await;
+            let _ = programs.pop().unwrap().run_n(1).await;
             info!("Program finished running.");
             Ok(0)
         });
@@ -185,11 +187,12 @@ impl Scenario for NestedConcurrency {
             .design_done();
 
         // Create programs
-        let mut programs = orch.create_programs().unwrap();
+        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut programs = program_manager.get_programs();
 
         // Put programs into runtime and run them
         let _ = rt.block_on(async move {
-            let _ = programs.programs.pop().unwrap().run_n(1).await;
+            let _ = programs.pop().unwrap().run_n(1).await;
             info!("Program finished running.");
             Ok(0)
         });

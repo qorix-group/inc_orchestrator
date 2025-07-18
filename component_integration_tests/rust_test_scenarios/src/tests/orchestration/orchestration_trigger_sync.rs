@@ -85,10 +85,12 @@ impl Scenario for OneTriggerOneSyncTwoPrograms {
         let mut deployment = orch.get_deployment_mut();
         deployment.bind_events_as_local(&["evt_sync".into()]).expect("Failed to specify event");
 
-        let mut programs = orch.create_programs().unwrap();
+        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut programs = program_manager.get_programs();
+
         let _ = rt.block_on(async move {
             let mut joiner = Vec::new();
-            for program in programs.programs.as_mut_slice() {
+            for program in programs.as_mut_slice() {
                 joiner.push(program.run_n(1));
             }
 
@@ -180,11 +182,12 @@ impl Scenario for OneTriggerTwoSyncsThreePrograms {
         let mut deployment = orch.get_deployment_mut();
         deployment.bind_events_as_local(&["evt_sync".into()]).expect("Failed to specify event");
 
-        let mut programs = orch.create_programs().unwrap();
+        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut programs = program_manager.get_programs();
 
         let _ = rt.block_on(async move {
             let mut joiner = Vec::new();
-            for program in programs.programs.as_mut_slice() {
+            for program in programs.as_mut_slice() {
                 joiner.push(program.run_n(1));
             }
 
@@ -245,11 +248,12 @@ impl Scenario for TriggerAndSyncInNestedBranches {
         let mut deployment = orch.get_deployment_mut();
         deployment.bind_events_as_local(&["evt_sync".into()]).expect("Failed to specify event");
 
-        let mut programs = orch.create_programs().unwrap();
+        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut programs = program_manager.get_programs();
 
         let _ = rt.block_on(async move {
             let mut joiner = Vec::new();
-            for program in programs.programs.as_mut_slice() {
+            for program in programs.as_mut_slice() {
                 joiner.push(program.run_n(1));
             }
 
@@ -302,11 +306,12 @@ impl Scenario for TriggerSyncOneAfterAnother {
         let mut deployment = orch.get_deployment_mut();
         deployment.bind_events_as_local(&["evt_sync".into()]).expect("Failed to specify event");
 
-        let mut programs = orch.create_programs().unwrap();
+        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut programs = program_manager.get_programs();
 
         let _ = rt.block_on(async move {
             let mut joiner = Vec::new();
-            for program in programs.programs.as_mut_slice() {
+            for program in programs.as_mut_slice() {
                 joiner.push(program.run_n(1));
             }
 
