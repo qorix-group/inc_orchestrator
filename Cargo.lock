@@ -31,6 +31,7 @@ dependencies = [
  "iceoryx2-bb-container",
  "iceoryx2-bb-posix",
  "iceoryx2-pal-concurrency-sync",
+ "libc",
  "loom",
  "testing",
 ]
