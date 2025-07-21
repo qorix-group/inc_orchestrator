@@ -56,7 +56,7 @@ use scheduler::{
 pub mod channels;
 pub mod core;
 pub mod futures;
-pub mod io;
+pub mod mio;
 pub mod prelude;
 pub mod runtime;
 pub mod safety;
