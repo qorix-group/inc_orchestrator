@@ -22,4 +22,24 @@ pub enum CommonErrors {
     NoSpaceLeft,
     NotFound,
     WrongArgs,
+    AlreadyExists,
+    NotSupported,
+}
+
+impl From<CommonErrors> for std::io::Error {
+    fn from(err: CommonErrors) -> Self {
+        std::io::Error::from(match err {
+            CommonErrors::NoData => std::io::ErrorKind::UnexpectedEof,
+            CommonErrors::AlreadyDone => std::io::ErrorKind::AlreadyExists,
+            CommonErrors::GenericError => std::io::ErrorKind::Other,
+            CommonErrors::OperationAborted => std::io::ErrorKind::Interrupted,
+            CommonErrors::Panicked => std::io::ErrorKind::Other,
+            CommonErrors::Timeout => std::io::ErrorKind::TimedOut,
+            CommonErrors::NoSpaceLeft => std::io::ErrorKind::OutOfMemory,
+            CommonErrors::NotFound => std::io::ErrorKind::NotFound,
+            CommonErrors::WrongArgs => std::io::ErrorKind::InvalidInput,
+            CommonErrors::AlreadyExists => std::io::ErrorKind::AlreadyExists,
+            CommonErrors::NotSupported => std::io::ErrorKind::Unsupported,
+        })
+    }
 }

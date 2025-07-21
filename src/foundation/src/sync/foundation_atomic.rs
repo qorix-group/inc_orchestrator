@@ -52,3 +52,6 @@ pub type FoundationAtomicU64 = AtomicU64;
 
 /// Behaves like [`sync::atomic::AtomicU64`]
 pub type FoundationAtomicPtr<T> = AtomicPtr<T>;
+
+/// Behaves like [`sync::atomic::Ordering`]
+pub type FoundationOrdering = Ordering;
