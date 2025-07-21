@@ -17,6 +17,7 @@ use core::{
     ops::{BitAnd, BitOr, Not},
     time::Duration,
 };
+
 use foundation::prelude::CommonErrors;
 use std::os::fd::{AsRawFd, RawFd};
 
@@ -34,6 +35,10 @@ impl IoId {
     /// Create an `Id`.
     pub fn new(id: u64) -> Self {
         IoId(id)
+    }
+
+    pub fn as_u64(&self) -> u64 {
+        self.0
     }
 }
 
@@ -158,7 +163,7 @@ impl IoEvent {
     }
 }
 
-/// Simple macro that implements `IoSourceTrait` for a type that has an inner field of type `T::IoProxy` to remove boilerplate code.
+/// Simple macro that implements `IoRegistryEntry` for a type that has an inner field of type `T::IoProxy` to remove boilerplate code.
 #[macro_export]
 macro_rules! impl_io_source_proxy {
     ($type:ident<$t:ident>, $inner:ident) => {

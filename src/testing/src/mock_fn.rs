@@ -16,6 +16,12 @@ use foundation::containers::reusable_objects::ReusableObjectTrait;
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 
+#[macro_export]
+macro_rules! build_with_location {
+    ($expr:expr $(,)?) => {
+        $expr.build_with_location(format!("{}:{}", file!(), line!()))
+    };
+}
 pub trait CallableTrait<OutType> {
     fn call(&mut self) -> OutType;
 }
@@ -37,6 +43,7 @@ pub struct MockFn<OutType> {
     is_will_repeatedly_set: bool,
     min_count: usize,
     returns: VecDeque<OutType>,
+    location: Option<String>,
 }
 
 impl<T> MockFn<T> {
@@ -57,6 +64,7 @@ impl<OutType: Default> Default for MockFn<OutType> {
             is_will_repeatedly_set: false,
             min_count: 0,
             returns: VecDeque::new(),
+            location: None,
         }
     }
 }
@@ -73,6 +81,7 @@ impl<OutType: Clone> Clone for MockFn<OutType> {
             is_will_repeatedly_set: self.is_will_repeatedly_set,
             min_count: self.min_count,
             returns: self.returns.clone(),
+            location: self.location.clone(),
         }
     }
 }
@@ -99,6 +108,7 @@ impl<OutType> MockFnBuilder<OutType> {
             is_will_repeatedly_set: false,
             min_count: 0,
             returns: VecDeque::new(),
+            location: None,
         })
     }
 
@@ -146,6 +156,16 @@ impl<OutType> MockFnBuilder<OutType> {
         self.0.is_built = true;
         self.0
     }
+
+    pub fn build_with_location(mut self, location: String) -> MockFn<OutType> {
+        // if only will_once is set, the min_count becomes the expected_count
+        if self.0.is_will_once_set && !self.0.is_will_repeatedly_set {
+            self.0.expected_count = self.0.min_count as isize;
+        }
+        self.0.is_built = true;
+        self.0.location = Some(location);
+        self.0
+    }
 }
 
 impl<OutType: Clone> CallableTrait<OutType> for MockFn<OutType> {
@@ -172,16 +192,17 @@ impl<OutType> Drop for MockFn<OutType> {
                 // the times() clause or only will_once() is set, so check for exact call counts
                 assert_eq!(
                     call_count as isize, self.expected_count,
-                    "MockFn is called {} times, but should be {} times!",
-                    call_count, self.expected_count
+                    "MockFn is called {} times, but should be {} times! Location is: {:?}",
+                    call_count, self.expected_count, self.location
                 );
             } else {
                 // check whether the mock fn is called at least min_count due to its configuration
                 assert!(
                     self.min_count <= call_count,
-                    "MockFn is called {} times, but should be at least {} times!",
+                    "MockFn is called {} times, but should be at least {} times! Location is: {:?}",
                     call_count,
-                    self.min_count
+                    self.min_count,
+                    self.location
                 );
             }
         }
