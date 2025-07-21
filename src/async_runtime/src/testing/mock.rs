@@ -82,6 +82,8 @@ pub mod runtime {
     /// Poll each task once to advance its state
     ///
     pub fn step() {
+        let mut to_enqueue = vec![];
+
         while let Some(task) = dequeue_task() {
             let waker = create_waker(task.clone());
             let mut ctx = Context::from_waker(&waker);
@@ -89,10 +91,16 @@ pub mod runtime {
             match task.poll(&mut ctx) {
                 _ => {
                     if !task.is_done() {
-                        enqueue_task(task);
+                        to_enqueue.push(task);
                     }
                 }
             }
+        }
+
+        // Push tasks back after polling so we don't block with a task that is not finished yet,
+        // as step only advances tasks once.
+        for task in to_enqueue {
+            enqueue_task(task);
         }
     }
 

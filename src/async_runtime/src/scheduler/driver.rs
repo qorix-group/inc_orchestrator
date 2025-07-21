@@ -11,6 +11,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+// TODO: To be removed once used in IO APIs
+#[allow(dead_code)]
 use ::core::{ops::Deref, task::Waker};
 use std::sync::Arc;
 
@@ -18,6 +20,8 @@ use foundation::prelude::FoundationAtomicU64;
 use foundation::prelude::ScopeGuardBuilder;
 use foundation::prelude::*;
 
+use crate::io::driver::IoDriver;
+use crate::io::AsyncSelector;
 use crate::{
     scheduler::{
         context::{ctx_get_handler, ctx_get_wakeup_time, ctx_get_worker_id, ctx_set_wakeup_time, ctx_unset_wakeup_time},
@@ -50,17 +54,24 @@ impl Deref for Drivers {
 
 pub(crate) struct Inner {
     time: TimeDriver,
+    io: IoDriver,
 
     next_promised_wakeup: FoundationAtomicU64, // next time we promise to wakeup "some" worker
 }
 
-//TODO: This has to be reworked once we have IoDriver since those two are tightly coupled between each other
 impl Inner {
     pub fn new() -> Self {
+        // TODO: Once tackling all configuration points in runtime, expose this
+        let selector = AsyncSelector::new(2048);
         Self {
             time: TimeDriver::new(4096),
             next_promised_wakeup: FoundationAtomicU64::new(0),
+            io: IoDriver::new(selector),
         }
+    }
+
+    pub fn get_io_driver(&self) -> &IoDriver {
+        &self.io
     }
 
     pub fn register_timeout(&self, expire_at: Instant, waker: Waker) -> Result<(), CommonErrors> {
