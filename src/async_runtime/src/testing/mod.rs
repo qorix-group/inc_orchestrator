@@ -18,13 +18,16 @@ use std::sync::Arc;
 
 use foundation::prelude::FoundationAtomicU16;
 
+#[cfg(test)]
+use testing::prelude::{CallableTrait, MockFn};
+
 use crate::{
     core::types::{box_future, ArcInternal},
     scheduler::{scheduler_mt::SchedulerTrait, waker::create_waker},
     AsyncTask, TaskRef,
 };
 
-#[cfg(feature = "runtime-api-mock")]
+#[cfg(any(test, feature = "runtime-api-mock"))]
 pub mod mock;
 
 #[derive(Default)]
@@ -128,4 +131,37 @@ pub fn get_dummy_sync_task_waker(sched: Arc<SchedulerSyncMock>) -> Waker {
     let task = Arc::new(AsyncTask::new(box_future(async {}), 0, sched));
 
     create_waker(TaskRef::new(task.clone()))
+}
+
+#[cfg(test)]
+pub struct MockWaker {
+    pub mock: std::sync::Mutex<MockFn<()>>,
+}
+
+#[cfg(test)]
+impl MockWaker {
+    pub fn new(mock: MockFn<()>) -> Self {
+        MockWaker {
+            mock: std::sync::Mutex::new(mock),
+        }
+    }
+
+    pub fn into_arc(self) -> std::sync::Arc<Self> {
+        std::sync::Arc::new(self)
+    }
+
+    pub fn times(&self) -> usize {
+        self.mock.lock().unwrap().times()
+    }
+}
+
+#[cfg(test)]
+impl std::task::Wake for MockWaker {
+    fn wake(self: std::sync::Arc<Self>) {
+        self.mock.lock().unwrap().call();
+    }
+
+    fn wake_by_ref(self: &std::sync::Arc<Self>) {
+        self.mock.lock().unwrap().call();
+    }
 }

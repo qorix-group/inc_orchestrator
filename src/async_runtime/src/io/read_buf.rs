@@ -11,6 +11,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+// TODO: To be removed once used in IO APIs
+#![allow(dead_code)]
+
 use core::mem::MaybeUninit;
 
 ///
@@ -167,6 +170,12 @@ impl<'a> ReadBuf<'a> {
     pub fn initialized_unfilled(&self) -> &[u8] {
         let unfilled_slice = &self.buf[self.filled..self.initialized];
         unsafe { Self::slice_assume_init(unfilled_slice) }
+    }
+
+    /// Returns a slice of the initialized but unfilled portion of the buffer.
+    pub fn initialized_unfilled_mut(&mut self) -> &mut [u8] {
+        let unfilled_slice = &mut self.buf[self.filled..self.initialized];
+        unsafe { Self::slice_assume_init_mut(unfilled_slice) }
     }
 
     // Private helpers

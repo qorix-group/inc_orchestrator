@@ -11,12 +11,14 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+use core::marker::PhantomPinned;
 use core::ptr;
 
 /// Every [`List`] item needs to have this as one of its fields.
 pub struct Link {
     prev: *mut Link,
     next: *mut Link,
+    _pin: PhantomPinned,
 }
 
 impl Link {
@@ -25,9 +27,12 @@ impl Link {
         Self {
             prev: ptr::null_mut(),
             next: ptr::null_mut(),
+            _pin: PhantomPinned,
         }
     }
 }
+
+unsafe impl Send for Link {}
 
 impl Default for Link {
     fn default() -> Self {
@@ -95,6 +100,84 @@ impl<I: Item> List<I> {
         } else {
             None
         }
+    }
+
+    pub fn pop_if<F>(&mut self, mut f: F)
+    where
+        F: FnMut(&I) -> bool,
+    {
+        if self.len == 0 {
+            return;
+        }
+
+        let mut curr = self.head.as_ptr();
+        let mut num_of_iteration = self.len;
+
+        unsafe {
+            while num_of_iteration > 0 {
+                let current_link = ptr::NonNull::new_unchecked(curr);
+                let next = (*curr).next;
+                curr = next;
+
+                if f(self.link_to_item(current_link).as_ref()) {
+                    self.remove_internal(current_link);
+                }
+                num_of_iteration -= 1; // whether removed or not, we just processed this elem
+            }
+        }
+    }
+
+    pub fn remove(&mut self, item: ptr::NonNull<I>) -> bool {
+        match self.len {
+            0 => false, // Nothing to remove.
+            1 => {
+                let link = unsafe { self.item_to_link(item) };
+
+                if link == self.head {
+                    // If this is the last item, we can just reset the list.
+                    self.head = ptr::NonNull::dangling();
+                    self.len = 0;
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => {
+                // If this is not the last item, we need to remove it from the list.
+                let mut curr = self.head.as_ptr();
+
+                unsafe {
+                    while !curr.is_null() {
+                        let link = ptr::NonNull::new_unchecked(curr);
+
+                        if item == self.link_to_item(link) {
+                            self.remove_internal(link);
+                            return true;
+                        }
+
+                        curr = (*curr).next;
+                    }
+                }
+
+                false
+            }
+        }
+    }
+
+    unsafe fn remove_internal(&mut self, link: ptr::NonNull<Link>) {
+        if link == self.head {
+            if self.len == 1 {
+                // If this is the last item, we can just reset the list.
+                self.head = ptr::NonNull::dangling();
+            } else {
+                self.head = unsafe { ptr::NonNull::new_unchecked(link.as_ref().next) };
+                Self::remove_link(link);
+            }
+        } else {
+            Self::remove_link(link);
+        }
+
+        self.len -= 1;
     }
 
     /// Number of linked items.
@@ -264,5 +347,95 @@ mod tests {
         }
 
         assert_eq!(*drop_counter.borrow(), 3);
+    }
+
+    #[test]
+    fn test_pop_if_removes_matching_items() {
+        #[repr(C)]
+        struct TestItem {
+            value: u32,
+            link: Link,
+        }
+        unsafe impl Item for TestItem {
+            fn link_field_offset() -> usize {
+                std::mem::offset_of!(TestItem, link)
+            }
+        }
+
+        {
+            let mut item1 = TestItem { value: 1, link: Link::new() };
+            let mut item2 = TestItem { value: 2, link: Link::new() };
+            let mut item3 = TestItem { value: 3, link: Link::new() };
+            let mut list: List<TestItem> = Default::default();
+            list.push_back(ptr::NonNull::new(&mut item1 as *mut TestItem).unwrap());
+            list.push_back(ptr::NonNull::new(&mut item2 as *mut TestItem).unwrap());
+            list.push_back(ptr::NonNull::new(&mut item3 as *mut TestItem).unwrap());
+            // Remove all even values
+            list.pop_if(|item| item.value % 2 == 0);
+
+            assert_eq!(list.len(), 2);
+            let v1 = unsafe { list.pop_front().unwrap().as_ref().value };
+            let v2 = unsafe { list.pop_front().unwrap().as_ref().value };
+            assert_eq!(vec![v1, v2], vec![1, 3]);
+        }
+
+        {
+            let mut item1 = TestItem { value: 1, link: Link::new() };
+            let mut list: List<TestItem> = Default::default();
+            list.push_back(ptr::NonNull::new(&mut item1 as *mut TestItem).unwrap());
+
+            // Remove all even values
+            list.pop_if(|item| item.value % 1 == 0);
+
+            assert_eq!(list.len(), 0);
+        }
+    }
+
+    #[test]
+    fn test_remove_specific_item() {
+        #[repr(C)]
+        struct TestItem {
+            value: u32,
+            link: Link,
+        }
+        unsafe impl Item for TestItem {
+            fn link_field_offset() -> usize {
+                std::mem::offset_of!(TestItem, link)
+            }
+        }
+        let mut item1 = TestItem {
+            value: 10,
+            link: Link::new(),
+        };
+        let mut item2 = TestItem {
+            value: 20,
+            link: Link::new(),
+        };
+        let mut item3 = TestItem {
+            value: 30,
+            link: Link::new(),
+        };
+        let mut list: List<TestItem> = Default::default();
+        let p1 = ptr::NonNull::new(&mut item1 as *mut TestItem).unwrap();
+        let p2 = ptr::NonNull::new(&mut item2 as *mut TestItem).unwrap();
+        let p3 = ptr::NonNull::new(&mut item3 as *mut TestItem).unwrap();
+        list.push_back(p1);
+        list.push_back(p2);
+        list.push_back(p3);
+        // Remove middle item
+        assert!(list.remove(p2));
+        assert_eq!(list.len(), 2);
+        let vals = [unsafe { list.pop_front().unwrap().as_ref().value }, unsafe {
+            list.pop_front().unwrap().as_ref().value
+        }];
+        assert_eq!(vals.contains(&10), true);
+        assert_eq!(vals.contains(&30), true);
+        // Remove non-existent item
+        let mut item4 = TestItem {
+            value: 40,
+            link: Link::new(),
+        };
+        let p4 = ptr::NonNull::new(&mut item4 as *mut TestItem).unwrap();
+        assert!(!list.remove(p4));
     }
 }

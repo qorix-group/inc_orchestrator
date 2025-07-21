@@ -71,7 +71,7 @@ impl IoSelector for Selector {
         self.inner.register(fd, id, interest)
     }
 
-    /// Update the `IoEventInterest` and `Ident` for an already registered file descriptor.
+    /// Update the `IoEventInterest` and `IoId` for an already registered file descriptor.
     ///
     /// Returns `Err(CommonErrors::NotFound)` if `fd` wasn't already registered.
     /// Returns `Err(CommonErrors::NotSupported)` if an error was reported for the `fd`.
@@ -536,6 +536,29 @@ impl Inner {
     }
 }
 
+impl IoSelectorEventContainer for Vec<IoEvent> {
+    fn push(&mut self, event: IoEvent) -> bool {
+        self.push(event);
+        true
+    }
+
+    fn clear(&mut self) {
+        self.clear();
+    }
+
+    fn len(&self) -> usize {
+        self.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.is_empty()
+    }
+
+    fn capacity(&self) -> usize {
+        self.capacity()
+    }
+}
+
 #[cfg(not(any(loom, miri)))]
 #[cfg(test)]
 mod tests {
@@ -621,29 +644,6 @@ mod tests {
                 result
             }),
         )
-    }
-
-    impl IoSelectorEventContainer for Vec<IoEvent> {
-        fn push(&mut self, event: IoEvent) -> bool {
-            self.push(event);
-            true
-        }
-
-        fn clear(&mut self) {
-            self.clear();
-        }
-
-        fn len(&self) -> usize {
-            self.len()
-        }
-
-        fn is_empty(&self) -> bool {
-            self.is_empty()
-        }
-
-        fn capacity(&self) -> usize {
-            self.capacity()
-        }
     }
 
     #[test]
