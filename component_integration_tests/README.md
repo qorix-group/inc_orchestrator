@@ -1,5 +1,107 @@
 # Component Integration Tests
 
+For general information check [main README.md file](../README.md).
+
+## Setup
+
+Create `venv`, activate and install dependencies:
+
+```bash
+python -m venv <REPO_ROOT>/.venv
+source <REPO_ROOT>/.venv/bin/activate
+pip install -r <REPO_ROOT>/component_integration_tests/python_test_cases/requirements.txt
+```
+
 ## Usage
-1. Build Test Scenarios following [README](./rust_test_scenarios/README.md)
-2. Prepare environment and run tests following [README](./python_test_cases/README.md)
+
+Set current working directory to the following:
+
+```bash
+cd <REPO_ROOT>/component_integration_tests/python_test_cases
+```
+
+### Run tests
+
+Basic run:
+
+```bash
+pytest .
+```
+
+Run with additional flags:
+
+```bash
+pytest -vsx . -k <PATTERN> --build-scenarios
+```
+
+- `-v` - increase verbosity.
+- `-s` - show logs (disable capture).
+- `-k <PATTERN>` - run tests matching the pattern.
+- `--build-scenarios` - build Rust test scenarios before execution.
+
+Run tests repeatedly:
+
+```bash
+pytest . --count <VALUE> --repeat-scope session -x
+```
+
+- `--count <VALUE>` - number of repeats.
+- `--repeat-scope session` - scope of repeat.
+- `-x` - exit on first error.
+
+Refer to `pytest` manual for `pytest` specific options.
+Refer to `conftest.py` for test suite specific options.
+
+### Create HTML report
+
+To generate HTML report use:
+
+```bash
+pytest -v . --build-scenarios --self-contained-html --html report.html --traces <VALUE>
+```
+
+- `--self-contained-html` - generate self contained HTML file.
+- `--html report.html` - HTML report output path.
+- `--traces <VALUE>` - verbosity of traces in output and HTML report - "none", "bin" or "all".
+
+> Traces are collected using `stdout`.
+> Setting `--capture` flag (including `-s`) might cause traces to be missing from HTML report.
+
+## Standalone execution of test scenarios
+
+Rust test scenarios can be run independently from `pytest`.
+
+Set current working directory to the following:
+
+```bash
+cd <REPO_ROOT>/component_integration_tests/rust_test_scenarios
+```
+
+List all available scenarios:
+
+```bash
+cargo run -- --list-scenarios
+```
+
+Run specific test scenario:
+
+```bash
+cargo run -- --name <TEST_GROUP>.<TEST_SCENARIO>
+```
+
+Executable is interactive and prompt will require test input to be provided.
+E.g., `{"runtime": {"task_queue_size": 256, "workers": 1}}`.
+
+Example of test scenario run with test input provided using `stdin`:
+
+```bash
+cargo run -- --name orchestration.single_sequence <<< '{"runtime": {"task_queue_size": 256, "workers": 1}}'
+```
+
+### Using executable directly
+
+Test scenario executable can be used directly:
+
+```bash
+./target/debug/rust_test_scenarios --name orchestration.single_sequence <<< '{"runtime": {"task_queue_size": 256, "workers": 1}}'
+```
