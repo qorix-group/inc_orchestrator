@@ -40,7 +40,7 @@ fn read_test_stdin_input() -> String {
     if trimmed.is_empty() {
         // Default value if input is empty
         // This is enough for most tests but not all
-        r#"{"runtime": {"task_queue_size": 256, "workers": 2}}"#.to_string()
+        r#"{"runtime": {"task_queue_size": 256, "workers": 4}}"#.to_string()
     } else {
         trimmed.to_string()
     }

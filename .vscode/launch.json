@@ -5,9 +5,15 @@
     "version": "0.2.0",
     "inputs": [
         {
-            "id": "userArgs",
+            "id": "nameArg",
             "type": "promptString",
-            "description": "Enter program arguments for --name (space-separated)"
+            "description": "Enter program argument for --name"
+        },
+        {
+            "id": "inputArg",
+            "type": "promptString",
+            "description": "Enter program argument for --input",
+            "default": "{\"runtime\": {\"task_queue_size\": 256, \"workers\": 4}}"
         }
     ],
     "configurations": [
@@ -28,7 +34,11 @@
             },
             "args": [
                 "--name",
-                "${input:userArgs}"
+                "${input:nameArg}",
+                "--input-type",
+                "arg",
+                "--input",
+                "${input:inputArg}"
             ],
             "cwd": "${workspaceFolder}/component_integration_tests/rust_test_scenarios"
         },
