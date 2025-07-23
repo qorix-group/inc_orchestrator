@@ -72,7 +72,7 @@ impl<T: NotifierTrait + Send> Trigger<T> {
         Box::new(Self {
             base: ActionBaseMeta {
                 tag: Tag::from_str_static(DEFAULT_TAG),
-                reusable_future_pool: ReusableBoxFuturePool::new(future_pool_size, notifier.notify(0)),
+                reusable_future_pool: ReusableBoxFuturePool::for_value(future_pool_size, notifier.notify(0)),
             },
             notifier,
         })

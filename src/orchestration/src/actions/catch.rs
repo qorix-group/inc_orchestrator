@@ -162,13 +162,13 @@ impl CatchBuilder {
             "Catch: No handler provided, this will cause an error in execution."
         );
 
-        let mut lp = ReusableBoxFuturePool::new(1, async move { Ok(()) });
+        let mut lp = ReusableBoxFuturePool::for_value(1, async move { Ok(()) });
         let action = lp.next(async { Ok(()) }).unwrap();
 
         Box::new(Catch {
             base: ActionBaseMeta {
                 tag: "orch::internal::catch_action".into(),
-                reusable_future_pool: ReusableBoxFuturePool::new(
+                reusable_future_pool: ReusableBoxFuturePool::for_value(
                     design.config.max_concurrent_action_executions,
                     Catch::execute_impl(action, HandlerType::None, self.filters),
                 ),

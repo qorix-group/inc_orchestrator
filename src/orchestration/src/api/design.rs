@@ -12,7 +12,7 @@
 //
 
 use crate::{
-    actions::invoke,
+    actions::{ifelse::IfElseCondition, invoke},
     api::ShutdownEvent,
     common::{orch_tag::OrchestrationTag, tag::Tag, DesignConfig},
     prelude::InvokeResult,
@@ -104,6 +104,30 @@ impl Design {
     /// Registers an event in the design and returns an [`OrchestrationTag`] that can be used to reference this event in programs.
     pub fn register_event(&self, tag: Tag) -> Result<OrchestrationTag, CommonErrors> {
         self.db.register_event(tag)
+    }
+
+    /// Registers a condition for an IfElse action.
+    pub fn register_if_else_condition<C>(&mut self, tag: Tag, condition: C) -> Result<OrchestrationTag, CommonErrors>
+    where
+        C: IfElseCondition + Send + Sync + 'static,
+    {
+        self.db.register_if_else_arc_condition(tag, Arc::new(condition))
+    }
+
+    /// Registers an arc condition for an IfElse action.
+    pub fn register_if_else_arc_condition<C>(&mut self, tag: Tag, condition: Arc<C>) -> Result<OrchestrationTag, CommonErrors>
+    where
+        C: IfElseCondition + Send + Sync + 'static,
+    {
+        self.db.register_if_else_arc_condition(tag, condition)
+    }
+
+    /// Registers an arc mutex condition for an IfElse action.
+    pub fn register_if_else_arc_mutex_condition<C>(&mut self, tag: Tag, condition: Arc<Mutex<C>>) -> Result<OrchestrationTag, CommonErrors>
+    where
+        C: IfElseCondition + Send + 'static,
+    {
+        self.db.register_if_else_arc_mutex_condition(tag, condition)
     }
 
     /// Fetches an [`OrchestrationTag`] for a given tag, which can be used to reference the orchestration in programs.

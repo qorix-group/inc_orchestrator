@@ -70,7 +70,7 @@ impl JustLogAction {
         Box::new(Self {
             base: ActionBaseMeta {
                 tag: Tag::from_str_static(DEFAULT_TAG),
-                reusable_future_pool: ReusableBoxFuturePool::new(1, Self::execute_impl("JustLogAction".into())),
+                reusable_future_pool: ReusableBoxFuturePool::for_value(1, Self::execute_impl("JustLogAction".into())),
             },
             name: name.into(),
         })

@@ -22,9 +22,9 @@ use std::rc::Rc;
 #[allow(clippy::enum_variant_names)]
 /// MapIdentifier is an enum that represents the type of SlotMap the orchestration tag belongs to.
 pub(crate) enum MapIdentifier {
-    ClonableInvokeMap,
+    Invoke,
     Event,
-    SimpleConditionMap,
+    IfElse,
     ComplexConditionMap,
 }
 
@@ -91,14 +91,9 @@ mod tests {
     fn orchestration_tag_creation() {
         let config = DesignConfig::default();
         let ap = Rc::new(RefCell::new(ActionProvider::new(config)));
-        let tag = OrchestrationTag::new(
-            Tag::from_str_static("test_tag"),
-            SlotMapKey::new(1),
-            MapIdentifier::ClonableInvokeMap,
-            ap.clone(),
-        );
+        let tag = OrchestrationTag::new(Tag::from_str_static("test_tag"), SlotMapKey::new(1), MapIdentifier::Invoke, ap.clone());
         assert_eq!(*tag.tag(), Tag::from_str_static("test_tag"));
         assert_eq!(*tag.key(), SlotMapKey::new(1));
-        assert_eq!(*tag.map_identifier(), MapIdentifier::ClonableInvokeMap);
+        assert_eq!(*tag.map_identifier(), MapIdentifier::Invoke);
     }
 }

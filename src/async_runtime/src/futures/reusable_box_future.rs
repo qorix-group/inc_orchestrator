@@ -63,31 +63,37 @@ const FUTURE_FREE: u8 = 0; // Future is in a pool, can be taken
 const FUTURE_POOL_GONE: u8 = 0xFF; // Pool is dropped or dropping and the future has to drop itself instead being dropped by pool
 
 impl<OutType> ReusableBoxFuturePool<OutType> {
-    ///
-    /// Creates a pool with `cnt` futures available
-    ///
-    pub fn new<U>(cnt: usize, _: U) -> Self
+    /// Creates a future pool with `size` number of futures of type `U` available.
+    pub fn for_type<U>(size: usize) -> Self
     where
         U: Future<Output = OutType> + Send + 'static,
     {
         //TODO: Consider using Vec from iceoryx once they fix miri issues, otherwise it's hard to use other code based on it
         let input_layout = Layout::new::<U>();
-        let boxes = Self::create_arr_storage(cnt, |_| unsafe {
+        let boxes = Self::create_arr_storage(size, |_| unsafe {
             let memory = alloc::alloc(input_layout);
             let typed = memory as *mut U;
 
             NonNull::new(typed).unwrap() as IndirectStorage<OutType>
         });
 
-        let states = Self::create_arr_storage(cnt, |_| Arc::new(BoxState::new()));
+        let states = Self::create_arr_storage(size, |_| Arc::new(BoxState::new()));
 
         Self {
             boxes,
             states,
             position: 0,
-            size: cnt,
+            size,
             mem_layout: input_layout,
         }
+    }
+
+    /// Creates a pool with `size` number of futures available.
+    pub fn for_value<U>(size: usize, _: U) -> Self
+    where
+        U: Future<Output = OutType> + Send + 'static,
+    {
+        Self::for_type::<U>(size)
     }
 
     ///
@@ -376,7 +382,7 @@ mod tests {
             let (fut, mock) = get_mock();
 
             {
-                let mut p = ReusableBoxFuturePool::<u32>::new(3, TestFuture::default());
+                let mut p = ReusableBoxFuturePool::<u32>::for_value(3, TestFuture::default());
                 {
                     let r = p.next(fut);
                     assert!(r.is_ok());
@@ -394,7 +400,7 @@ mod tests {
             let (fut2, _) = get_mock();
 
             {
-                let mut p = ReusableBoxFuturePool::<u32>::new(3, TestFuture::default());
+                let mut p = ReusableBoxFuturePool::<u32>::for_value(3, TestFuture::default());
                 let mut r = p.next(fut);
                 assert!(r.is_ok());
 
@@ -415,7 +421,7 @@ mod tests {
         let r;
 
         {
-            let mut p = ReusableBoxFuturePool::<u32>::new(3, TestFuture::default());
+            let mut p = ReusableBoxFuturePool::<u32>::for_value(3, TestFuture::default());
             r = p.next(fut);
             assert!(r.is_ok());
         }
@@ -431,7 +437,7 @@ mod tests {
     #[test]
     fn test_no_more_futures_return_err() {
         {
-            let mut p = ReusableBoxFuturePool::<u32>::new(3, async { 1 });
+            let mut p = ReusableBoxFuturePool::<u32>::for_value(3, async { 1 });
 
             let r = p.next(async { 1 });
             assert!(r.is_ok());
@@ -447,7 +453,7 @@ mod tests {
         }
 
         {
-            let mut p = ReusableBoxFuturePool::<u32>::new(3, async { 1 });
+            let mut p = ReusableBoxFuturePool::<u32>::for_value(3, async { 1 });
 
             let r = p.next(async { 1 });
             assert!(r.is_ok());
@@ -468,7 +474,7 @@ mod tests {
     #[test]
     fn test_return_future_if_available() {
         {
-            let mut p = ReusableBoxFuturePool::<u32>::new(3, async { 1 });
+            let mut p = ReusableBoxFuturePool::<u32>::for_value(3, async { 1 });
 
             let r = p.next(async { 1 });
             assert!(r.is_ok());
@@ -484,7 +490,7 @@ mod tests {
         }
 
         {
-            let mut p = ReusableBoxFuturePool::<u32>::new(3, async { 1 });
+            let mut p = ReusableBoxFuturePool::<u32>::for_value(3, async { 1 });
 
             let r = p.next(async { 1 });
             assert!(r.is_ok());
@@ -531,7 +537,7 @@ mod tests {
 
     #[test]
     fn test_mixing_not_compatible_futures_return_error() {
-        let mut p = ReusableBoxFuturePool::<u32>::new(3, test1());
+        let mut p = ReusableBoxFuturePool::<u32>::for_value(3, test1());
         let mut r = p.next(test1());
         assert!(r.is_ok());
 
@@ -541,7 +547,7 @@ mod tests {
 
     #[test]
     fn test_replacing_future_really_replaces_it() {
-        let mut p = ReusableBoxFuturePool::<u32>::new(1, TestFuture::default());
+        let mut p = ReusableBoxFuturePool::<u32>::for_value(1, TestFuture::default());
 
         let (fut, mut mock) = get_mock();
         p.next(fut).unwrap();
@@ -564,7 +570,7 @@ mod tests {
         impl UnwindSafe for TestWrapper {}
         impl RefUnwindSafe for TestWrapper {}
 
-        let mut p = TestWrapper(ReusableBoxFuturePool::<u32>::new(1, TestFuture::default()));
+        let mut p = TestWrapper(ReusableBoxFuturePool::<u32>::for_value(1, TestFuture::default()));
 
         let (panic_fur, panic_mock) = get_mock_panic();
 

@@ -13,10 +13,12 @@
 #![allow(dead_code)]
 
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
 
 use async_runtime::futures::{sleep, yield_now};
 use foundation::prelude::*;
 use orchestration::actions::action::UserErrValue;
+use orchestration::actions::ifelse::IfElseCondition;
 use orchestration::actions::invoke::InvokeResult;
 use orchestration::api::design::Design;
 
@@ -129,6 +131,22 @@ pub fn error_after_third_run() -> InvokeResult {
     }
 }
 
+pub struct AlwaysTrueCondition {}
+
+impl IfElseCondition for AlwaysTrueCondition {
+    fn compute(&self) -> bool {
+        true
+    }
+}
+
+pub struct AlwaysFalseCondition {}
+
+impl IfElseCondition for AlwaysFalseCondition {
+    fn compute(&self) -> bool {
+        false
+    }
+}
+
 pub fn register_all_common_into_design(design: &mut Design) -> Result<(), CommonErrors> {
     design.register_invoke_fn("test1_sync_func".into(), test1_sync_func)?;
     design.register_invoke_fn("test2_sync_func".into(), test2_sync_func)?;
@@ -145,6 +163,9 @@ pub fn register_all_common_into_design(design: &mut Design) -> Result<(), Common
     design.register_event("Event2".into())?;
     design.register_event("Event3".into())?;
     design.register_event("Event4".into())?;
+
+    design.register_if_else_arc_condition("always_true_condition".into(), Arc::new(AlwaysTrueCondition {}))?;
+    design.register_if_else_arc_condition("always_false_condition".into(), Arc::new(AlwaysFalseCondition {}))?;
 
     Ok(())
 }

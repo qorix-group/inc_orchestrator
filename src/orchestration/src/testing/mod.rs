@@ -95,7 +95,7 @@ impl MockActionBuilder {
 
         // Create a dummy future for the sake of initializing the reusable future pool's layout
         let dummy_future = MockAction::execute_impl(reusable_mockfn_pool.next_object().unwrap());
-        let reusable_future_pool = ReusableBoxFuturePool::<ActionResult>::new(DEFAULT_POOL_SIZE, dummy_future);
+        let reusable_future_pool = ReusableBoxFuturePool::<ActionResult>::for_value(DEFAULT_POOL_SIZE, dummy_future);
 
         MockAction {
             reusable_future_pool,
