@@ -114,7 +114,7 @@ impl Concurrency {
     fn create_reusable_future_pool(pool_size: usize) -> ReusableBoxFuturePool<ActionResult> {
         let mut vec_pool = ReusableVecPool::<ActionMeta>::new(pool_size, |_| Vec::new(1));
         let vec = vec_pool.next_object().unwrap();
-        ReusableBoxFuturePool::<ActionResult>::new(pool_size, Self::execute_impl("dummy".into(), vec))
+        ReusableBoxFuturePool::<ActionResult>::for_value(pool_size, Self::execute_impl("dummy".into(), vec))
     }
 }
 

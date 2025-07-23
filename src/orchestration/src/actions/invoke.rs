@@ -38,7 +38,7 @@ pub struct Invoke {}
 impl Invoke {
     /// Create an invoke action out of an orchestration tag.
     pub fn from_tag(tag: &OrchestrationTag, config: &DesignConfig) -> Box<dyn ActionTrait> {
-        (*tag.action_provider()).borrow_mut().provide_invoke(*tag.key(), config).unwrap()
+        tag.action_provider().borrow_mut().provide_invoke(*tag.key(), config).unwrap()
     }
 
     pub fn from_design(name: &str, design: &Design) -> Box<dyn ActionTrait> {
@@ -56,11 +56,11 @@ impl Invoke {
     pub(crate) fn from_fn(tag: Tag, action: InvokeFunctionType, worker_id: Option<UniqueWorkerId>, config: &DesignConfig) -> Box<dyn ActionTrait> {
         Box::new(InvokeFn {
             action,
-            action_future_pool: ReusableBoxFuturePool::new(config.max_concurrent_action_executions, InvokeFn::action_future(action)),
+            action_future_pool: ReusableBoxFuturePool::for_value(config.max_concurrent_action_executions, InvokeFn::action_future(action)),
             worker_id,
             base: ActionBaseMeta {
                 tag,
-                reusable_future_pool: ReusableBoxFuturePool::new(
+                reusable_future_pool: ReusableBoxFuturePool::for_value(
                     config.max_concurrent_action_executions,
                     InvokeFn::spawn_action(InstantOrSpawn::None),
                 ),
@@ -77,11 +77,11 @@ impl Invoke {
 
         Box::new(InvokeAsync {
             action,
-            action_future_pool: ReusableBoxFuturePool::new(config.max_concurrent_action_executions, InvokeAsync::<A, F>::action_future(future)),
+            action_future_pool: ReusableBoxFuturePool::for_value(config.max_concurrent_action_executions, InvokeAsync::<A, F>::action_future(future)),
             worker_id,
             base: ActionBaseMeta {
                 tag,
-                reusable_future_pool: ReusableBoxFuturePool::new(
+                reusable_future_pool: ReusableBoxFuturePool::for_value(
                     config.max_concurrent_action_executions,
                     InvokeAsync::<A, F>::spawn_action(InstantOrSpawn::None),
                 ),
@@ -99,14 +99,14 @@ impl Invoke {
         Box::new(InvokeMethod {
             object: Arc::clone(&object),
             method,
-            action_future_pool: ReusableBoxFuturePool::new(
+            action_future_pool: ReusableBoxFuturePool::for_value(
                 config.max_concurrent_action_executions,
                 InvokeMethod::<T>::action_future(Arc::clone(&object), method),
             ),
             worker_id,
             base: ActionBaseMeta {
                 tag,
-                reusable_future_pool: ReusableBoxFuturePool::new(
+                reusable_future_pool: ReusableBoxFuturePool::for_value(
                     config.max_concurrent_action_executions,
                     InvokeMethod::<T>::spawn_action(InstantOrSpawn::None),
                 ),
@@ -131,14 +131,14 @@ impl Invoke {
         Box::new(InvokeMethodAsync {
             object,
             method,
-            action_future_pool: ReusableBoxFuturePool::new(
+            action_future_pool: ReusableBoxFuturePool::for_value(
                 config.max_concurrent_action_executions,
                 InvokeMethodAsync::<T, M, F>::action_future(future),
             ),
             worker_id,
             base: ActionBaseMeta {
                 tag,
-                reusable_future_pool: ReusableBoxFuturePool::new(
+                reusable_future_pool: ReusableBoxFuturePool::for_value(
                     config.max_concurrent_action_executions,
                     InvokeMethodAsync::<T, M, F>::spawn_action(InstantOrSpawn::None),
                 ),

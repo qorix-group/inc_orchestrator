@@ -103,7 +103,7 @@ impl SequenceBuilder {
         let futures_vec = futures_vec_pool.next_object().unwrap();
 
         // Populate the futures' collection to initialize the reusable future pool's layout
-        let reusable_future_pool = ReusableBoxFuturePool::<ActionResult>::new(
+        let reusable_future_pool = ReusableBoxFuturePool::<ActionResult>::for_value(
             REUSABLE_FUTURE_POOL_SIZE,
             Sequence::execute_impl(Tag::from_str_static(DEFAULT_TAG), futures_vec),
         );

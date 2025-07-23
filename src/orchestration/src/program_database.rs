@@ -11,6 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+use crate::actions::ifelse::{IfElse, IfElseCondition};
 use crate::common::orch_tag::{MapIdentifier, OrchestrationTag};
 use crate::common::tag::{AsTagTrait, Tag};
 use crate::common::DesignConfig;
@@ -33,17 +34,24 @@ use std::{
 
 use ::core::{cell::RefCell, fmt::Debug, future::Future};
 
-type ActionGenerator = dyn Fn(Tag, Option<UniqueWorkerId>, &DesignConfig) -> Box<dyn ActionTrait>;
+type InvokeGenerator = dyn Fn(Tag, Option<UniqueWorkerId>, &DesignConfig) -> Box<dyn ActionTrait>;
+type IfElseGenerator = dyn Fn(Box<dyn ActionTrait>, Box<dyn ActionTrait>, &DesignConfig) -> Box<dyn ActionTrait>;
 
-struct ActionData {
+struct InvokeData {
     tag: Tag,
     worker_id: Option<UniqueWorkerId>,
-    generator: Box<ActionGenerator>,
+    generator: Box<InvokeGenerator>,
+}
+
+struct IfElseData {
+    tag: Tag,
+    generator: Box<IfElseGenerator>,
 }
 
 pub(crate) struct ActionProvider {
-    clonable_invokes: SlotMap<ActionData>,
+    clonable_invokes: SlotMap<InvokeData>,
     design_events: SlotMap<DesignEvent>,
+    if_elses: SlotMap<IfElseData>,
 }
 
 impl ActionProvider {
@@ -51,6 +59,7 @@ impl ActionProvider {
         Self {
             clonable_invokes: SlotMap::new(config.db_params.clonable_invokes_capacity),
             design_events: SlotMap::new(DEFAULT_EVENTS_CAPACITY),
+            if_elses: SlotMap::new(config.db_params.if_else_conditions_capacity),
         }
     }
 
@@ -66,6 +75,20 @@ impl ActionProvider {
         match t {
             EventActionType::Trigger => self.design_events.get(key).and_then(|e| e.creator()?.borrow_mut().create_trigger(config)),
             EventActionType::Sync => self.design_events.get(key).and_then(|e| e.creator()?.borrow_mut().create_sync(config)),
+        }
+    }
+
+    pub(crate) fn provide_if_else(
+        &mut self,
+        key: SlotMapKey,
+        true_branch: Box<dyn ActionTrait>,
+        false_branch: Box<dyn ActionTrait>,
+        config: &DesignConfig,
+    ) -> Option<Box<dyn ActionTrait>> {
+        if let Some(data) = self.if_elses.get(key) {
+            Some((data.generator)(true_branch, false_branch, config))
+        } else {
+            None
         }
     }
 }
@@ -88,40 +111,19 @@ impl ProgramDatabase {
         }
     }
 
-    pub fn register_event(&self, tag: Tag) -> Result<OrchestrationTag, CommonErrors> {
-        let mut ap = self.action_provider.borrow_mut();
-
-        if tag.is_in_collection(ap.design_events.iter()) {
-            return Err(CommonErrors::AlreadyDone);
-        }
-
-        ap.design_events
-            .insert(DesignEvent::new(tag))
-            .ok_or(CommonErrors::NoSpaceLeft)
-            .map(|key| {
-                trace!("Registered event with tag: {:?}", tag);
-                OrchestrationTag::new(tag, key, MapIdentifier::Event, Rc::clone(&self.action_provider))
-            })
-    }
-
     /// Registers a function as an invoke action that can be created multiple times.
     pub fn register_invoke_fn(&self, tag: Tag, action: InvokeFunctionType) -> Result<OrchestrationTag, CommonErrors> {
         let mut ap = self.action_provider.borrow_mut();
 
         if !tag.is_in_collection(ap.clonable_invokes.iter()) {
-            if let Some(key) = ap.clonable_invokes.insert(ActionData {
+            if let Some(key) = ap.clonable_invokes.insert(InvokeData {
                 tag,
                 worker_id: None,
                 generator: Box::new(move |tag: Tag, worker_id: Option<UniqueWorkerId>, config: &DesignConfig| {
                     Invoke::from_fn(tag, action, worker_id, config)
                 }),
             }) {
-                Ok(OrchestrationTag::new(
-                    tag,
-                    key,
-                    MapIdentifier::ClonableInvokeMap,
-                    Rc::clone(&self.action_provider),
-                ))
+                Ok(OrchestrationTag::new(tag, key, MapIdentifier::Invoke, Rc::clone(&self.action_provider)))
             } else {
                 Err(CommonErrors::NoSpaceLeft)
             }
@@ -139,19 +141,14 @@ impl ProgramDatabase {
         let mut ap = self.action_provider.borrow_mut();
 
         if !tag.is_in_collection(ap.clonable_invokes.iter()) {
-            if let Some(key) = ap.clonable_invokes.insert(ActionData {
+            if let Some(key) = ap.clonable_invokes.insert(InvokeData {
                 tag,
                 worker_id: None,
                 generator: Box::new(move |tag: Tag, worker_id: Option<UniqueWorkerId>, config: &DesignConfig| {
                     Invoke::from_async(tag, action.clone(), worker_id, config)
                 }),
             }) {
-                Ok(OrchestrationTag::new(
-                    tag,
-                    key,
-                    MapIdentifier::ClonableInvokeMap,
-                    Rc::clone(&self.action_provider),
-                ))
+                Ok(OrchestrationTag::new(tag, key, MapIdentifier::Invoke, Rc::clone(&self.action_provider)))
             } else {
                 Err(CommonErrors::NoSpaceLeft)
             }
@@ -170,19 +167,14 @@ impl ProgramDatabase {
         let mut ap = self.action_provider.borrow_mut();
 
         if !tag.is_in_collection(ap.clonable_invokes.iter()) {
-            if let Some(key) = ap.clonable_invokes.insert(ActionData {
+            if let Some(key) = ap.clonable_invokes.insert(InvokeData {
                 tag,
                 worker_id: None,
                 generator: Box::new(move |tag: Tag, worker_id: Option<UniqueWorkerId>, config: &DesignConfig| {
                     Invoke::from_method(tag, Arc::clone(&object), method, worker_id, config)
                 }),
             }) {
-                Ok(OrchestrationTag::new(
-                    tag,
-                    key,
-                    MapIdentifier::ClonableInvokeMap,
-                    Rc::clone(&self.action_provider),
-                ))
+                Ok(OrchestrationTag::new(tag, key, MapIdentifier::Invoke, Rc::clone(&self.action_provider)))
             } else {
                 Err(CommonErrors::NoSpaceLeft)
             }
@@ -201,19 +193,14 @@ impl ProgramDatabase {
         let mut ap = self.action_provider.borrow_mut();
 
         if !tag.is_in_collection(ap.clonable_invokes.iter()) {
-            if let Some(key) = ap.clonable_invokes.insert(ActionData {
+            if let Some(key) = ap.clonable_invokes.insert(InvokeData {
                 tag,
                 worker_id: None,
                 generator: Box::new(move |tag: Tag, worker_id: Option<UniqueWorkerId>, config: &DesignConfig| {
                     Invoke::from_method_async(tag, Arc::clone(&object), method.clone(), worker_id, config)
                 }),
             }) {
-                Ok(OrchestrationTag::new(
-                    tag,
-                    key,
-                    MapIdentifier::ClonableInvokeMap,
-                    Rc::clone(&self.action_provider),
-                ))
+                Ok(OrchestrationTag::new(tag, key, MapIdentifier::Invoke, Rc::clone(&self.action_provider)))
             } else {
                 Err(CommonErrors::NoSpaceLeft)
             }
@@ -244,6 +231,73 @@ impl ProgramDatabase {
         Err(CommonErrors::NotFound)
     }
 
+    /// Registers an event for the Sync and Trigger actions.
+    pub fn register_event(&self, tag: Tag) -> Result<OrchestrationTag, CommonErrors> {
+        let mut ap = self.action_provider.borrow_mut();
+
+        if tag.is_in_collection(ap.design_events.iter()) {
+            return Err(CommonErrors::AlreadyDone);
+        }
+
+        ap.design_events
+            .insert(DesignEvent::new(tag))
+            .ok_or(CommonErrors::NoSpaceLeft)
+            .map(|key| {
+                trace!("Registered event with tag: {:?}", tag);
+                OrchestrationTag::new(tag, key, MapIdentifier::Event, Rc::clone(&self.action_provider))
+            })
+    }
+
+    /// Registers an arc condition for an IfElse action.
+    pub fn register_if_else_arc_condition<C>(&mut self, tag: Tag, condition: Arc<C>) -> Result<OrchestrationTag, CommonErrors>
+    where
+        C: IfElseCondition + Send + Sync + 'static,
+    {
+        let mut ap = self.action_provider.borrow_mut();
+
+        if !tag.is_in_collection(ap.if_elses.iter()) {
+            if let Some(key) = ap.if_elses.insert(IfElseData {
+                tag,
+                generator: Box::new(
+                    move |true_branch: Box<dyn ActionTrait>, false_branch: Box<dyn ActionTrait>, config: &DesignConfig| {
+                        IfElse::from_arc_condition(Arc::clone(&condition), true_branch, false_branch, config)
+                    },
+                ),
+            }) {
+                Ok(OrchestrationTag::new(tag, key, MapIdentifier::IfElse, Rc::clone(&self.action_provider)))
+            } else {
+                Err(CommonErrors::NoSpaceLeft)
+            }
+        } else {
+            Err(CommonErrors::AlreadyDone)
+        }
+    }
+
+    /// Registers an arc mutex condition for an IfElse action.
+    pub fn register_if_else_arc_mutex_condition<C>(&mut self, tag: Tag, condition: Arc<Mutex<C>>) -> Result<OrchestrationTag, CommonErrors>
+    where
+        C: IfElseCondition + Send + 'static,
+    {
+        let mut ap = self.action_provider.borrow_mut();
+
+        if !tag.is_in_collection(ap.if_elses.iter()) {
+            if let Some(key) = ap.if_elses.insert(IfElseData {
+                tag,
+                generator: Box::new(
+                    move |true_branch: Box<dyn ActionTrait>, false_branch: Box<dyn ActionTrait>, config: &DesignConfig| {
+                        IfElse::from_arc_mutex_condition(Arc::clone(&condition), true_branch, false_branch, config)
+                    },
+                ),
+            }) {
+                Ok(OrchestrationTag::new(tag, key, MapIdentifier::IfElse, Rc::clone(&self.action_provider)))
+            } else {
+                Err(CommonErrors::NoSpaceLeft)
+            }
+        } else {
+            Err(CommonErrors::AlreadyDone)
+        }
+    }
+
     /// Returns an `OrchestrationTag` for an action previously registered with the given tag.
     ///
     /// # Returns
@@ -255,21 +309,33 @@ impl ProgramDatabase {
         let ap = self.action_provider.borrow();
 
         let invoke = tag.find_in_collection(ap.clonable_invokes.iter());
-        let evt = tag.find_in_collection(ap.design_events.iter()).map(|(key, _)| key);
+        let event = tag.find_in_collection(ap.design_events.iter()).map(|(key, _)| key);
+        let ifelse = tag.find_in_collection(ap.if_elses.iter());
 
-        if evt.is_some() && invoke.is_some() {
+        let mut present_count = 0;
+
+        if invoke.is_some() {
+            present_count += 1;
+        }
+
+        if event.is_some() {
+            present_count += 1;
+        }
+
+        if ifelse.is_some() {
+            present_count += 1;
+        }
+
+        if present_count > 1 {
             return Err(CommonErrors::GenericError);
         }
 
-        if let Some((key, entry)) = invoke {
-            Ok(OrchestrationTag::new(
-                entry.tag,
-                key,
-                MapIdentifier::ClonableInvokeMap,
-                Rc::clone(&self.action_provider),
-            ))
-        } else if let Some(key) = evt {
+        if let Some((key, _)) = invoke {
+            Ok(OrchestrationTag::new(tag, key, MapIdentifier::Invoke, Rc::clone(&self.action_provider)))
+        } else if let Some(key) = event {
             Ok(OrchestrationTag::new(tag, key, MapIdentifier::Event, Rc::clone(&self.action_provider)))
+        } else if let Some((key, _)) = ifelse {
+            Ok(OrchestrationTag::new(tag, key, MapIdentifier::IfElse, Rc::clone(&self.action_provider)))
         } else {
             Err(CommonErrors::NotFound)
         }
@@ -300,7 +366,13 @@ impl Default for ProgramDatabase {
     }
 }
 
-impl AsTagTrait for (SlotMapKey, &ActionData) {
+impl AsTagTrait for (SlotMapKey, &InvokeData) {
+    fn as_tag(&self) -> &Tag {
+        &self.1.tag
+    }
+}
+
+impl AsTagTrait for (SlotMapKey, &IfElseData) {
     fn as_tag(&self) -> &Tag {
         &self.1.tag
     }
