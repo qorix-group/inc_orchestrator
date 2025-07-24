@@ -10,8 +10,9 @@
 *
 * SPDX-License-Identifier: Apache-2.0
 ********************************************************************************/
+#pragma once
 
-enum class ObjDetectionState
+enum class ObjectDetectionState
 {
     INITIAL,
     PRE_PROCESSING,
@@ -21,15 +22,15 @@ enum class ObjDetectionState
     OBJECT_FUSION,
 };
 
-class ObjDetectionCC
+class ObjectDetection
 {
-    ObjDetectionState state;
+    ObjectDetectionState state;
 
 public:
-    ObjDetectionCC();
-    void pre_processing_cc();
-    void drive_q1_cc();
-    void drive_q2_cc();
-    void drive_q3_cc();
-    void object_fusion_cc();
+    ObjectDetection();
+    void pre_processing();
+    void drive_q1();
+    void drive_q2();
+    void drive_q3();
+    void object_fusion();
 };

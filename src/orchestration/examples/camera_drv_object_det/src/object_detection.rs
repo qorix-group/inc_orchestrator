@@ -11,72 +11,23 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use crate::ffi::{
-    create_obj_detection, free_obj_detection, obj_detection_drive_q1, obj_detection_drive_q2, obj_detection_drive_q3, obj_detection_object_fusion,
-    obj_detection_pre_processing,
-};
+use orchestration_macros::import_from_cpp;
+
+#[import_from_cpp("pre_processing", "drive_q1", "drive_q2", "drive_q3", "object_fusion")]
+pub struct ObjectDetection;
+
+// For logging from C++ methods
 use logging_tracing::prelude::*;
-use orchestration::actions::invoke::InvokeResult;
-use std::ffi::c_void;
+use std::ffi::CStr;
+use std::os::raw::c_char;
 
-unsafe impl Send for ObjectDetection {}
-pub struct ObjectDetection {
-    obj_detection_ptr: *mut c_void,
-}
-
-impl ObjectDetection {
-    pub fn new() -> Self {
-        Self {
-            obj_detection_ptr: unsafe { create_obj_detection() },
-        }
+#[no_mangle]
+pub extern "C" fn rust_log_info(msg: *const c_char) {
+    if msg.is_null() {
+        return;
     }
-
-    pub fn pre_processing(&mut self) -> InvokeResult {
-        info!("PreProcessing start");
-        unsafe {
-            obj_detection_pre_processing(self.obj_detection_ptr);
-        }
-        info!("PreProcessing end");
-        Ok(())
-    }
-    pub fn drive_q1(&mut self) -> InvokeResult {
-        info!("DriveQ1 start");
-        unsafe {
-            obj_detection_drive_q1(self.obj_detection_ptr);
-        }
-        info!("DriveQ1 end");
-        Ok(())
-    }
-    pub fn drive_q2(&mut self) -> InvokeResult {
-        info!("DriveQ2 start");
-        unsafe {
-            obj_detection_drive_q2(self.obj_detection_ptr);
-        }
-        info!("DriveQ2 end");
-        Ok(())
-    }
-    pub fn drive_q3(&mut self) -> InvokeResult {
-        info!("DriveQ3 start");
-        unsafe {
-            obj_detection_drive_q3(self.obj_detection_ptr);
-        }
-        info!("DriveQ3 end");
-        Ok(())
-    }
-    pub fn object_fusion(&mut self) -> InvokeResult {
-        info!("ObjectFusion start");
-        unsafe {
-            obj_detection_object_fusion(self.obj_detection_ptr);
-        }
-        info!("ObjectFusion end");
-        Ok(())
-    }
-}
-
-impl Drop for ObjectDetection {
-    fn drop(&mut self) {
-        unsafe {
-            free_obj_detection(self.obj_detection_ptr);
-        }
+    let c_str = unsafe { CStr::from_ptr(msg) };
+    if let Ok(rust_str) = c_str.to_str() {
+        info!("{}", rust_str);
     }
 }

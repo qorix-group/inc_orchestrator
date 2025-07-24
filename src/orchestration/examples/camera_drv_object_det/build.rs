@@ -12,9 +12,15 @@
 //
 
 fn main() {
-    println!("cargo::rerun-if-changed=cpp/include/obj_detection.h");
-    println!("cargo::rerun-if-changed=cpp/obj_detection.cpp");
+    let orchestration_macro_include = "../../../orchestration_macros/cpp/include";
+    println!("cargo::rerun-if-changed=cpp/include/object_detection.h");
+    println!("cargo::rerun-if-changed=cpp/object_detection.cpp");
     println!("cargo::rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed={}", orchestration_macro_include);
 
-    cc::Build::new().cpp(true).file("cpp/obj_detection.cpp").compile("libobj_detection_cc");
+    cc::Build::new()
+        .cpp(true)
+        .file("cpp/object_detection.cpp")
+        .include(orchestration_macro_include)
+        .compile("libobject_detection");
 }

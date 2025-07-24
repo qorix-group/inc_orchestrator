@@ -8,6 +8,7 @@ orchestration.workspace = true
 async_runtime.workspace = true
 foundation.workspace = true
 logging_tracing.workspace = true
+orchestration_macros = { workspace = true }
 
 [build-dependencies]
 cc = "1.2.30"
