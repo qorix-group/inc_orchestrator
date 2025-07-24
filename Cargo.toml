@@ -2,7 +2,7 @@
 resolver = "2"
 # Split to default members without component integration tests.
 # Used when executing cargo from project root.
-default-members=[
+default-members = [
     "src/foundation",
     "src/async_runtime",
     "src/orchestration",
@@ -12,7 +12,7 @@ default-members=[
     "src/testing_macros",
 ]
 # Include component integration tests as a member for IDE support and Bazel builds.
-members=[
+members = [
     "src/foundation",
     "src/async_runtime",
     "src/orchestration",
@@ -22,6 +22,7 @@ members=[
     "src/testing_macros",
     "component_integration_tests/rust_test_scenarios",
     "src/orchestration/examples/camera_drv_object_det",
+    "src/orchestration_macros",
 ]
 
 
@@ -37,19 +38,20 @@ orchestration = { path = "src/orchestration" }
 testing = { path = "src/testing" }
 testing_macros = { path = "src/testing_macros" }
 xtask = { path = "src/xtask" }
+orchestration_macros = { path = "src/orchestration_macros" }
 
-iceoryx2 = { git = "https://github.com/qorix-group/iceoryx2.git", branch = "iox2-875-base-string-fix-miri"}
-iceoryx2-bb-container = { git = "https://github.com/qorix-group/iceoryx2.git", branch = "iox2-875-base-string-fix-miri"}
-iceoryx2-bb-derive-macros = { git = "https://github.com/qorix-group/iceoryx2.git", branch = "iox2-875-base-string-fix-miri"}
-iceoryx2-bb-elementary = { git = "https://github.com/qorix-group/iceoryx2.git", branch = "iox2-875-base-string-fix-miri"}
-iceoryx2-bb-elementary-traits = { git = "https://github.com/qorix-group/iceoryx2.git", branch = "iox2-875-base-string-fix-miri"}
-iceoryx2-bb-lock-free = { git = "https://github.com/qorix-group/iceoryx2.git", branch = "iox2-875-base-string-fix-miri"}
-iceoryx2-bb-memory = { git = "https://github.com/qorix-group/iceoryx2.git", branch = "iox2-875-base-string-fix-miri"}
-iceoryx2-bb-posix = { git = "https://github.com/qorix-group/iceoryx2.git", branch = "iox2-875-base-string-fix-miri"}
-iceoryx2-bb-system-types = { git = "https://github.com/qorix-group/iceoryx2.git", branch = "iox2-875-base-string-fix-miri"}
-iceoryx2-bb-testing = { git = "https://github.com/qorix-group/iceoryx2.git", branch = "iox2-875-base-string-fix-miri"}
-iceoryx2-bb-threadsafe = { git = "https://github.com/qorix-group/iceoryx2.git", branch = "iox2-875-base-string-fix-miri"}
-iceoryx2-pal-concurrency-sync = { git = "https://github.com/qorix-group/iceoryx2.git", branch = "iox2-875-base-string-fix-miri"}
+iceoryx2 = { git = "https://github.com/qorix-group/iceoryx2.git", branch = "iox2-875-base-string-fix-miri" }
+iceoryx2-bb-container = { git = "https://github.com/qorix-group/iceoryx2.git", branch = "iox2-875-base-string-fix-miri" }
+iceoryx2-bb-derive-macros = { git = "https://github.com/qorix-group/iceoryx2.git", branch = "iox2-875-base-string-fix-miri" }
+iceoryx2-bb-elementary = { git = "https://github.com/qorix-group/iceoryx2.git", branch = "iox2-875-base-string-fix-miri" }
+iceoryx2-bb-elementary-traits = { git = "https://github.com/qorix-group/iceoryx2.git", branch = "iox2-875-base-string-fix-miri" }
+iceoryx2-bb-lock-free = { git = "https://github.com/qorix-group/iceoryx2.git", branch = "iox2-875-base-string-fix-miri" }
+iceoryx2-bb-memory = { git = "https://github.com/qorix-group/iceoryx2.git", branch = "iox2-875-base-string-fix-miri" }
+iceoryx2-bb-posix = { git = "https://github.com/qorix-group/iceoryx2.git", branch = "iox2-875-base-string-fix-miri" }
+iceoryx2-bb-system-types = { git = "https://github.com/qorix-group/iceoryx2.git", branch = "iox2-875-base-string-fix-miri" }
+iceoryx2-bb-testing = { git = "https://github.com/qorix-group/iceoryx2.git", branch = "iox2-875-base-string-fix-miri" }
+iceoryx2-bb-threadsafe = { git = "https://github.com/qorix-group/iceoryx2.git", branch = "iox2-875-base-string-fix-miri" }
+iceoryx2-pal-concurrency-sync = { git = "https://github.com/qorix-group/iceoryx2.git", branch = "iox2-875-base-string-fix-miri" }
 libc = "0.2.171"
 tracing = "0.1.41"
 tracing-appender = "0.2.3"
@@ -68,7 +70,6 @@ tracing-perfetto-sdk-sys = { git = "https://github.com/qorix-group/tracing-perfe
 [workspace.lints.clippy]
 std_instead_of_core = "warn"
 alloc_instead_of_core = "warn"
-
 
 
 [workspace.lints.rust]

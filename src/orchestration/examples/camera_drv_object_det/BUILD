@@ -32,25 +32,30 @@ rust_binary(
     name = "camera_drv_object_det",
     srcs = [
         "src/camera_driver.rs",
-        "src/ffi.rs",
         "src/main.rs",
         "src/object_detection.rs",
     ],
+    proc_macro_deps = [
+        "//src/orchestration_macros:orch_macros",
+    ],
     visibility = ["//visibility:public"],
     deps = _EXAMPLE_DEPS + [
-        ":libobj_detection_cc",
+        ":libobject_detection",
     ],
 )
 
 cc_library(
-    name = "libobj_detection_cc",
+    name = "libobject_detection",
     srcs = [
-        "cpp/obj_detection.cpp",
+        "cpp/object_detection.cpp",
     ],
     hdrs = [
-        "cpp/include/obj_detection.h",
+        "cpp/include/object_detection.h",
     ],
     includes = [
         "cpp",
+    ],
+    deps = [
+        "//src/orchestration_macros:orchestration_macros_headers",
     ],
 )
