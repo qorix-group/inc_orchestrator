@@ -1,6 +1,6 @@
-use crate::internals::helpers::execution_barrier::RuntimeJoiner;
-use crate::internals::helpers::runtime_helper::Runtime;
-use crate::internals::scenario::Scenario;
+use crate::internals::execution_barrier::RuntimeJoiner;
+use crate::internals::runtime_helper::Runtime;
+use test_scenarios_rust::scenario::Scenario;
 
 use async_runtime::spawn;
 
@@ -31,7 +31,7 @@ async fn simple_task(name: String) {
 pub struct BasicWorker;
 
 impl Scenario for BasicWorker {
-    fn get_name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "basic"
     }
 

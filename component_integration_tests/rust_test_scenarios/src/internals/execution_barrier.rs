@@ -38,12 +38,8 @@ impl MultiExecutionBarrier {
 
     pub fn get_notifiers(&self) -> Vec<ThreadReadyNotifier> {
         let mut notifiers = Vec::new();
-        loop {
-            if let Some(notifier) = self.barrier.get_notifier() {
-                notifiers.push(notifier);
-            } else {
-                break;
-            }
+        while let Some(notifier) = self.barrier.get_notifier() {
+            notifiers.push(notifier);
         }
         notifiers
     }

@@ -1,13 +1,11 @@
-use crate::{
-    internals::scenario::{ScenarioGroup, ScenarioGroupImpl},
-    tests::orchestration::orchestration_shutdown::ShutdownBeforeStart,
-};
+use crate::tests::orchestration::orchestration_shutdown::ShutdownBeforeStart;
 use orchestration_concurrency::{MultipleConcurrency, NestedConcurrency, SingleConcurrency};
 use orchestration_sequence::{AwaitSequence, NestedSequence, SingleSequence};
 use orchestration_sleep::SleepUnderLoad;
 use orchestration_trigger_sync::{
     OneTriggerOneSyncTwoPrograms, OneTriggerTwoSyncsThreePrograms, TriggerAndSyncInNestedBranches, TriggerSyncOneAfterAnother,
 };
+use test_scenarios_rust::scenario::{ScenarioGroup, ScenarioGroupImpl};
 
 use async_runtime::futures::reusable_box_future::ReusableBoxFuturePool;
 use orchestration::{common::tag::Tag, prelude::*};
@@ -21,53 +19,41 @@ macro_rules! generic_test_func {
     };
 }
 #[macro_use]
-pub mod orchestration_concurrency;
-pub mod orchestration_sequence;
-pub mod orchestration_shutdown;
-pub mod orchestration_sleep;
-pub mod orchestration_trigger_sync;
+mod orchestration_concurrency;
+mod orchestration_sequence;
+mod orchestration_shutdown;
+mod orchestration_sleep;
+mod orchestration_trigger_sync;
 
-pub struct OrchestrationScenarioGroup {
-    group: ScenarioGroupImpl,
-}
-
-impl OrchestrationScenarioGroup {
-    pub fn new() -> Self {
-        OrchestrationScenarioGroup {
-            group: ScenarioGroupImpl::new("orchestration"),
-        }
-    }
-}
-
-impl ScenarioGroup for OrchestrationScenarioGroup {
-    fn get_group_impl(&mut self) -> &mut ScenarioGroupImpl {
-        &mut self.group
-    }
-
-    fn init(&mut self) -> () {
-        // Sequence scenarios
-        self.group.add_scenario(Box::new(SingleSequence));
-        self.group.add_scenario(Box::new(NestedSequence));
-        self.group.add_scenario(Box::new(AwaitSequence));
-        // Concurrency scenarios
-        self.group.add_scenario(Box::new(SingleConcurrency));
-        self.group.add_scenario(Box::new(MultipleConcurrency));
-        self.group.add_scenario(Box::new(NestedConcurrency));
-        // Trigger and sync scenarios
-        self.group.add_scenario(Box::new(OneTriggerOneSyncTwoPrograms));
-        self.group.add_scenario(Box::new(OneTriggerTwoSyncsThreePrograms));
-        self.group.add_scenario(Box::new(TriggerAndSyncInNestedBranches));
-        self.group.add_scenario(Box::new(TriggerSyncOneAfterAnother));
-        // Sleep scenarios
-        self.group.add_scenario(Box::new(SleepUnderLoad));
-        // Shutdown scenarios
-        self.group.add_scenario(Box::new(SingleProgramSingleShutdown));
-        self.group.add_scenario(Box::new(TwoProgramsSingleShutdown));
-        self.group.add_scenario(Box::new(TwoProgramsTwoShutdowns));
-        self.group.add_scenario(Box::new(GetAllShutdowns));
-        self.group.add_scenario(Box::new(OneProgramNotShut));
-        self.group.add_scenario(Box::new(ShutdownBeforeStart));
-    }
+pub fn orchestration_scenario_group() -> Box<dyn ScenarioGroup> {
+    Box::new(ScenarioGroupImpl::new(
+        "orchestration",
+        vec![
+            // Sequence scenarios
+            Box::new(SingleSequence),
+            Box::new(NestedSequence),
+            Box::new(AwaitSequence),
+            // Concurrency scenarios
+            Box::new(SingleConcurrency),
+            Box::new(MultipleConcurrency),
+            Box::new(NestedConcurrency),
+            // Trigger and sync scenarios
+            Box::new(OneTriggerOneSyncTwoPrograms),
+            Box::new(OneTriggerTwoSyncsThreePrograms),
+            Box::new(TriggerAndSyncInNestedBranches),
+            Box::new(TriggerSyncOneAfterAnother),
+            // Sleep scenarios
+            Box::new(SleepUnderLoad),
+            // Shutdown scenarios
+            Box::new(SingleProgramSingleShutdown),
+            Box::new(TwoProgramsSingleShutdown),
+            Box::new(TwoProgramsTwoShutdowns),
+            Box::new(GetAllShutdowns),
+            Box::new(OneProgramNotShut),
+            Box::new(ShutdownBeforeStart),
+        ],
+        vec![],
+    ))
 }
 
 pub struct JustLogAction {

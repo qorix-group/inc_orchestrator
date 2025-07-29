@@ -68,14 +68,14 @@ pytest -v . --build-scenarios --self-contained-html --html report.html --traces 
 
 - `--self-contained-html` - generate self contained HTML file.
 - `--html report.html` - HTML report output path.
-- `--traces <VALUE>` - verbosity of traces in output and HTML report - "none", "bin" or "all".
+- `--traces <VALUE>` - verbosity of traces in output and HTML report - "none", "target" or "all".
 
 > Traces are collected using `stdout`.
 > Setting `--capture` flag (including `-s`) might cause traces to be missing from HTML report.
 
 ## Standalone execution of test scenarios
 
-Rust test scenarios can be run independently from `pytest`.
+Test scenarios can be run independently from `pytest`.
 
 Set current working directory to the following:
 
@@ -92,24 +92,19 @@ cargo run -- --list-scenarios
 Run specific test scenario:
 
 ```bash
-cargo run -- --name <TEST_GROUP>.<TEST_SCENARIO>
+cargo run -- --name <TEST_GROUP>.<TEST_SCENARIO> --input <TEST_INPUT>
 ```
 
-Executable is interactive and prompt will require test input to be provided.
-E.g., `{"runtime": {"task_queue_size": 256, "workers": 1}}`.
-
-Example of test scenario run with test input provided using `stdin`:
+Example:
 
 ```bash
-cargo run -- --name orchestration.single_sequence <<< '{"runtime": {"task_queue_size": 256, "workers": 1}}'
+cargo run -- --name basic.only_shutdown --input '{"runtime": {"task_queue_size": 256, "workers": 1}}'
 ```
 
-### Using executable directly
-
-Test scenario executable can be used directly:
+Run test scenario executable directly:
 
 ```bash
-./target/debug/rust_test_scenarios --name orchestration.single_sequence <<< '{"runtime": {"task_queue_size": 256, "workers": 1}}'
+<REPO_ROOT>/target/debug/rust_test_scenarios --name basic.only_shutdown --input '{"runtime": {"task_queue_size": 256, "workers": 1}}'
 ```
 
 ### Using Bazel

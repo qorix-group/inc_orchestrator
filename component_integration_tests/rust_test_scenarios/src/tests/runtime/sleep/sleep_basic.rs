@@ -1,6 +1,6 @@
-use crate::internals::helpers::execution_barrier::RuntimeJoiner;
-use crate::internals::helpers::runtime_helper::Runtime;
-use crate::internals::scenario::Scenario;
+use crate::internals::execution_barrier::RuntimeJoiner;
+use crate::internals::runtime_helper::Runtime;
+use test_scenarios_rust::scenario::Scenario;
 
 use async_runtime::futures::sleep;
 use async_runtime::spawn;
@@ -58,7 +58,7 @@ async fn non_sleep_task(name: String) {
 pub struct SleepBasic;
 
 impl Scenario for SleepBasic {
-    fn get_name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "basic"
     }
 

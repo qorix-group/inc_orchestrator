@@ -1,6 +1,5 @@
 use super::*;
-use crate::internals::helpers::runtime_helper::Runtime;
-use crate::internals::scenario::Scenario;
+use crate::internals::runtime_helper::Runtime;
 use async_runtime::futures::sleep;
 use foundation::prelude::*;
 use orchestration::{
@@ -10,6 +9,7 @@ use orchestration::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::time::Duration;
+use test_scenarios_rust::scenario::Scenario;
 use tracing::info;
 
 fn location_checkpoint(id: &str, location: &str) {
@@ -105,7 +105,7 @@ fn sleep_under_load(sleep_duration_ms: u64) -> Result<Design, CommonErrors> {
 }
 
 impl Scenario for SleepUnderLoad {
-    fn get_name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "sleep_under_load"
     }
 

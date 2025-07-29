@@ -1,32 +1,17 @@
-use crate::internals::scenario::{ScenarioGroup, ScenarioGroupImpl};
-use basic::BasicScenarioGroup;
-use orchestration::OrchestrationScenarioGroup;
-use runtime::RuntimeScenarioGroup;
+use test_scenarios_rust::scenario::{ScenarioGroup, ScenarioGroupImpl};
 
-pub mod basic;
-pub mod orchestration;
-pub mod runtime;
+mod basic;
+mod orchestration;
+mod runtime;
 
-pub struct RootScenarioGroup {
-    group: ScenarioGroupImpl,
-}
+use basic::basic_scenario_group;
+use orchestration::orchestration_scenario_group;
+use runtime::runtime_scenario_group;
 
-impl RootScenarioGroup {
-    pub fn new() -> Self {
-        RootScenarioGroup {
-            group: ScenarioGroupImpl::new("root"),
-        }
-    }
-}
-
-impl ScenarioGroup for RootScenarioGroup {
-    fn get_group_impl(&mut self) -> &mut ScenarioGroupImpl {
-        &mut self.group
-    }
-
-    fn init(&mut self) -> () {
-        self.group.add_group(Box::new(BasicScenarioGroup::new()));
-        self.group.add_group(Box::new(RuntimeScenarioGroup::new()));
-        self.group.add_group(Box::new(OrchestrationScenarioGroup::new()));
-    }
+pub fn root_scenario_group() -> Box<dyn ScenarioGroup> {
+    Box::new(ScenarioGroupImpl::new(
+        "root",
+        vec![],
+        vec![basic_scenario_group(), orchestration_scenario_group(), runtime_scenario_group()],
+    ))
 }

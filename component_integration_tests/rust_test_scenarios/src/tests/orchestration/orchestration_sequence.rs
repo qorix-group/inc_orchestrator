@@ -1,5 +1,5 @@
-use crate::internals::helpers::runtime_helper::Runtime;
-use crate::internals::scenario::Scenario;
+use crate::internals::runtime_helper::Runtime;
+use test_scenarios_rust::scenario::Scenario;
 
 use super::*;
 use foundation::prelude::*;
@@ -30,7 +30,7 @@ fn single_sequence_design() -> Result<Design, CommonErrors> {
 
 /// Checks three actions in a single sequence execution
 impl Scenario for SingleSequence {
-    fn get_name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "single_sequence"
     }
 
@@ -85,7 +85,7 @@ fn nested_sequence_design() -> Result<Design, CommonErrors> {
 
 /// Checks actions in a inner and outer sequence execution
 impl Scenario for NestedSequence {
-    fn get_name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "nested_sequence"
     }
 
@@ -140,7 +140,7 @@ fn awaited_sequence_design() -> Result<Design, CommonErrors> {
                                 .with_step(JustLogAction::new("Action5"))
                                 .build(),
                         )
-                        .build(&design),
+                        .build(design),
                 )
                 .with_step(JustLogAction::new("FinishAction"))
                 .build(),
@@ -154,7 +154,7 @@ fn awaited_sequence_design() -> Result<Design, CommonErrors> {
 
 /// Checks three actions in a single sequence execution
 impl Scenario for AwaitSequence {
-    fn get_name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "await_sequence"
     }
 
