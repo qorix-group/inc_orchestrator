@@ -32,7 +32,7 @@ impl SyncBuilder {
         let sync = tag
             .action_provider()
             .borrow_mut()
-            .provide_event(*tag.key(), EventActionType::Sync, config);
+            .provide_event(*tag.tag(), EventActionType::Sync, config);
         assert!(
             sync.is_some(),
             "Failed to create Sync Action with tag {:?}, design/deployment errors where not handled properly before or You passing wrong tag.",

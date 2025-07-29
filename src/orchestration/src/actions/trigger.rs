@@ -34,7 +34,7 @@ impl TriggerBuilder {
         let trigger = tag
             .action_provider()
             .borrow_mut()
-            .provide_event(*tag.key(), EventActionType::Trigger, config);
+            .provide_event(*tag.tag(), EventActionType::Trigger, config);
         assert!(
             trigger.is_some(),
             "Failed to create Trigger Action with tag {:?}, design/deployment errors where not handled properly before or You passing wrong tag.",

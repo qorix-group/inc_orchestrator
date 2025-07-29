@@ -39,7 +39,7 @@ impl IfElse {
     ) -> Box<dyn ActionTrait> {
         tag.action_provider()
             .borrow_mut()
-            .provide_if_else(*tag.key(), true_branch, false_branch, config)
+            .provide_if_else(*tag.tag(), true_branch, false_branch, config)
             .unwrap()
     }
 

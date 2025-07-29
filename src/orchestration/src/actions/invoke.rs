@@ -38,7 +38,7 @@ pub struct Invoke {}
 impl Invoke {
     /// Create an invoke action out of an orchestration tag.
     pub fn from_tag(tag: &OrchestrationTag, config: &DesignConfig) -> Box<dyn ActionTrait> {
-        tag.action_provider().borrow_mut().provide_invoke(*tag.key(), config).unwrap()
+        tag.action_provider().borrow_mut().provide_invoke(*tag.tag(), config).unwrap()
     }
 
     pub fn from_design(name: &str, design: &Design) -> Box<dyn ActionTrait> {

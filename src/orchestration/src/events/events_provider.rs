@@ -22,7 +22,6 @@ use crate::{
     common::tag::AsTagTrait,
 };
 use foundation::prelude::*;
-use iceoryx2_bb_container::slotmap::SlotMapKey;
 
 use crate::{actions::action::ActionTrait, common::tag::Tag, events::local_events::LocalEvent};
 
@@ -192,49 +191,6 @@ impl<GlobalProvider: IpcProvider> EventCreatorTrait for GlobalEventCreator<Globa
         Some(Box::new(ShutdownNotifierImpl {
             notifier: self.global_provider.borrow_mut().get_notifier(self.system_event_name.as_str())?,
         }))
-    }
-}
-
-pub(crate) struct DesignEvent {
-    tag: Tag,
-    creator: Option<EventCreator>,
-}
-
-impl DesignEvent {
-    pub fn new(tag: Tag) -> Self {
-        Self { tag, creator: None }
-    }
-
-    pub fn creator(&self) -> Option<EventCreator> {
-        self.creator.clone()
-    }
-
-    pub fn set_creator(&mut self, creator: EventCreator) {
-        let prev = self.creator.replace(creator);
-        if prev.is_some() {
-            warn!(
-                "Event with tag {:?} already has a binding, we replace it with new one provided.",
-                self.tag
-            );
-        }
-    }
-}
-
-impl AsTagTrait for &DesignEvent {
-    fn as_tag(&self) -> &Tag {
-        &self.tag
-    }
-}
-
-impl AsTagTrait for &mut DesignEvent {
-    fn as_tag(&self) -> &Tag {
-        &self.tag
-    }
-}
-
-impl AsTagTrait for (SlotMapKey, &DesignEvent) {
-    fn as_tag(&self) -> &Tag {
-        &self.1.tag
     }
 }
 
