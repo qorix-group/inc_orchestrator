@@ -79,7 +79,7 @@ rust.toolchain(
 
 crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
 crate.from_cargo(
-    name = "crates",
+    name = "score_orchestrator_crates",
     cargo_lockfile = "//:Cargo.lock",
     manifests = [
         "//:Cargo.toml",
@@ -95,4 +95,4 @@ crate.from_cargo(
         "//src/orchestration_macros:Cargo.toml",
     ],
 )
-use_repo(crate, "crates")
+use_repo(crate, "score_orchestrator_crates")

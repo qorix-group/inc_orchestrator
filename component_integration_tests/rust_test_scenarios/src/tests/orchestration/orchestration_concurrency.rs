@@ -1,5 +1,5 @@
-use crate::internals::helpers::runtime_helper::Runtime;
-use crate::internals::scenario::Scenario;
+use crate::internals::runtime_helper::Runtime;
+use test_scenarios_rust::scenario::Scenario;
 
 use super::*;
 use foundation::prelude::*;
@@ -26,7 +26,7 @@ fn single_concurrency_design() -> Result<Design, CommonErrors> {
                         .with_branch(Invoke::from_tag(&t1_tag, design.config()))
                         .with_branch(Invoke::from_tag(&t2_tag, design.config()))
                         .with_branch(Invoke::from_tag(&t3_tag, design.config()))
-                        .build(&design),
+                        .build(design),
                 )
                 .with_step(JustLogAction::new("FinishAction"))
                 .build(),
@@ -40,7 +40,7 @@ fn single_concurrency_design() -> Result<Design, CommonErrors> {
 
 /// Checks Concurrency Functions
 impl Scenario for SingleConcurrency {
-    fn get_name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "single_concurrency"
     }
 
@@ -87,7 +87,7 @@ fn multiple_concurrency_design() -> Result<Design, CommonErrors> {
                         .with_branch(Invoke::from_tag(&t1_tag, design.config()))
                         .with_branch(Invoke::from_tag(&t2_tag, design.config()))
                         .with_branch(Invoke::from_tag(&t3_tag, design.config()))
-                        .build(&design),
+                        .build(design),
                 )
                 .with_step(JustLogAction::new("IntermediateAction"))
                 .with_step(
@@ -95,7 +95,7 @@ fn multiple_concurrency_design() -> Result<Design, CommonErrors> {
                         .with_branch(Invoke::from_tag(&t4_tag, design.config()))
                         .with_branch(Invoke::from_tag(&t5_tag, design.config()))
                         .with_branch(Invoke::from_tag(&t6_tag, design.config()))
-                        .build(&design),
+                        .build(design),
                 )
                 .with_step(JustLogAction::new("FinishAction"))
                 .build(),
@@ -109,7 +109,7 @@ fn multiple_concurrency_design() -> Result<Design, CommonErrors> {
 
 /// Checks Concurrency Functions
 impl Scenario for MultipleConcurrency {
-    fn get_name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "multiple_concurrency"
     }
 
@@ -157,10 +157,10 @@ fn nested_concurrency_design() -> Result<Design, CommonErrors> {
                             ConcurrencyBuilder::new()
                                 .with_branch(Invoke::from_tag(&t2_tag, design.config()))
                                 .with_branch(Invoke::from_tag(&t3_tag, design.config()))
-                                .build(&design),
+                                .build(design),
                         )
                         .with_branch(Invoke::from_tag(&t4_tag, design.config()))
-                        .build(&design),
+                        .build(design),
                 )
                 .with_step(JustLogAction::new("FinishAction"))
                 .build(),
@@ -174,7 +174,7 @@ fn nested_concurrency_design() -> Result<Design, CommonErrors> {
 
 /// Checks Concurrency Functions
 impl Scenario for NestedConcurrency {
-    fn get_name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "nested_concurrency"
     }
 

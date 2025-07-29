@@ -1,29 +1,17 @@
-pub mod execution_engine;
-pub mod sleep;
-pub mod worker;
+mod execution_engine;
+mod sleep;
+mod worker;
 
-use crate::internals::scenario::{ScenarioGroup, ScenarioGroupImpl};
+use test_scenarios_rust::scenario::{ScenarioGroup, ScenarioGroupImpl};
 
-pub struct RuntimeScenarioGroup {
-    group: ScenarioGroupImpl,
-}
+use crate::tests::runtime::execution_engine::execution_engine_scenario_group;
+use crate::tests::runtime::sleep::sleep_scenario_group;
+use crate::tests::runtime::worker::worker_scenario_group;
 
-impl RuntimeScenarioGroup {
-    pub fn new() -> Self {
-        RuntimeScenarioGroup {
-            group: ScenarioGroupImpl::new("runtime"),
-        }
-    }
-}
-
-impl ScenarioGroup for RuntimeScenarioGroup {
-    fn get_group_impl(&mut self) -> &mut ScenarioGroupImpl {
-        &mut self.group
-    }
-
-    fn init(&mut self) -> () {
-        self.group.add_group(Box::new(execution_engine::ExecutionEngineScenarioGroup::new()));
-        self.group.add_group(Box::new(sleep::SleepScenarioGroup::new()));
-        self.group.add_group(Box::new(worker::WorkerScenarioGroup::new()));
-    }
+pub fn runtime_scenario_group() -> Box<dyn ScenarioGroup> {
+    Box::new(ScenarioGroupImpl::new(
+        "runtime",
+        vec![],
+        vec![execution_engine_scenario_group(), sleep_scenario_group(), worker_scenario_group()],
+    ))
 }

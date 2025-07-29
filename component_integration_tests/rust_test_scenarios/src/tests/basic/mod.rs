@@ -1,24 +1,11 @@
-use crate::internals::scenario::{ScenarioGroup, ScenarioGroupImpl};
+use test_scenarios_rust::scenario::{ScenarioGroup, ScenarioGroupImpl};
 
-pub mod basic;
-pub struct BasicScenarioGroup {
-    group: ScenarioGroupImpl,
-}
+mod only_shutdown_sequence;
 
-impl BasicScenarioGroup {
-    pub fn new() -> Self {
-        BasicScenarioGroup {
-            group: ScenarioGroupImpl::new("basic"),
-        }
-    }
-}
-
-impl ScenarioGroup for BasicScenarioGroup {
-    fn get_group_impl(&mut self) -> &mut ScenarioGroupImpl {
-        &mut self.group
-    }
-
-    fn init(&mut self) -> () {
-        self.group.add_scenario(Box::new(basic::OnlyShutdownSequence));
-    }
+pub fn basic_scenario_group() -> Box<dyn ScenarioGroup> {
+    Box::new(ScenarioGroupImpl::new(
+        "basic",
+        vec![Box::new(only_shutdown_sequence::OnlyShutdownSequence)],
+        vec![],
+    ))
 }

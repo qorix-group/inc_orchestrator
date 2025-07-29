@@ -1,11 +1,11 @@
-use crate::internals::helpers::execution_barrier::RuntimeJoiner;
-use crate::internals::helpers::runtime_helper::Runtime;
-use crate::internals::scenario::Scenario;
+use crate::internals::execution_barrier::RuntimeJoiner;
+use crate::internals::runtime_helper::Runtime;
 use async_runtime::runtime::async_runtime::RuntimeErrors;
 use async_runtime::spawn;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::string::String;
+use test_scenarios_rust::scenario::Scenario;
 use tracing::info;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -38,7 +38,7 @@ fn rt_errors_to_string(e: RuntimeErrors) -> String {
 pub struct SingleRtMultipleExecEngine;
 
 impl Scenario for SingleRtMultipleExecEngine {
-    fn get_name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "single_rt_multiple_exec_engine"
     }
 

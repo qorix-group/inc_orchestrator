@@ -1,6 +1,6 @@
-use crate::internals::helpers::execution_barrier::{MultiExecutionBarrier, RuntimeJoiner};
-use crate::internals::helpers::runtime_helper::Runtime;
-use crate::internals::scenario::Scenario;
+use crate::internals::execution_barrier::{MultiExecutionBarrier, RuntimeJoiner};
+use crate::internals::runtime_helper::Runtime;
+use test_scenarios_rust::scenario::Scenario;
 
 use async_runtime::spawn;
 use foundation::threading::thread_wait_barrier::ThreadReadyNotifier;
@@ -52,7 +52,7 @@ async fn blocking_task(name: String, counter: Arc<AtomicUsize>, counter_unblock_
 pub struct WorkerWithBlockingTasks;
 
 impl Scenario for WorkerWithBlockingTasks {
-    fn get_name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "with_blocking_tasks"
     }
 

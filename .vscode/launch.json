@@ -35,8 +35,6 @@
             "args": [
                 "--name",
                 "${input:nameArg}",
-                "--input-type",
-                "arg",
                 "--input",
                 "${input:inputArg}"
             ],

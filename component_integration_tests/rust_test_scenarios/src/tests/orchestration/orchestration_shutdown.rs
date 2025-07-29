@@ -1,6 +1,5 @@
 use super::*;
-use crate::internals::helpers::runtime_helper::Runtime;
-use crate::internals::scenario::Scenario;
+use crate::internals::runtime_helper::Runtime;
 use foundation::prelude::*;
 use orchestration::{
     api::{design::Design, Orchestration},
@@ -11,6 +10,7 @@ use std::sync::{
     Arc,
 };
 use std::vec::Vec;
+use test_scenarios_rust::scenario::Scenario;
 
 pub struct SingleProgramSingleShutdown;
 pub struct TwoProgramsSingleShutdown;
@@ -34,7 +34,7 @@ fn shutdown_design_with_counter(name: &str, shutdown_tag: Tag, counter: ActionCo
 
     // Register async for incrementing execution counter
     let name_str = name.to_owned();
-    let execution_tag = design.register_invoke_async(format!("{}::ExecutionCounter", name).into(), move || {
+    let execution_tag = design.register_invoke_async(format!("{name}::ExecutionCounter").into(), move || {
         let execution_counter = counter.run_cnt.clone();
         let name_str = name_str.clone();
         async move {
@@ -45,7 +45,7 @@ fn shutdown_design_with_counter(name: &str, shutdown_tag: Tag, counter: ActionCo
     })?;
 
     // Register async for setting stop flag
-    let stop_tag = design.register_invoke_async(format!("{}::StopFlag", name).into(), move || {
+    let stop_tag = design.register_invoke_async(format!("{name}::StopFlag").into(), move || {
         let stop_flag = counter.stop_flag.clone();
         let stop_action_name = stop_action_name.clone();
         async move {
@@ -111,7 +111,7 @@ fn infinite_design() -> Result<Design, CommonErrors> {
 
 // Scenarios
 impl Scenario for SingleProgramSingleShutdown {
-    fn get_name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "single_program_single_shutdown"
     }
 
@@ -156,7 +156,7 @@ impl Scenario for SingleProgramSingleShutdown {
 }
 
 impl Scenario for TwoProgramsSingleShutdown {
-    fn get_name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "two_programs_single_shutdown"
     }
 
@@ -221,7 +221,7 @@ impl Scenario for TwoProgramsSingleShutdown {
 }
 
 impl Scenario for TwoProgramsTwoShutdowns {
-    fn get_name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "two_programs_two_shutdowns"
     }
 
@@ -296,7 +296,7 @@ impl Scenario for TwoProgramsTwoShutdowns {
 }
 
 impl Scenario for GetAllShutdowns {
-    fn get_name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "two_programs_all_shutdowns"
     }
 
@@ -349,7 +349,7 @@ impl Scenario for GetAllShutdowns {
 }
 
 impl Scenario for OneProgramNotShut {
-    fn get_name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "one_program_not_shut"
     }
 
@@ -403,7 +403,7 @@ impl Scenario for OneProgramNotShut {
 }
 
 impl Scenario for ShutdownBeforeStart {
-    fn get_name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "shutdown_before_start"
     }
 

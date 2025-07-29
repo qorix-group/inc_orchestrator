@@ -1,5 +1,5 @@
-use crate::internals::helpers::runtime_helper::Runtime;
-use crate::internals::scenario::Scenario;
+use crate::internals::runtime_helper::Runtime;
+use test_scenarios_rust::scenario::Scenario;
 
 use super::*;
 use foundation::prelude::*;
@@ -71,7 +71,7 @@ fn trigger_sync_design() -> Result<Design, CommonErrors> {
 
 /// Checks trigger and sync between two programs
 impl Scenario for OneTriggerOneSyncTwoPrograms {
-    fn get_name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "1_trigger_1_sync_2_programs"
     }
 
@@ -166,7 +166,7 @@ fn sync_design_b() -> Result<Design, CommonErrors> {
 
 /// Checks trigger in one program and sync in other two programs
 impl Scenario for OneTriggerTwoSyncsThreePrograms {
-    fn get_name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "1_trigger_2_syncs_3_programs"
     }
 
@@ -219,11 +219,11 @@ fn nested_trigger_sync_design() -> Result<Design, CommonErrors> {
                 )
                 .with_branch(
                     SequenceBuilder::new()
-                        .with_step(SyncBuilder::from_design("evt_sync", &design))
+                        .with_step(SyncBuilder::from_design("evt_sync", design))
                         .with_step(Invoke::from_tag(&basic_task_tag, design.config()))
                         .build(),
                 )
-                .build(&design),
+                .build(design),
         );
 
         Ok(())
@@ -234,7 +234,7 @@ fn nested_trigger_sync_design() -> Result<Design, CommonErrors> {
 
 /// Checks trigger and sync in the separate concurrency branches in a single program
 impl Scenario for TriggerAndSyncInNestedBranches {
-    fn get_name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "trigger_and_sync_in_nested_branches"
     }
 
@@ -292,7 +292,7 @@ fn trigger_sync_oaa_design() -> Result<Design, CommonErrors> {
 
 /// Checks trigger and sync as sequential steps in a single program
 impl Scenario for TriggerSyncOneAfterAnother {
-    fn get_name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "trigger_sync_one_after_another"
     }
 

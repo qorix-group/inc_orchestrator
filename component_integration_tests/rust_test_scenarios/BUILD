@@ -1,5 +1,5 @@
-load("@crates//:defs.bzl", "all_crate_deps")
 load("@rules_rust//rust:defs.bzl", "rust_binary")
+load("@score_orchestrator_crates//:defs.bzl", "all_crate_deps")
 
 rust_binary(
     name = "rust_test_scenarios",
@@ -7,7 +7,7 @@ rust_binary(
     tags = [
         "manual",
     ],
-    visibility = ["//visibility:public"],
+    visibility = ["//component_integration_tests/python_test_cases:__pkg__"],
     deps = [
         "//src/async_runtime:libasync_runtime",
         "//src/foundation:libfoundation",
