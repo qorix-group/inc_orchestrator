@@ -16,6 +16,7 @@ class ResultCode:
     SUCCESS = 0
     PANIC = 101
     SIGKILL = -9
+    SIGABRT = -6
 
 
 class CitScenario(Scenario):
