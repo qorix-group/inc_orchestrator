@@ -88,8 +88,8 @@ impl<'a> ReadBuf<'a> {
     /// Returns a mutable slice of the unfilled portion of the buffer (may be uninitialized).
     ///
     /// # Safety
-    /// The caller must ensure only writes are performed, and pair with `assume_init` and `advance_filled`.
-    pub unsafe fn unfilled_mut(&mut self) -> &mut [MaybeUninit<u8>] {
+    /// The caller must ensure that when writes are performed, they are paired with `assume_init` and `advance_filled`.
+    pub fn unfilled_mut(&mut self) -> &mut [MaybeUninit<u8>] {
         &mut self.buf[self.filled..]
     }
 
@@ -131,8 +131,8 @@ impl<'a> ReadBuf<'a> {
     /// # Panics
     /// Panics if this would exceed the number of initialized bytes.
     pub fn advance_filled(&mut self, n: usize) {
-        assert!(self.filled + n <= self.initialized, "Cannot advance filled more than initialized");
-        self.filled += n;
+        let value = self.filled.checked_add(n).expect("Overflow in advance_filled");
+        self.filled = value;
     }
 
     /// Copies a slice into the buffer at the filled position, advancing filled and initialized as needed.
@@ -141,13 +141,12 @@ impl<'a> ReadBuf<'a> {
     /// Panics if the slice would exceed the buffer's capacity.
     pub fn put_slice(&mut self, buf: &[u8]) {
         let len = buf.len();
-        assert!(self.filled + len <= self.capacity(), "Cannot put slice more than capacity");
+        assert!(self.remaining() >= len, "Cannot put slice more than capacity");
+
+        // Above assert ensures no overflow
         let filled_slice_uninit = &mut self.buf[self.filled..self.filled + len];
 
-        // We will not read from it
-        let filled_slice = unsafe { Self::slice_assume_init_mut(filled_slice_uninit) };
-
-        filled_slice.copy_from_slice(buf);
+        unsafe { filled_slice_uninit.as_mut_ptr().copy_from_nonoverlapping(buf.as_ptr().cast(), buf.len()) };
 
         self.filled += len;
 
@@ -158,7 +157,7 @@ impl<'a> ReadBuf<'a> {
 
     /// Marks the unfilled portion as initialized and returns it as a mutable slice.
     pub fn initialize_unfilled(&mut self) -> &mut [u8] {
-        self.fill_uninit(self.capacity() - self.initialized);
+        self.init_unfilled(self.remaining());
         let unfilled_slice = &mut self.buf[self.filled..];
 
         unsafe { Self::slice_assume_init_mut(unfilled_slice) }
@@ -172,25 +171,29 @@ impl<'a> ReadBuf<'a> {
 
     // Private helpers
     unsafe fn slice_assume_init(slice: &[MaybeUninit<u8>]) -> &[u8] {
-        core::slice::from_raw_parts(slice.as_ptr() as *const u8, slice.len())
+        core::slice::from_raw_parts(slice.as_ptr().cast::<u8>(), slice.len())
     }
 
     unsafe fn slice_assume_init_mut(slice: &mut [MaybeUninit<u8>]) -> &mut [u8] {
-        core::slice::from_raw_parts_mut(slice.as_mut_ptr() as *mut u8, slice.len())
+        core::slice::from_raw_parts_mut(slice.as_mut_ptr().cast::<u8>(), slice.len())
     }
 
     ///
     /// # Panics
-    /// Caller needs to ensure size + self.initialized is in capacity bounds
-    fn fill_uninit(&mut self, size: usize) {
-        let end = self.initialized + size;
-        assert!(end <= self.capacity(), "Cannot fill uninit more than capacity");
+    ///  Panics if `size` is greater than the remaining capacity.
+    fn init_unfilled(&mut self, size: usize) {
+        assert!(self.remaining() >= size, "Cannot fill unfilled more than capacity");
 
-        let unfilled_slice = &mut self.buf[self.initialized..end];
+        // Above assert ensures no overflow
+        let end = self.filled + size;
+
+        let unfilled_slice = &mut self.buf[self.filled..end];
 
         unsafe { unfilled_slice.as_mut_ptr().write_bytes(0, size) };
 
-        self.initialized += size;
+        if end > self.initialized {
+            self.initialized = end;
+        }
     }
 }
 
