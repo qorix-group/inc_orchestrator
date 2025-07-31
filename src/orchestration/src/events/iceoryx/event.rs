@@ -32,7 +32,8 @@ use foundation::prelude::*;
 static EVENT_OBJ: LazyLock<Mutex<Event>> = LazyLock::new(|| {
     let mut evts: HashMap<usize, (Listener<ipc_threadsafe::Service>, Option<Waker>, bool)> = HashMap::new();
     // The internal event name shall be unique within the system. Otherwise, when two or more processes running, the trigger will be delivered to all.
-    let internal_event_name = "qorix_internal_waker_".to_string() + &process::id().to_string();
+    let timestamp = (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos() % 1_000_000_000) as u32;
+    let internal_event_name = "qorix_internal_waker_".to_string() + &process::id().to_string() + "_" + &timestamp.to_string();
 
     let config = {
         let mut config = Config::default();
@@ -51,20 +52,38 @@ static EVENT_OBJ: LazyLock<Mutex<Event>> = LazyLock::new(|| {
     })
     .expect("failed clenup node stall state");
 
-    let name = NodeName::new(&format!("orch_node_{}", process::id())).expect("Broken node name");
-    let node = NodeBuilder::new()
-        .name(&name)
+    Node::<local_threadsafe::Service>::cleanup_dead_nodes(&config);
+    Node::<local_threadsafe::Service>::list(&config, |node_state| {
+        if let NodeState::<local_threadsafe::Service>::Dead(view) = node_state {
+            if let Err(e) = view.remove_stale_resources() {
+                error!("Failed to clean iceoryx2 resources: {:?}", e);
+            }
+        }
+        CallbackProgression::Continue
+    })
+    .expect("failed clenup node stall state");
+
+    let local_name = NodeName::new(&format!("orch_node_local_{}", process::id())).expect("Broken node name");
+    let local_node = NodeBuilder::new()
+        .name(&local_name)
         .config(&config)
-        .create::<ipc_threadsafe::Service>()
+        .create::<local_threadsafe::Service>()
         .unwrap();
 
-    let internal_notifier = node
+    let internal_notifier = local_node
         .service_builder(&internal_event_name.as_str().try_into().unwrap())
         .event()
         .open_or_create()
         .unwrap()
         .notifier_builder()
         .create()
+        .unwrap();
+
+    let name = NodeName::new(&format!("orch_node_{}", process::id())).expect("Broken node name");
+    let node = NodeBuilder::new()
+        .name(&name)
+        .config(&config)
+        .create::<ipc_threadsafe::Service>()
         .unwrap();
 
     let internal_listener = node
@@ -90,7 +109,7 @@ pub struct Event {
     service_node: Node<ipc_threadsafe::Service>,
     // Hash Map: event name (for debugging/logging), waker, bool flag to indicate whether event was received already. It is updated by polling thread.
     events: HashMap<usize, (Listener<ipc_threadsafe::Service>, Option<Waker>, bool)>,
-    internal_notifier: Notifier<ipc_threadsafe::Service>,
+    internal_notifier: Notifier<local_threadsafe::Service>,
     notifiers: HashMap<String, Notifier<ipc_threadsafe::Service>>,
 }
 
