@@ -12,6 +12,7 @@
 //
 
 pub mod growable_vec;
+pub mod intrusive_linked_list;
 pub mod mpmc_queue;
 mod queue;
 pub mod reusable_objects;
