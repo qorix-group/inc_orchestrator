@@ -22,6 +22,12 @@ cd <REPO_ROOT>/component_integration_tests/python_test_cases
 
 ### Run tests
 
+Bazel:
+
+```bash
+bazel test //component_integration_tests/python_test_cases:cit
+```
+
 Basic run:
 
 ```bash
@@ -104,4 +110,25 @@ Test scenario executable can be used directly:
 
 ```bash
 ./target/debug/rust_test_scenarios --name orchestration.single_sequence <<< '{"runtime": {"task_queue_size": 256, "workers": 1}}'
+```
+
+### Using Bazel
+
+Bazel handles all setup steps like environment, rebuilding test scenarios by itself.
+All Component Integration Tests can be executed with:
+
+```bash
+bazel test //component_integration_tests/python_test_cases:cit
+```
+
+Run all tests 5 times to check for sporadic errors:
+
+```bash
+bazel test //component_integration_tests/python_test_cases:cit_repeat
+```
+
+Run Test Scenarios:
+
+```bash
+bazel run //component_integration_tests/rust_test_scenarios:rust_test_scenarios -- --help
 ```
