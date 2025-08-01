@@ -1,9 +1,10 @@
 from datetime import timedelta
+from typing import Any
 
 import pytest
 from testing_utils import LogContainer
-from cit_scenario import CitScenario
-from typing import Any
+
+from component_integration_tests.python_test_cases.tests.cit_scenario import CitScenario
 
 BLOCKING_TASK_ID = "blocking_sleep_task"
 BLOCKING_TASK_DELAY_MS = 1000
