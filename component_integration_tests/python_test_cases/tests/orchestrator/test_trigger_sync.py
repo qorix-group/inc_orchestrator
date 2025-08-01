@@ -67,7 +67,11 @@ class TestOneTriggerTwoSyncsThreePrograms(CitScenario):
     def test_config(self) -> dict[str, Any]:
         return {"runtime": {"task_queue_size": 256, "workers": 4}}
 
-    def test_execution_order(self, logs_info_level: LogContainer):
+    def test_execution_order(
+        self, scenario_name, test_config, logs_info_level: LogContainer
+    ):
+        print(scenario_name)
+        print(test_config)
         results = logs_info_level.get_logs()
         assert len(results) == 4, "Expected 4 messages in total"
 

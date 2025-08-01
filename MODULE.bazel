@@ -26,6 +26,14 @@ python.toolchain(
 )
 use_repo(python)
 
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+pip.parse(
+    hub_name = "pip_score_venv_test",
+    python_version = PYTHON_VERSION,
+    requirements_lock = "//component_integration_tests/python_test_cases:requirements.txt",
+)
+use_repo(pip, "pip_score_venv_test")
+
 # Add GoogleTest dependency
 bazel_dep(name = "googletest", version = "1.14.0")
 
@@ -34,7 +42,7 @@ bazel_dep(name = "rules_rust", version = "0.56.0")
 
 # Checker rule for CopyRight checks/fixs
 bazel_dep(name = "score_cr_checker", version = "0.2.2")
-bazel_dep(name = "score_python_basics", version = "0.3.0")
+bazel_dep(name = "score_python_basics", version = "0.3.4")
 bazel_dep(name = "score_starpls_lsp", version = "0.1.0")
 
 # C/C++ rules for Bazel
