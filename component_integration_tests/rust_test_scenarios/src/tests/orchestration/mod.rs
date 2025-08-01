@@ -1,4 +1,7 @@
-use crate::internals::scenario::{ScenarioGroup, ScenarioGroupImpl};
+use crate::{
+    internals::scenario::{ScenarioGroup, ScenarioGroupImpl},
+    tests::orchestration::orchestration_shutdown::ShutdownBeforeStart,
+};
 use orchestration_concurrency::{MultipleConcurrency, NestedConcurrency, SingleConcurrency};
 use orchestration_sequence::{AwaitSequence, NestedSequence, SingleSequence};
 use orchestration_sleep::SleepUnderLoad;
@@ -9,6 +12,7 @@ use orchestration_trigger_sync::{
 use async_runtime::futures::reusable_box_future::ReusableBoxFuturePool;
 use orchestration::{common::tag::Tag, prelude::*};
 
+use orchestration_shutdown::{GetAllShutdowns, OneProgramNotShut, SingleProgramSingleShutdown, TwoProgramsSingleShutdown, TwoProgramsTwoShutdowns};
 use tracing::info;
 
 macro_rules! generic_test_func {
@@ -19,6 +23,7 @@ macro_rules! generic_test_func {
 #[macro_use]
 pub mod orchestration_concurrency;
 pub mod orchestration_sequence;
+pub mod orchestration_shutdown;
 pub mod orchestration_sleep;
 pub mod orchestration_trigger_sync;
 
@@ -55,6 +60,13 @@ impl ScenarioGroup for OrchestrationScenarioGroup {
         self.group.add_scenario(Box::new(TriggerSyncOneAfterAnother));
         // Sleep scenarios
         self.group.add_scenario(Box::new(SleepUnderLoad));
+        // Shutdown scenarios
+        self.group.add_scenario(Box::new(SingleProgramSingleShutdown));
+        self.group.add_scenario(Box::new(TwoProgramsSingleShutdown));
+        self.group.add_scenario(Box::new(TwoProgramsTwoShutdowns));
+        self.group.add_scenario(Box::new(GetAllShutdowns));
+        self.group.add_scenario(Box::new(OneProgramNotShut));
+        self.group.add_scenario(Box::new(ShutdownBeforeStart));
     }
 }
 
