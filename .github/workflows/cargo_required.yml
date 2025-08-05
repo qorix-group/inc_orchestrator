@@ -19,7 +19,7 @@ jobs:
       pages: write
       id-token: write
     runs-on: ${{ vars.REPO_RUNNER_LABELS && fromJSON(vars.REPO_RUNNER_LABELS) || 'ubuntu-latest' }}
-    timeout-minutes: 25 # minutes is the maximum allowed for a cold run
+    timeout-minutes: 45 # minutes is the maximum allowed for a cold run
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
