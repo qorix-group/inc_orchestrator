@@ -28,7 +28,8 @@ runs:
           target
           ~/.cargo/bin
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: "${{ runner.os }}-cargo- \n#magic___^_^___line\n"
+        restore-keys: |
+          ${{ runner.os }}-cargo-
     - name: Install cargo-tarpaulin if not already installed
       run: |
         if ! command -v cargo-tarpaulin > /dev/null; then
