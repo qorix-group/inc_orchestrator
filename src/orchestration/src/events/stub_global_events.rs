@@ -11,7 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use crate::actions::internal::action::ActionResult;
+use crate::actions::action::ActionResult;
 use crate::events::event_traits::{IpcProvider, ListenerTrait, NotifierTrait};
 use ::core::future::Future;
 use foundation::prelude::*;
@@ -56,6 +56,11 @@ impl NotifierTrait for StubIpcNotifier {
     fn notify(&self, _value: u32) -> impl Future<Output = ActionResult> + Send + 'static {
         warn!("This is stub implementation. Global events will not work!");
         async { Ok(()) }
+    }
+
+    fn notify_sync(&self, _value: u32) -> crate::prelude::ActionResult {
+        warn!("This is stub implementation. Global events will not work!");
+        Ok(())
     }
 }
 

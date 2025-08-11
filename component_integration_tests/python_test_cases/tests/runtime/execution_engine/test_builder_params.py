@@ -285,7 +285,7 @@ class TestThreadAffinity_LargeCoreId(TestThreadAffinity):
         assert results.return_code == ResultCode.PANIC
         assert results.stderr is not None
         assert (
-            f"index out of bounds: the len is 1024 but the index is {affinity[0]}"
+            "called `Result::unwrap()` on an `Err` value: CpuCoreOutsideOfSupportedCpuRangeForAffinity"
             in results.stderr
         )
 
@@ -305,7 +305,7 @@ class TestThreadAffinity_AffinityMaskTooLarge(TestThreadAffinity):
         assert results.return_code == ResultCode.PANIC
         assert results.stderr is not None
         assert (
-            f"index out of bounds: the len is 1024 but the index is {len(affinity) - 1}"
+            "called `Result::unwrap()` on an `Err` value: CpuCoreOutsideOfSupportedCpuRangeForAffinity"
             in results.stderr
         )
 
