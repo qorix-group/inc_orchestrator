@@ -18,7 +18,10 @@ use crate::mio::{
 use core::time::Duration;
 use foundation::{containers::vector_extension::VectorExtension, not_recoverable_error, prelude::*};
 use iceoryx2_bb_container::flatmap::FlatMap;
-use libc::{close, pipe2, poll, pollfd, read, write, EAGAIN, EINTR, O_CLOEXEC, O_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI};
+use libc::{
+    close, fcntl, pipe, poll, pollfd, read, write, EAGAIN, EINTR, FD_CLOEXEC, F_SETFD, F_SETFL, O_CLOEXEC, O_NONBLOCK, POLLERR, POLLHUP, POLLIN,
+    POLLOUT, POLLPRI,
+};
 use std::{
     ffi,
     os::fd::{AsRawFd, RawFd},
@@ -215,10 +218,40 @@ struct InternalWaker {
 }
 
 impl InternalWaker {
+    /// Wrapper around pipe to provide functionality similar to pipe2 since it is not available on QNX.
+    /// This creates a pipe and then sets the flags manually. The supported flags are O_NONBLOCK and O_CLOEXEC.
+    fn pipe_with_flags(fds: &mut [RawFd; 2], flags: i32) -> i32 {
+        if unsafe { pipe(fds.as_mut_ptr()) } == -1 {
+            return -1;
+        }
+
+        for fd in fds.iter() {
+            if (flags & O_NONBLOCK) != 0 {
+                unsafe {
+                    if fcntl(*fd, F_SETFL, O_NONBLOCK) == -1 {
+                        close(fds[0]);
+                        close(fds[1]);
+                        return -1;
+                    }
+                }
+            }
+            if (flags & O_CLOEXEC) != 0 {
+                unsafe {
+                    if fcntl(*fd, F_SETFD, FD_CLOEXEC) == -1 {
+                        close(fds[0]);
+                        close(fds[1]);
+                        return -1;
+                    }
+                }
+            }
+        }
+        0 // Success
+    }
+
     fn new() -> Option<Self> {
         let mut fds: [RawFd; 2] = [-1, -1];
 
-        match unsafe { pipe2(fds.as_mut_ptr(), O_NONBLOCK | O_CLOEXEC) } {
+        match Self::pipe_with_flags(&mut fds, O_NONBLOCK | O_CLOEXEC) {
             -1 => None,
             _ => Some(InternalWaker {
                 read_fd: fds[0],
@@ -458,7 +491,7 @@ impl Inner {
                 fds = self.accesses_finished.wait(fds).unwrap();
             }
 
-            let poll_result: i32 = unsafe { poll(fds.pollfds.as_mut_slice().as_mut_ptr(), fds.pollfds.len() as u64, timeout) };
+            let poll_result: i32 = unsafe { poll(fds.pollfds.as_mut_slice().as_mut_ptr(), fds.pollfds.len() as libc::nfds_t, timeout) };
 
             match poll_result {
                 -1 => {
@@ -581,12 +614,12 @@ impl IoSelectorEventContainer for Vec<IoEvent> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use libc::{pipe2, EAGAIN};
+    use libc::EAGAIN;
     use std::{io::Error, thread};
 
     fn create_pipe() -> (RawFd, RawFd) {
         let mut fds: [RawFd; 2] = [-1, -1];
-        assert_eq!(unsafe { pipe2(fds.as_mut_ptr(), O_NONBLOCK) }, 0);
+        assert_eq!(InternalWaker::pipe_with_flags(&mut fds, O_NONBLOCK), 0);
         (fds[0], fds[1])
     }
 

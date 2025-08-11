@@ -20,6 +20,7 @@ use iceoryx2::port::listener::Listener;
 use iceoryx2::port::notifier::Notifier;
 use iceoryx2::prelude::*;
 use libc::{poll, pollfd, POLLIN};
+#[cfg(not(target_os = "nto"))]
 use libc::{sched_param, sched_setscheduler, SCHED_FIFO};
 use std::collections::HashMap;
 use std::process;
@@ -180,6 +181,7 @@ impl Event {
             // Set the priority of Event Handler Thread to appropriate higher value for faster response to event.
             // The executable shall have CAP_SYS_NICE capability on Linux / PROCMGR_AID_PRIORITY capability on Qnx for priorities above 63.
             // The CAP_SYS_NICE capability can be enabled by executing "sudo setcap cap_sys_nice=eip <executable_name>" on terminal.
+            #[cfg(not(target_os = "nto"))]
             unsafe {
                 let param = sched_param { sched_priority: 50 }; // Priority shall be configurable between 1-99
                 let pid = libc::gettid(); // Get thread ID
@@ -220,7 +222,7 @@ impl Event {
                     if result > 0 {
                         // Some events received, process it.
                         for (index, poll_fd) in poll_fds.iter().enumerate() {
-                            if poll_fd.revents & POLLIN == POLLIN {
+                            if poll_fd.revents & POLLIN != 0 {
                                 // Read the data and empty it.
                                 let mut buf = [0u8; 128];
                                 let recv_size = unsafe { libc::recv(poll_fds[index].fd, buf.as_mut_ptr() as *mut _, buf.len(), 0) };
