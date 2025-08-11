@@ -13,22 +13,30 @@
 
 pub mod prelude;
 
+#[cfg(not(target_os = "nto"))]
 use ::core::fmt::Write;
-use std::fs::File;
-use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
-use std::{env, fs};
+#[cfg(not(target_os = "nto"))]
+use std::{
+    fs::File,
+    path::PathBuf,
+    time::{SystemTime, UNIX_EPOCH},
+    {env, fs},
+};
 use tracing::level_filters::LevelFilter;
 use tracing::{span, Level, Span};
 use tracing_appender::non_blocking::WorkerGuard;
+#[cfg(not(target_os = "nto"))]
 use tracing_perfetto_sdk_layer::{self as layer, NativeLayer};
+#[cfg(not(target_os = "nto"))]
 use tracing_perfetto_sdk_schema as schema;
+#[cfg(not(target_os = "nto"))]
 use tracing_perfetto_sdk_schema::trace_config;
 use tracing_subscriber::fmt;
 use tracing_subscriber::fmt::format;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::Layer;
 
+#[cfg(not(target_os = "nto"))]
 const TRACE_OUTDIR_ENV_VAR: &str = "TRACE_OUTDIR";
 
 #[derive(Debug, Clone, Copy)]
@@ -50,6 +58,7 @@ pub enum TraceScope {
     SystemScope,
 }
 
+#[allow(dead_code)]
 pub struct TracingLibrary {
     log_level: Level,
     enable_tracing: Option<TraceScope>,
@@ -85,7 +94,7 @@ impl TracingLibraryBuilder {
     }
 
     ///
-    /// Enables tracing in given mode
+    /// Enables tracing in given mode. Not supported on QNX target now.
     ///
     pub fn enable_tracing(mut self, scope: TraceScope) -> Self {
         self.enable_tracing = Some(scope);
@@ -110,6 +119,7 @@ impl TracingLibraryBuilder {
     }
 }
 
+#[cfg(not(target_os = "nto"))]
 fn system_trace_config() -> schema::TraceConfig {
     schema::TraceConfig {
         buffers: vec![trace_config::BufferConfig {
@@ -127,6 +137,7 @@ fn system_trace_config() -> schema::TraceConfig {
     }
 }
 
+#[cfg(not(target_os = "nto"))]
 fn local_trace_config() -> schema::TraceConfig {
     const FTRACE_EVENTS: [&str; 3] = ["sched_switch", "sched_wakeup", "sched_waking"];
     let ftrace = schema::FtraceConfig {
@@ -189,7 +200,7 @@ impl TracingLibrary {
         if self.enable_logging {
             layers = Some(fmt_layer.boxed());
         }
-
+        #[cfg(not(target_os = "nto"))]
         if let Some(tracing_mode) = self.enable_tracing {
             match tracing_mode {
                 TraceScope::AppScope => {
@@ -230,6 +241,7 @@ impl TracingLibrary {
     /**
      * @brief This API is used to create a file name for the tracing file.
      */
+    #[cfg(not(target_os = "nto"))]
     fn get_trace_filename(&self) -> PathBuf {
         // Get the current process name
         let process_name = env::current_exe()
@@ -263,6 +275,7 @@ impl TracingLibrary {
     /**
      * @brief Formats timestamp as YYYY-MM-DD_HH-MM-SS". This is used for naming the tracing file.
      */
+    #[cfg(not(target_os = "nto"))]
     fn format_timestamp(&self, seconds: u64) -> String {
         let days = seconds / 86400;
         let hours = (seconds % 86400) / 3600;

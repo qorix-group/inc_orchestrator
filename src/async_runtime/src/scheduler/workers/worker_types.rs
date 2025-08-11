@@ -389,6 +389,7 @@ impl WorkerInteractor {
 
 #[cfg(test)]
 #[cfg(not(loom))]
+#[cfg(not(miri))]
 mod tests {
     use crate::io::AsyncSelector;
 

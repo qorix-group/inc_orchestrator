@@ -125,7 +125,9 @@ impl TimeDriver {
 
 // TODO: This is a problem because this takes stack memory during construction.
 // We can get rid of it implementing FixedSizePoolAllocator facade that uses fully heap memory at start
-const MAX_TIMERS: usize = 1024 * 32;
+// Reduced max timers to 4K to minimize stack usage so that it runs on QNX target.
+// Though there is no problem upto 8K, it is set to 4K since TimeDriver instance is created with 4K timers only.
+const MAX_TIMERS: usize = 1024 * 4;
 
 struct Inner {
     levels: Box<[wheel::TimeWheel]>,
@@ -568,7 +570,7 @@ mod tests {
     #[test]
     #[cfg(not(miri))]
     fn fuzzy_polling_before_in_after() {
-        const NUM_OF_TIMERS: usize = 30000;
+        const NUM_OF_TIMERS: usize = 4000;
         let start_time = Clock::now();
 
         let mut rng = SimpleRng::new();
@@ -648,7 +650,7 @@ mod tests {
     #[test]
     #[cfg(not(miri))]
     fn fuzzy_polling_in_random_places() {
-        const NUM_OF_TIMERS: usize = 30000;
+        const NUM_OF_TIMERS: usize = 4000;
         let start_time = Clock::now();
 
         let mut rng = SimpleRng::new();
@@ -688,7 +690,7 @@ mod tests {
     #[test]
     #[cfg(not(miri))]
     fn fuzzy_polling_in_random_places_with_many_nodes_in_slots() {
-        const NUM_OF_TIMERS: usize = 30000;
+        const NUM_OF_TIMERS: usize = 4000;
         let start_time = Clock::now();
 
         let mut rng = SimpleRng::new();
@@ -707,7 +709,7 @@ mod tests {
             for _ in 0..num_of_slots_taken {
                 let slot_taken = rng.gen_range(SLOTS_CNT) + 1;
 
-                let mut numbers = generate_unique_numbers(rng.gen_range(100) as usize, rng);
+                let mut numbers = generate_unique_numbers(rng.gen_range(10) as usize, rng);
 
                 for n in numbers.iter_mut() {
                     *n = *n / (slot_taken * level_range); // align to slot beginning
