@@ -43,7 +43,7 @@ pub struct ConcurrencyBuilder {
 /// Holds the actions to be executed concurrently and manages their execution and result collection.
 /// All actions are spawned as tasks and their results are awaited concurrently.
 /// The result of the concurrency execution is either `Ok(())` if all branches succeed,
-/// or an `ActionExecError` if any branch fails. The error returned is the last failing branch's error.
+/// or an `ActionExecError` if any branch fails. The error returned is the last failing branch's error in the registration order of concurrency.
 /// If any branch fails, the other branches are still awaited to completion (without aborting them).
 pub struct Concurrency {
     base: ActionBaseMeta,
@@ -176,7 +176,7 @@ impl ActionMeta {
 struct ConcurrencyJoin {
     handles: ReusableObject<Vec<ActionMeta>>,
     state: FutureState,
-    action_execution_result: ActionResult,
+    action_execution_result: (usize, ActionResult),
 }
 
 impl ConcurrencyJoin {
@@ -185,7 +185,7 @@ impl ConcurrencyJoin {
         Self {
             handles,
             state: FutureState::New,
-            action_execution_result: ActionResult::Ok(()),
+            action_execution_result: (0, ActionResult::Ok(())),
         }
     }
 
@@ -198,20 +198,25 @@ impl ConcurrencyJoin {
                 // Poll all handles and collect results.
                 let mut is_done = true;
 
-                for hnd in self.handles.iter_mut() {
-                    match hnd {
+                for hnd in self.handles.iter_mut().enumerate() {
+                    match hnd.1 {
                         ActionMeta::Handle(handle) => {
                             let res = Pin::new(handle).poll(cx);
                             match res {
                                 Poll::Ready(action_result) => {
-                                    *hnd = ActionMeta::Empty; // Clear the hanlde after polling
-                                    self.action_execution_result = match action_result {
+                                    *hnd.1 = ActionMeta::Empty; // Clear the handle after polling
+                                    let execution_result = match action_result {
                                         Ok(Ok(_)) => continue,
                                         Ok(Err(err)) => Err(err),
 
                                         // This a JoinResult error, not the future error
                                         Err(_) => Err(ActionExecError::Internal),
                                     };
+
+                                    // Store the error of the last failed branch in the registration order of concurrency.
+                                    if execution_result.is_err() && hnd.0 >= self.action_execution_result.0 {
+                                        self.action_execution_result = (hnd.0, execution_result);
+                                    }
                                 }
                                 Poll::Pending => {
                                     is_done = false; // At least one handle is still pending
@@ -235,7 +240,7 @@ impl ConcurrencyJoin {
                 }
 
                 if is_done {
-                    FutureInternalReturn::ready(self.action_execution_result)
+                    FutureInternalReturn::ready(self.action_execution_result.1)
                 } else {
                     FutureInternalReturn::polled()
                 }
