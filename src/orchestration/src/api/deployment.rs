@@ -65,6 +65,22 @@ impl Deployment<'_> {
         ret
     }
 
+    /// Binds user events to a timer with given params
+    pub fn bind_events_as_timer(&mut self, events_to_bind: &[Tag], cycle_duration: core::time::Duration) -> Result<(), CommonErrors> {
+        let mut ret = Err(CommonErrors::NotFound);
+
+        let creator = self.api.events.specify_timer_event(events_to_bind, cycle_duration)?;
+
+        for d in &mut self.api.designs {
+            // This logic allows to report NotFound only if no design has the event.
+            ret =
+                d.db.set_creator_for_events(Rc::clone(&creator), events_to_bind)
+                    .or_else(|e| if e == CommonErrors::NotFound { ret } else { Err(e) })
+        }
+
+        ret
+    }
+
     /// Binds an invoke action to a worker across all designs wherever that invoke action is registered.
     /// The registered invoke action will always be executed by the specified worker.
     /// # Arguments

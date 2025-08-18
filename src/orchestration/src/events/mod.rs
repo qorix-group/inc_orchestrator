@@ -14,6 +14,7 @@
 pub mod event_traits;
 pub mod events_provider;
 pub mod local_events;
+pub mod timer_events;
 
 #[cfg(feature = "iceoryx-ipc")]
 pub(crate) mod iceoryx;

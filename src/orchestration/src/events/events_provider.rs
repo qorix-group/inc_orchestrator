@@ -11,10 +11,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 use ::core::cell::RefCell;
+use core::time::Duration;
 use std::rc::Rc;
 
 use crate::common::DesignConfig;
 use crate::events::event_traits::{IpcProvider, NotifierTrait};
+use crate::events::timer_events::TimerEvent;
 use crate::events::GlobalEventProvider;
 use crate::prelude::ActionResult;
 use crate::{
@@ -34,6 +36,9 @@ enum EventType {
 
     /// Even that is cross processes
     Global,
+
+    /// Timer event
+    Timer,
 }
 
 ///
@@ -45,6 +50,7 @@ where
 {
     events: Vec<DeploymentEventInfo>,
     local_event_next_id: u64,
+    timer_event_next_id: u64,
     pub(crate) ipc: Rc<RefCell<GlobalProvider>>,
 }
 
@@ -60,23 +66,50 @@ impl<GlobalProvider: IpcProvider + 'static> EventsProvider<GlobalProvider> {
             events: Vec::new(DEFAULT_EVENTS_CAPACITY),
             local_event_next_id: 0,
             ipc: Rc::new(RefCell::new(GlobalProvider::new())),
+            timer_event_next_id: 0,
         }
     }
 
     /// Deployment time event specification
     /// This let integrator register new event and specify whether it's local or global and which design events should map to it.
     pub(crate) fn specify_global_event(&mut self, system_event: &str, events_to_bind: &[Tag]) -> Result<EventCreator, CommonErrors> {
-        self.specify_event(system_event, EventType::Global, events_to_bind)
+        let ipc_c = Rc::clone(&self.ipc);
+
+        self.specify_event(system_event, EventType::Global, events_to_bind, |evt_name, _| GlobalEventCreator {
+            system_event_name: evt_name.to_string(),
+            global_provider: ipc_c,
+        })
     }
 
     pub(crate) fn specify_local_event(&mut self, events_to_bind: &[Tag]) -> Result<EventCreator, CommonErrors> {
         let name = format!("local_event_{}", self.local_event_next_id);
         self.local_event_next_id += 1;
 
-        self.specify_event(name.as_str(), EventType::Local, events_to_bind)
+        self.specify_event(name.as_str(), EventType::Local, events_to_bind, |_, evt_tag| LocalEventCreator {
+            local_event: LocalEvent::new(evt_tag),
+        })
     }
 
-    fn specify_event(&mut self, system_event: &str, t: EventType, events_to_bind: &[Tag]) -> Result<EventCreator, CommonErrors> {
+    pub(crate) fn specify_timer_event(&mut self, events_to_bind: &[Tag], cycle_duration: core::time::Duration) -> Result<EventCreator, CommonErrors> {
+        let name = format!("timer_event_{}", self.timer_event_next_id);
+        self.timer_event_next_id += 1;
+
+        self.specify_event(name.as_str(), EventType::Timer, events_to_bind, |_, _| TimerEventCreator {
+            cycle: cycle_duration,
+        })
+    }
+
+    fn specify_event<C, Ret>(
+        &mut self,
+        system_event: &str,
+        t: EventType,
+        events_to_bind: &[Tag],
+        creator_builder: C,
+    ) -> Result<EventCreator, CommonErrors>
+    where
+        C: FnOnce(&str, Tag) -> Ret,
+        Ret: EventCreatorTrait + 'static,
+    {
         let system_event_tag: Tag = system_event.into();
 
         if system_event_tag.is_in_collection(self.events.iter()) {
@@ -86,15 +119,7 @@ impl<GlobalProvider: IpcProvider + 'static> EventsProvider<GlobalProvider> {
 
         trace!("Binding event({:?}) {} to user events {:?}", t, system_event, events_to_bind);
 
-        let creator = match t {
-            EventType::Local => Rc::new(RefCell::new(LocalEventCreator {
-                local_event: LocalEvent::new(system_event_tag),
-            })) as EventCreator,
-            EventType::Global => Rc::new(RefCell::new(GlobalEventCreator {
-                system_event_name: system_event.to_string(),
-                global_provider: Rc::clone(&self.ipc),
-            })) as EventCreator,
-        };
+        let creator: Rc<RefCell<dyn EventCreatorTrait>> = Rc::new(RefCell::new(creator_builder(system_event, system_event_tag)));
 
         self.events.push(DeploymentEventInfo {
             system_tag: system_event_tag,
@@ -194,6 +219,24 @@ impl<GlobalProvider: IpcProvider> EventCreatorTrait for GlobalEventCreator<Globa
     }
 }
 
+struct TimerEventCreator {
+    cycle: Duration,
+}
+
+impl EventCreatorTrait for TimerEventCreator {
+    fn create_trigger(&mut self, _config: &DesignConfig) -> Option<Box<dyn ActionTrait>> {
+        panic!("Cannot create trigger for a event that is bound to a Timer Event type !")
+    }
+
+    fn create_sync(&mut self, config: &DesignConfig) -> Option<Box<dyn ActionTrait>> {
+        Some(Sync::new(TimerEvent::new(self.cycle), config.max_concurrent_action_executions) as Box<dyn ActionTrait>)
+    }
+
+    fn create_shutdown_notifier(&mut self) -> Option<Box<dyn ShutdownNotifier>> {
+        panic!("Cannot create trigger for a event that is bound to a Timer Event type for shutdown!")
+    }
+}
+
 struct DeploymentEventInfo {
     system_tag: Tag,
     creator: EventCreator,
@@ -223,9 +266,15 @@ mod tests {
     fn specify_event_duplicate() {
         let mut provider: EventsProvider = EventsProvider::new();
 
-        provider.specify_event("100", EventType::Local, &["UserEvt".into()]).unwrap();
+        provider
+            .specify_event("100", EventType::Local, &["UserEvt".into()], |_, evt_tag| LocalEventCreator {
+                local_event: LocalEvent::new(evt_tag),
+            })
+            .unwrap();
         // Try to specify again with the same system tag
-        let res = provider.specify_event("100", EventType::Local, &["UserEvt".into()]);
+        let res = provider.specify_event("100", EventType::Local, &["UserEvt".into()], |_, evt_tag| LocalEventCreator {
+            local_event: LocalEvent::new(evt_tag),
+        });
         assert_eq!(res.err().unwrap(), CommonErrors::AlreadyDone);
     }
 
@@ -234,7 +283,9 @@ mod tests {
         let config = DesignConfig::default();
         let mut provider: EventsProvider = EventsProvider::new();
 
-        let res = provider.specify_event("100", EventType::Local, &["UserEvt".into()]);
+        let res = provider.specify_event("100", EventType::Local, &["UserEvt".into()], |_, evt_tag| LocalEventCreator {
+            local_event: LocalEvent::new(evt_tag),
+        });
         assert!(res.is_ok());
 
         let creator = provider.get_event_creator("100").unwrap();
@@ -250,7 +301,9 @@ mod tests {
         let config = DesignConfig::default();
         let mut provider: EventsProvider = EventsProvider::new();
 
-        let res = provider.specify_event("100", EventType::Local, &["UserEvt".into()]);
+        let res = provider.specify_event("100", EventType::Local, &["UserEvt".into()], |_, evt_tag| LocalEventCreator {
+            local_event: LocalEvent::new(evt_tag),
+        });
         assert!(res.is_ok());
 
         let creator = provider.get_event_creator("100").unwrap();
@@ -270,7 +323,9 @@ mod tests {
         let config = DesignConfig::default();
         let mut provider: EventsProvider = EventsProvider::new();
 
-        let res = provider.specify_event("100", EventType::Local, &["UserEvt".into()]);
+        let res = provider.specify_event("100", EventType::Local, &["UserEvt".into()], |_, evt_tag| LocalEventCreator {
+            local_event: LocalEvent::new(evt_tag),
+        });
         assert!(res.is_ok());
 
         let mut trigger_action = provider.get_event_creator("100").unwrap().borrow_mut().create_trigger(&config).unwrap();
@@ -299,9 +354,13 @@ mod tests {
         let config = DesignConfig::default();
         let mut provider: EventsProvider = EventsProvider::new();
 
-        let mut res = provider.specify_event("100", EventType::Local, &["UserEvt".into()]);
+        let mut res = provider.specify_event("100", EventType::Local, &["UserEvt".into()], |_, evt_tag| LocalEventCreator {
+            local_event: LocalEvent::new(evt_tag),
+        });
         assert!(res.is_ok());
-        res = provider.specify_event("101", EventType::Local, &["UserEvt".into()]);
+        res = provider.specify_event("101", EventType::Local, &["UserEvt".into()], |_, evt_tag| LocalEventCreator {
+            local_event: LocalEvent::new(evt_tag),
+        });
         assert!(res.is_ok());
 
         let mut trigger_action = provider.get_event_creator("100").unwrap().borrow_mut().create_trigger(&config).unwrap();
