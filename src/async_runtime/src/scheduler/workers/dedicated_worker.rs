@@ -43,15 +43,17 @@ pub(crate) struct DedicatedWorker {
     id: WorkerId,
     engine_has_safety_worker: bool,
     stop_signal: Arc<FoundationAtomicBool>,
+    thread_params: ThreadParameters,
 }
 
 impl DedicatedWorker {
-    pub(crate) fn new(id: WorkerId, engine_has_safety_worker: bool) -> Self {
+    pub(crate) fn new(id: WorkerId, engine_has_safety_worker: bool, thread_params: ThreadParameters) -> Self {
         DedicatedWorker {
             id,
             thread_handle: None,
             engine_has_safety_worker,
             stop_signal: Arc::new(FoundationAtomicBool::new(false)),
+            thread_params,
         }
     }
 
@@ -65,7 +67,6 @@ impl DedicatedWorker {
         drivers: Drivers,
         dedicated_scheduler: Arc<DedicatedScheduler>,
         ready_notifier: ThreadReadyNotifier,
-        thread_params: &ThreadParameters,
     ) {
         self.thread_handle = {
             let queue = self.get_queue(&dedicated_scheduler);
@@ -89,7 +90,7 @@ impl DedicatedWorker {
 
                         Self::run_internal(internal, drivers, scheduler, ready_notifier, with_safety);
                     },
-                    thread_params,
+                    &self.thread_params,
                 )
                 .unwrap(),
             )
