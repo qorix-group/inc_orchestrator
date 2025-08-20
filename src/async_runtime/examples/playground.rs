@@ -59,7 +59,7 @@ fn main() {
         ExecutionEngineBuilder::new()
             .task_queue_size(256)
             .workers(3)
-            .with_dedicated_worker("dedicated".into())
+            .with_dedicated_worker("dedicated".into(), ThreadParameters::default())
             .enable_safety_worker(ThreadParameters::default()),
     );
     let mut runtime = builder.build().unwrap();

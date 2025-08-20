@@ -171,7 +171,6 @@ impl ExecutionEngine {
                 drivers.clone(),
                 self.dedicated_scheduler.clone(),
                 start_barrier.get_notifier().unwrap(),
-                &self.thread_params,
             );
         });
 
@@ -255,7 +254,7 @@ pub struct ExecutionEngineBuilder {
     queue_size: u32,
     thread_params: ThreadParameters,
 
-    dedicated_workers_ids: GrowableVec<UniqueWorkerId>,
+    dedicated_workers_ids: GrowableVec<(UniqueWorkerId, ThreadParameters)>,
     with_safe_worker: (bool, ThreadParameters), //enabled, params
 }
 
@@ -337,13 +336,13 @@ impl ExecutionEngineBuilder {
     /// Adds new dedicated worker identified by `id` to the engine
     ///
     #[allow(dead_code)]
-    pub fn with_dedicated_worker(mut self, id: UniqueWorkerId) -> Self {
+    pub fn with_dedicated_worker(mut self, id: UniqueWorkerId, params: ThreadParameters) -> Self {
         assert!(
-            !self.dedicated_workers_ids.contains(&id),
+            !self.dedicated_workers_ids.iter().any(|(worker_id, _)| *worker_id == id),
             "Cannot register same unique worker multiple times!"
         );
 
-        self.dedicated_workers_ids.push(id);
+        self.dedicated_workers_ids.push((id, params));
         debug!("Registered worker {:?}", id);
         self
     }
@@ -397,10 +396,10 @@ impl ExecutionEngineBuilder {
         let mut dedicated_queues = Box::<[(WorkerId, Arc<TriggerQueue<TaskRef>>)]>::new_uninit_slice(self.dedicated_workers_ids.len());
 
         for i in 0..self.dedicated_workers_ids.len() {
-            let id = self.dedicated_workers_ids[i];
+            let id = self.dedicated_workers_ids[i].0;
             let real_id = WorkerId::new(id, 0, i as u8, WorkerType::Dedicated);
-
-            dedicated_workers.push(DedicatedWorker::new(real_id, self.with_safe_worker.0));
+            let thread_params = self.dedicated_workers_ids[i].1;
+            dedicated_workers.push(DedicatedWorker::new(real_id, self.with_safe_worker.0, thread_params));
             unsafe {
                 dedicated_queues[i]
                     .as_mut_ptr()

@@ -164,11 +164,9 @@ impl WorkerInner {
         // Setup context
         ctx_initialize(builder);
 
-        self.local_state = LocalState::Executing;
-        self.own_interactor
-            .state
-            .0
-            .store(WORKER_STATE_EXECUTING, ::core::sync::atomic::Ordering::SeqCst);
+        // The `self.local_state` and `self.own_interactor.state.0` are set to EXECUTING when the instance is created.
+        // So need not set again here, this also avoids overwriting SHUTDOWN state which is set due to worker spawn error.
+        // If SHUTDOWN state is overwritten, the worker goes to indefinite sleep and the process hangs.
     }
 
     fn run(&mut self) {

@@ -20,7 +20,7 @@ use crate::scheduler::{workers::worker_types::WorkerId, SchedulerType};
 use ::core::fmt::Debug;
 use iceoryx2_bb_posix::thread::{Thread, ThreadBuilder, ThreadName, ThreadSpawnError};
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 pub struct ThreadParameters {
     pub priority: Option<u8>,
     pub scheduler_type: Option<SchedulerType>,

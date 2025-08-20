@@ -13,7 +13,7 @@
 
 use std::time::Duration;
 
-use async_runtime::{runtime::async_runtime::AsyncRuntimeBuilder, scheduler::execution_engine::*};
+use async_runtime::{prelude::ThreadParameters, runtime::async_runtime::AsyncRuntimeBuilder, scheduler::execution_engine::*};
 use foundation::prelude::*;
 use logging_tracing::{TraceScope, TracingLibraryBuilder};
 use orchestration::{
@@ -70,7 +70,7 @@ fn main() {
         ExecutionEngineBuilder::new()
             .task_queue_size(256)
             .workers(2)
-            .with_dedicated_worker("dedicated_worker1".into()),
+            .with_dedicated_worker("dedicated_worker1".into(), ThreadParameters::default()),
     );
 
     let mut runtime = builder.build().unwrap();
