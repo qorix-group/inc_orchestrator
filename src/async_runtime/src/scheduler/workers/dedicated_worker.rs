@@ -71,7 +71,7 @@ impl DedicatedWorker {
         self.thread_handle = {
             let queue = self.get_queue(&dedicated_scheduler);
             let id = self.id;
-            let local_size = queue.capacity() / LOCAL_STORAGE_SIZE_REDUCTION;
+            let local_size = ::core::cmp::max(1, queue.capacity() / LOCAL_STORAGE_SIZE_REDUCTION);
             let with_safety = self.engine_has_safety_worker;
             let stop_signal = self.stop_signal.clone();
 
