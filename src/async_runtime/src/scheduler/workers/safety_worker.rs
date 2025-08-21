@@ -75,7 +75,7 @@ impl SafetyWorker {
         self.thread_handle = {
             let queue = self.queue.clone();
             let id = self.id;
-            let local_size = queue.capacity() / LOCAL_STORAGE_SIZE_REDUCTION;
+            let local_size = ::core::cmp::max(1, queue.capacity() / LOCAL_STORAGE_SIZE_REDUCTION);
             let stop_signal = self.stop_signal.clone();
 
             Some(
