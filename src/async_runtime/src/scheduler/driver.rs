@@ -87,7 +87,18 @@ impl Inner {
             .create()
             .unwrap();
 
-        let expire_time = self.time.next_process_time();
+        // TODO: When reworking with IO driver, think over if we want to mark globally that someone is right now sleeping on timer
+        // Then logic with this time calculations shall not be needed
+
+        // This is th last time we promised to wakeup this worker
+        let previous_wakeup_time = self.get_last_wakeup_time_for_worker();
+        let global_promis_next_time_wakeup = self.next_promised_wakeup.load(::core::sync::atomic::Ordering::Relaxed);
+
+        // If global promised time is the same as our last promised time it means it was us who promised sleep, so we need to
+        // make sure that we take a lock and don't race it with other worker, otherwise no one will sleep on time
+        let is_doing_resleep = previous_wakeup_time == global_promis_next_time_wakeup;
+
+        let expire_time = self.time.next_process_time(is_doing_resleep);
 
         if expire_time.is_none() {
             // No expiration is there, I sleep indefinitely
@@ -98,10 +109,6 @@ impl Inner {
 
         let expire_time_instant = expire_time.unwrap();
         let expire_time_u64 = self.time.instant_into_u64(&expire_time_instant);
-
-        // This is th last time we promised to wakeup this worker
-        let previous_wakeup_time = self.get_last_wakeup_time_for_worker();
-        let global_promis_next_time_wakeup = self.next_promised_wakeup.load(::core::sync::atomic::Ordering::Relaxed);
 
         if (expire_time_u64 == global_promis_next_time_wakeup) && (previous_wakeup_time != expire_time_u64) {
             debug!("Someone else waiting on timewheel, we will park on cv without timeout");
@@ -161,7 +168,7 @@ impl Inner {
             .unwrap();
 
         if wait_result.timed_out() {
-            // We did timeout due to sleep request, so we fullfilled driver promise
+            // We did timeout due to sleep request, so we fulfilled driver promise
             self.clear_last_wakeup_time_for_worker();
             worker.state.0.store(WORKER_STATE_EXECUTING, ::core::sync::atomic::Ordering::SeqCst);
             scheduler.transition_from_parked(worker_id);

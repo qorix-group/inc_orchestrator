@@ -45,6 +45,7 @@ impl Default for TimeSlot {
     }
 }
 
+#[derive(Debug)]
 pub(super) struct ExpireInfo {
     pub level: u8,
     pub slot_id: u8,

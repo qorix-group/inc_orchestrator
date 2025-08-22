@@ -92,14 +92,18 @@ impl TimeDriver {
     }
 
     ///
-    /// Returns next time the poll shall happen to not miss next deadline.
+    /// Returns next time the poll shall happen to not miss next deadline. `wait_on_access` tells if we shall wait to acquire lock or return None if lock is not available.
     /// # ATTENTION
     /// After this call user can register timeout closer to returned time, upper layer need to ensure correct logic to keep up with deadlines
     ///
-    pub fn next_process_time(&self) -> Option<Instant> {
-        match self.inner.try_write() {
-            Ok(mut inner) => inner.next_process_time().map(|(instant, _)| instant),
-            Err(_) => None,
+    pub fn next_process_time(&self, wait_on_access: bool) -> Option<Instant> {
+        if wait_on_access {
+            return self.inner.write().unwrap().next_process_time().map(|(instant, _)| instant);
+        } else {
+            match self.inner.try_write() {
+                Ok(mut inner) => inner.next_process_time().map(|(instant, _)| instant),
+                Err(_) => None,
+            }
         }
     }
 
@@ -170,7 +174,6 @@ impl Inner {
             // since it's O(N). We choose this over not precise sleep to make better sleep decisions. This is subject to reconsider once having numbers from
             // real world applications
             let precise_deadline = self.levels[info.level as usize].next_expiration_in_slot(info.slot_id as usize);
-
             if let Some(deadline) = precise_deadline {
                 (
                     self.start_time + ::core::time::Duration::from_millis(deadline),
@@ -240,6 +243,7 @@ impl Inner {
         for e in &self.levels {
             if let Some(info) = e.next_expiration(now) {
                 // TODO: would be good to add some debug checks
+
                 return Some(info);
             }
         }
