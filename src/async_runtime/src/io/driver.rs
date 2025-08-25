@@ -119,7 +119,7 @@ impl Registrations {
     fn schedule_registration_for_disposal(&self, key: SlotMapKey) {
         let mut data = self.data.lock().unwrap();
         data.waiting_release.push(key);
-        self.pending_release_count.store(true, Ordering::Relaxed);
+        self.pending_release_count.store(true, Ordering::Release);
     }
 
     fn cleanup_disposed_registrations(&self) {

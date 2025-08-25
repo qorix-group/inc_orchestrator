@@ -11,7 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 use ::core::time::Duration;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use super::scheduler_mt::*;
 use super::task::async_task::TaskRef;
@@ -94,6 +94,9 @@ pub struct ExecutionEngine {
     safety_worker: Option<SafetyWorker>,
     thread_params: ThreadParameters,
     state: EngineState,
+
+    // TODO: When we add enter into runtime from main, this does not need to be here
+    drivers: Drivers,
 }
 
 impl ExecutionEngine {
@@ -141,15 +144,13 @@ impl ExecutionEngine {
             self.async_workers.len() as u32 + self.dedicated_workers.len() as u32 + safety_worker_count,
         ));
 
-        let drivers = Drivers::new();
-
         if safety_worker_count > 0 {
             self.safety_worker
                 .as_mut()
                 .expect("Safety worker has to present as check was done above")
                 .start(
                     self.async_scheduler.clone(),
-                    drivers.clone(),
+                    self.drivers.clone(),
                     self.dedicated_scheduler.clone(),
                     start_barrier.get_notifier().unwrap(),
                 );
@@ -158,7 +159,7 @@ impl ExecutionEngine {
         self.async_workers.iter_mut().for_each(|w| {
             w.start(
                 self.async_scheduler.clone(),
-                drivers.clone(),
+                self.drivers.clone(),
                 self.dedicated_scheduler.clone(),
                 start_barrier.get_notifier().unwrap(),
                 &self.thread_params,
@@ -168,7 +169,7 @@ impl ExecutionEngine {
         self.dedicated_workers.iter_mut().for_each(|w| {
             w.start(
                 self.async_scheduler.clone(),
-                drivers.clone(),
+                self.drivers.clone(),
                 self.dedicated_scheduler.clone(),
                 start_barrier.get_notifier().unwrap(),
             );
@@ -379,34 +380,35 @@ impl ExecutionEngineBuilder {
             }
         };
 
-        for i in 0..self.async_workers_cnt {
-            async_queues.push(create_steal_queue(self.queue_size));
-
-            unsafe {
-                worker_interactors[i].as_mut_ptr().write(WorkerInteractor::new(async_queues[i].clone()));
-            }
-        }
-
-        let global_queue = MpmcQueue::new(32);
-        let async_scheduler = Arc::new(AsyncScheduler {
-            worker_access: unsafe { worker_interactors.assume_init() },
-            num_of_searching_workers: FoundationAtomicU8::new(0),
-            parked_workers_indexes: Mutex::new(Vec::new(self.async_workers_cnt)),
-            global_queue,
-            safety_worker_queue,
-        });
-
         let mut async_workers = Vec::new(self.async_workers_cnt);
 
         if self.thread_params.priority.is_none() ^ self.thread_params.scheduler_type.is_none() {
             warn!("Either priority or scheduler type is 'None' for async worker, both attributes will be inherited from parent thread.");
         }
+
         for i in 0..self.async_workers_cnt {
-            async_workers.push(Worker::new(
-                WorkerId::new(format!("arunner{}", i).as_str().into(), 0, i as u8, WorkerType::Async),
-                self.with_safe_worker.0,
-            ));
+            async_queues.push(create_steal_queue(self.queue_size));
+
+            let id = WorkerId::new(format!("arunner{}", i).as_str().into(), 0, i as u8, WorkerType::Async);
+
+            unsafe {
+                worker_interactors[i]
+                    .as_mut_ptr()
+                    .write(WorkerInteractor::new(async_queues[i].clone(), id));
+            }
+
+            async_workers.push(Worker::new(id, self.with_safe_worker.0));
         }
+
+        let drivers = Drivers::new();
+
+        let global_queue = MpmcQueue::new(32);
+        let async_scheduler = Arc::new(AsyncScheduler::new(
+            unsafe { worker_interactors.assume_init() },
+            global_queue,
+            safety_worker_queue,
+            drivers.get_io_driver().get_unparker(),
+        ));
 
         // Create dedicated workers part
         let mut dedicated_workers = Vec::new(self.dedicated_workers_ids.len());
@@ -437,6 +439,7 @@ impl ExecutionEngineBuilder {
             safety_worker,
             thread_params: self.thread_params,
             state: EngineState::Starting,
+            drivers,
         }
     }
 }

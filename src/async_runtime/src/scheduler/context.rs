@@ -173,16 +173,18 @@ impl Handler {
         let task_ref;
         let handle;
 
+        let worker_id = ctx_get_worker_id().worker_id();
+
         match self.inner {
             HandlerImpl::Async(ref async_inner) => {
-                let task = c(boxed, ctx_get_worker_id().worker_id(), async_inner.scheduler.clone());
+                let task = c(boxed, worker_id, async_inner.scheduler.clone());
                 task_ref = TaskRef::new(task.clone());
                 handle = JoinHandle::new(task_ref.clone());
 
                 async_inner.scheduler.spawn_from_runtime(task_ref, &async_inner.prod_con);
             }
             HandlerImpl::Dedicated(ref dedicated_inner) => {
-                let task = c(boxed, ctx_get_worker_id().worker_id(), dedicated_inner.scheduler.clone());
+                let task = c(boxed, worker_id, dedicated_inner.scheduler.clone());
                 task_ref = TaskRef::new(task.clone());
                 handle = JoinHandle::new(task_ref.clone());
 
@@ -204,16 +206,18 @@ impl Handler {
         let task_ref;
         let handle;
 
+        let worker_id = ctx_get_worker_id().worker_id();
+
         match self.inner {
             HandlerImpl::Async(ref async_inner) => {
-                let task = c(reusable.into_pin(), ctx_get_worker_id().worker_id(), async_inner.scheduler.clone());
+                let task = c(reusable.into_pin(), worker_id, async_inner.scheduler.clone());
                 task_ref = TaskRef::new(task.clone());
                 handle = JoinHandle::new(task_ref.clone());
 
                 async_inner.scheduler.spawn_from_runtime(task_ref, &async_inner.prod_con);
             }
             HandlerImpl::Dedicated(ref dedicated_inner) => {
-                let task = c(reusable.into_pin(), ctx_get_worker_id().worker_id(), dedicated_inner.scheduler.clone());
+                let task = c(reusable.into_pin(), worker_id, dedicated_inner.scheduler.clone());
                 task_ref = TaskRef::new(task.clone());
                 handle = JoinHandle::new(task_ref.clone());
 

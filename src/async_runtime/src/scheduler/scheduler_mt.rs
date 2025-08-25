@@ -15,6 +15,7 @@ use super::workers::worker_types::*;
 use crate::core::types::BoxInternal;
 use crate::core::types::UniqueWorkerId;
 use crate::ctx_get_handler;
+use crate::io::driver::IoDriverUnparker;
 use crate::{scheduler::context::ctx_get_worker_id, TaskRef};
 use ::core::ops::Deref;
 use foundation::containers::trigger_queue::TriggerQueue;
@@ -40,7 +41,7 @@ pub(crate) trait SchedulerTrait {
 pub(crate) const SCHEDULER_MAX_SEARCHING_WORKERS_DIVIDER: u8 = 2; // Tune point: We allow only half of worker to steal, to limit contention
 
 pub(crate) struct AsyncScheduler {
-    pub(super) worker_access: BoxInternal<[WorkerInteractor]>,
+    worker_access: BoxInternal<[WorkerInteractor]>,
 
     // Hot path for figuring out if we shall wake-up someone, or we shall go to sleep from worker
     pub(super) num_of_searching_workers: FoundationAtomicU8,
@@ -50,14 +51,34 @@ pub(crate) struct AsyncScheduler {
     pub(super) global_queue: MpmcQueue<TaskRef>,
 
     pub(super) safety_worker_queue: Option<Arc<TriggerQueue<TaskRef>>>,
+
+    // We need to keep io driver here so scheduler used outside of runtime can still access it
+    pub(super) io_unparker: IoDriverUnparker,
 }
 
 impl AsyncScheduler {
+    pub(super) fn new(
+        worker_access: BoxInternal<[WorkerInteractor]>,
+        global_queue: MpmcQueue<TaskRef>,
+        safety_worker_queue: Option<Arc<TriggerQueue<TaskRef>>>,
+        io_unparker: IoDriverUnparker,
+    ) -> Self {
+        let workers_cnt = worker_access.len();
+
+        AsyncScheduler {
+            worker_access,
+            num_of_searching_workers: FoundationAtomicU8::new(0),
+            parked_workers_indexes: std::sync::Mutex::new(Vec::new(workers_cnt)),
+            global_queue,
+            safety_worker_queue,
+            io_unparker,
+        }
+    }
+
     pub(super) fn spawn_from_runtime(&self, task: TaskRef, local_queue: &BoundProducerConsumer<TaskRef>) {
         match local_queue.push(task, &self.global_queue) {
             Ok(_) => {
-                let current_worker = ctx_get_worker_id().worker_id() as usize;
-                self.try_notify_siblings_workers(Some(current_worker));
+                self.try_notify_siblings_workers(Some(ctx_get_worker_id()));
             }
             Err(_) => {
                 // TODO: Add error hooks so we can notify app owner that we are done
@@ -73,6 +94,14 @@ impl AsyncScheduler {
             // TODO: Add error hooks so we can notify app owner that we are done
             panic!("Cannot push to global queue anymore, overflow!");
         }
+    }
+
+    pub(super) fn get_worker_access(&self, id: WorkerId) -> &WorkerInteractor {
+        &self.worker_access[id.worker_id() as usize]
+    }
+
+    pub(super) fn as_worker_access_slice(&self) -> &[WorkerInteractor] {
+        &self.worker_access
     }
 }
 
@@ -94,6 +123,7 @@ impl SchedulerTrait for AsyncScheduler {
         }
     }
 
+    // Used from async task to bring back task to work queue
     fn respawn_into_safety(&self, task: TaskRef) {
         if let Some(ref safety) = self.safety_worker_queue {
             let ret = safety.push(task);
@@ -124,7 +154,7 @@ impl AsyncScheduler {
         self.num_of_searching_workers.fetch_sub(1, ::core::sync::atomic::Ordering::SeqCst);
     }
 
-    pub(super) fn transition_to_parked(&self, was_searching: bool, index: usize) -> bool {
+    pub(super) fn transition_to_parked(&self, was_searching: bool, id: WorkerId) -> bool {
         let mut guard = self.parked_workers_indexes.lock().unwrap();
 
         let mut num_of_searching = 2; //2 as false condition
@@ -133,14 +163,14 @@ impl AsyncScheduler {
             num_of_searching = self.num_of_searching_workers.fetch_sub(1, ::core::sync::atomic::Ordering::SeqCst);
         }
 
-        guard.push(index);
+        guard.push(id.worker_id() as usize); // worker_id is index in worker_access
         num_of_searching == 1
     }
 
-    pub(super) fn transition_from_parked(&self, index: usize) {
+    pub(super) fn transition_from_parked(&self, id: WorkerId) {
         let mut guard = self.parked_workers_indexes.lock().unwrap();
         // Find and remove the worker from the list. The order of the parked workers is not important after removal.
-        if let Some(pos) = guard.iter().position(|x| *x == index) {
+        if let Some(pos) = guard.iter().position(|x| *x == id.worker_id() as usize) {
             guard.swap_remove(pos);
         }
     }
@@ -149,7 +179,7 @@ impl AsyncScheduler {
     // Private
     //
 
-    pub(crate) fn try_notify_siblings_workers(&self, current_worker: Option<usize>) {
+    pub(crate) fn try_notify_siblings_workers(&self, current_worker: Option<WorkerId>) {
         if !self.should_notify_some_worker() {
             trace!("Too many searchers while scheduling, no one will be woken up!");
             return; // Too much searchers already, let them find a job
@@ -158,30 +188,32 @@ impl AsyncScheduler {
         self.try_notify_siblings_worker_unconditional(current_worker)
     }
 
-    fn try_notify_siblings_worker_unconditional(&self, _: Option<usize>) {
-        let index_opt;
+    fn try_notify_siblings_worker_unconditional(&self, current: Option<WorkerId>) {
+        let mut index_opt = None;
 
         // Keep section short not overlapping with worker access in unpark which can also take another mutex
         {
             let mut guard = self.parked_workers_indexes.lock().unwrap();
             // Pop the worker index so that another worker can be notified next time (instead of the same one)
-            // TODO: Change to random pop - currently Vec does not support erasing.
-            index_opt = guard.pop();
+            let removal = guard
+                .iter()
+                .position(|e| current.is_none() || *e != current.unwrap().worker_id() as usize);
+
+            if let Some(rindex) = removal {
+                index_opt = guard.swap_remove(rindex);
+            }
         }
 
         if let Some(index) = index_opt {
             trace!("Notifying worker at index {} to wakeup", index);
-            self.worker_access[index].unpark();
+            self.worker_access[index].unpark(&self.io_unparker);
         } else {
-            // No one is sleeping but no one is searching, means they are before sleep. For now we simply notify all (as we only use syscall once someone really sleeps)
+            // No one is sleeping but no one is searching, means they are before sleep.
+            // For now we simply notify all (as we only use syscall once someone really sleeps)
             for w in &self.worker_access {
-                w.unpark();
+                w.unpark(&self.io_unparker);
             }
         }
-    }
-
-    pub(super) fn notify_worker(&self, worker_id: u8) {
-        self.worker_access[worker_id as usize].cv.notify_one();
     }
 
     //
@@ -254,8 +286,9 @@ impl SchedulerTrait for DedicatedSchedulerLocalInner {
 }
 
 #[cfg(test)]
-pub(crate) fn scheduler_new(workers_cnt: usize, local_queue_size: u32) -> AsyncScheduler {
+pub(crate) fn scheduler_new(workers_cnt: usize, local_queue_size: u32, drivers: &super::driver::Drivers) -> AsyncScheduler {
     // artificially construct a scheduler
+
     let mut worker_interactors = BoxInternal::<[WorkerInteractor]>::new_uninit_slice(workers_cnt);
     let mut queues: Vec<TaskStealQueue> = Vec::new(workers_cnt);
 
@@ -265,31 +298,37 @@ pub(crate) fn scheduler_new(workers_cnt: usize, local_queue_size: u32) -> AsyncS
         queues.push(c.clone());
 
         unsafe {
-            worker_interactors[i].as_mut_ptr().write(WorkerInteractor::new(c));
+            worker_interactors[i].as_mut_ptr().write(WorkerInteractor::new(
+                c,
+                WorkerId::new(format!("{}", i).into(), 0, i as u8, WorkerType::Async),
+            ));
         }
     }
 
     let safety_worker_queue = Some(Arc::new(TriggerQueue::new(64)));
 
     let global_queue = MpmcQueue::new(32);
-    AsyncScheduler {
-        worker_access: unsafe { worker_interactors.assume_init() },
-        num_of_searching_workers: FoundationAtomicU8::new(0),
-        parked_workers_indexes: std::sync::Mutex::new(Vec::new(workers_cnt)),
+
+    AsyncScheduler::new(
+        unsafe { worker_interactors.assume_init() },
         global_queue,
         safety_worker_queue,
-    }
+        drivers.get_io_driver().get_unparker(),
+    )
 }
 
 #[cfg(test)]
 #[cfg(not(loom))]
 mod tests {
+    use crate::scheduler::driver::Drivers;
+
     use super::*;
 
     #[test]
     fn should_transition_to_searching_test() {
+        let drivers = Drivers::new();
         // scheduler with one worker and a queue size of 2
-        let scheduler = scheduler_new(1, 2);
+        let scheduler = scheduler_new(1, 2, &drivers);
         // if no worker is in searching state one worker should steal work
         assert!(scheduler.try_transition_worker_to_searching());
         // if our one and only worker is in searching state no other worker should steal work
@@ -297,7 +336,7 @@ mod tests {
         assert!(!scheduler.try_transition_worker_to_searching());
 
         // scheduler with two workers and a queue size of 2
-        let scheduler = scheduler_new(2, 2);
+        let scheduler = scheduler_new(2, 2, &drivers);
 
         assert!(scheduler.should_notify_some_worker());
         // if no worker is in searching state one worker should steal work
@@ -308,7 +347,7 @@ mod tests {
         // not transition to searching also
 
         // scheduler with 10 workers and a queue size of 2
-        let scheduler = scheduler_new(10, 2);
+        let scheduler = scheduler_new(10, 2, &drivers);
         // 0 searching
         assert!(scheduler.should_notify_some_worker());
         assert!(scheduler.try_transition_worker_to_searching());
