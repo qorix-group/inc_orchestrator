@@ -47,7 +47,7 @@ macro_rules! not_recoverable_error {
     // handles a case where we want to log the object with an error in form not_recoverable_error!(with OBJECT, "MSG");
     ( with $obj_to_log:expr, $literal_str:expr ) => {{
         const MSG: &str = $literal_str;
-        error!("not_recoverable_error: {} with {:?}", $literal_str, $obj_to_log);
+        error!("not_recoverable_error: {}. with {:?}", $literal_str, $obj_to_log);
         panic!(
             "Currently no custom handler connected for panic, using rust one. Panicked with {} with {:?}",
             $literal_str, $obj_to_log

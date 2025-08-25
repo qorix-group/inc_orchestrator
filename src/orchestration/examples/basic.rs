@@ -58,7 +58,7 @@ fn example_component_design() -> Result<Design, CommonErrors> {
 fn main() {
     // Setup any logging framework you want to use.
     let mut logger = TracingLibraryBuilder::new()
-        .global_log_level(Level::DEBUG)
+        .global_log_level(Level::TRACE)
         .enable_tracing(TraceScope::AppScope)
         .enable_logging(true)
         .build();
@@ -90,7 +90,7 @@ fn main() {
         .expect("Failed to bind invoke action to worker");
 
     deployment
-        .bind_events_as_timer(&["cyclic_evt".into()], Duration::from_secs(3))
+        .bind_events_as_timer(&["cyclic_evt".into()], Duration::from_secs(1))
         .expect("Failed to bind cycle event to timer");
 
     // Create programs

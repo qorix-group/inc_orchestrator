@@ -230,17 +230,23 @@ impl InternalWaker {
     fn wake(&self) {
         let flag = 1_u8;
         loop {
-            if unsafe { write(self.write_fd, &flag as *const u8 as *const ffi::c_void, 1) } == -1 {
-                match std::io::Error::last_os_error().raw_os_error().unwrap() {
-                    // EAGAIN means the read would block. Since this is a pipe, the assumtion is
-                    // that it's thus readable and that poll will be awaken, thus don't have to do anything.
-                    EAGAIN => break,
-                    EINTR => (), // Retry.
-                    _ => not_recoverable_error!("InternalWaker write failed"),
+            let res = unsafe { write(self.write_fd, &flag as *const u8 as *const ffi::c_void, 1) };
+
+            match res {
+                0 => {
+                    not_recoverable_error!("There shall be no write with 0 bytes written, some error happened");
                 }
-            } else {
-                // Write suceeded.
-                break;
+                -1 => {
+                    let err = std::io::Error::last_os_error().raw_os_error().unwrap();
+                    match err {
+                        // EAGAIN means the read would block. Since this is a pipe, the assumtion is
+                        // that it's thus readable and that poll will be awaken, thus don't have to do anything.
+                        EAGAIN => break,
+                        EINTR => (), // Retry.
+                        _ => not_recoverable_error!(with err, "InternalWaker write failed"),
+                    }
+                }
+                _ => break, // Successfully wrote some data.
             }
         }
     }
