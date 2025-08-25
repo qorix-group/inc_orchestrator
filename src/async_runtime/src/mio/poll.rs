@@ -31,6 +31,8 @@ impl<T: IoSelector> Poll<T> {
     }
 
     /// Wait on events on the registered I/O resources using the chosen selector.
+    ///
+    /// `timeout` specifies the maximum time to wait for an event. If `None` is provided, it will wait indefinitely.
     pub fn poll<Container: IoSelectorEventContainer>(&self, events: &mut Container, timeout: Option<Duration>) -> Result<()> {
         events.clear();
         self.registry.selector.select(events, timeout)

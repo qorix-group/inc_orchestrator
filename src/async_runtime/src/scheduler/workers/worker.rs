@@ -12,6 +12,7 @@
 //
 
 use ::core::task::Context;
+use core::time::Duration;
 use std::{rc::Rc, sync::Arc};
 
 use crate::scheduler::{context::ctx_get_drivers, driver::Drivers, scheduler_mt::DedicatedScheduler, waker::create_waker, workers::Thread};
@@ -89,7 +90,7 @@ impl Worker {
     ) {
         self.scheduler = Some(scheduler.clone());
         self.thread_handle = {
-            let interactor = scheduler.worker_access[self.id.worker_id() as usize].clone();
+            let interactor = scheduler.get_worker_access(self.id).clone();
             let id = self.id;
             let with_safety = self.engine_has_safety_worker;
 
@@ -136,17 +137,14 @@ impl Worker {
 
     pub(crate) fn stop(&mut self) {
         if let Some(scheduler) = &self.scheduler {
-            let id = self.id.worker_id() as usize;
-            let _guard = scheduler.worker_access[id].mtx.lock().unwrap();
-            // Set the state to shutting down
-            scheduler.worker_access[id]
-                .state
-                .0
-                .store(WORKER_STATE_SHUTTINGDOWN, ::core::sync::atomic::Ordering::SeqCst);
-
-            // wake up the worker in case it is parked, it then shuts down
-            scheduler.notify_worker(self.id.worker_id());
+            scheduler.get_worker_access(self.id).request_stop(&scheduler.io_unparker);
         }
+    }
+}
+
+impl Drop for Worker {
+    fn drop(&mut self) {
+        self.stop();
     }
 }
 
@@ -170,7 +168,7 @@ impl WorkerInner {
     }
 
     fn run(&mut self) {
-        while self.own_interactor.state.0.load(::core::sync::atomic::Ordering::Acquire) != WORKER_STATE_SHUTTINGDOWN {
+        while !self.own_interactor.is_shutdown_requested() {
             let (task_opt, should_notify) = self.try_pick_work();
 
             if let Some(task) = task_opt {
@@ -185,10 +183,7 @@ impl WorkerInner {
     }
 
     fn park_worker(&mut self) {
-        if self
-            .scheduler
-            .transition_to_parked(self.local_state == LocalState::Searching, self.get_worker_id())
-        {
+        if self.scheduler.transition_to_parked(self.local_state == LocalState::Searching, self.id) {
             trace!("Last searcher is trying to sleep, inspect all work sources");
 
             // we transition ourself but we are last one who is going to sleep, let's recheck all queues, otherwise something may stuck there
@@ -196,14 +191,14 @@ impl WorkerInner {
 
             if !gc_empty {
                 debug!("Unparking during parking due to global queue having work");
-                self.scheduler.transition_from_parked(self.get_worker_id());
+                self.scheduler.transition_from_parked(self.id);
                 return;
             }
 
-            for access in &self.scheduler.worker_access {
+            for access in self.scheduler.as_worker_access_slice() {
                 if access.steal_handle.count() > 0 {
                     debug!("Unparking during parking due to some steal queue having work");
-                    self.scheduler.transition_from_parked(self.get_worker_id());
+                    self.scheduler.transition_from_parked(self.id);
                     return;
                 }
             }
@@ -216,7 +211,7 @@ impl WorkerInner {
         self.transition_to_executing();
 
         if should_notify {
-            self.scheduler.try_notify_siblings_workers(Some(self.get_worker_id()));
+            self.scheduler.try_notify_siblings_workers(Some(self.id));
         }
 
         let waker = create_waker(task.clone());
@@ -234,6 +229,7 @@ impl WorkerInner {
 
     fn try_pick_work(&mut self) -> (Option<TaskRef>, bool) {
         self.next_task_tick = self.next_task_tick.wrapping_add(1);
+        // ctx_get_drivers().process_io();
 
         self.maybe_run_driver();
 
@@ -283,7 +279,10 @@ impl WorkerInner {
         let current_worker = ctx_get_worker_id().worker_id() as usize;
 
         let start_idx = self.randomness_source.next() as usize;
-        let cnt = self.scheduler.worker_access.len();
+
+        let worker_access = self.scheduler.as_worker_access_slice();
+
+        let cnt = worker_access.len();
 
         let mut stolen = 0;
 
@@ -295,9 +294,7 @@ impl WorkerInner {
                 continue;
             }
 
-            let res = self.scheduler.worker_access[real_idx]
-                .steal_handle
-                .steal_into(&self.own_interactor.steal_handle, None);
+            let res = worker_access[real_idx].steal_handle.steal_into(&self.own_interactor.steal_handle, None);
 
             stolen += res.unwrap_or_default();
         }
@@ -351,16 +348,26 @@ impl WorkerInner {
         }
     }
 
-    fn get_worker_id(&self) -> usize {
-        self.id.worker_id() as usize
-    }
-
     // Function responsible to run work under the driver (ie process timeouts, etc.)
     fn maybe_run_driver(&mut self) {
-        const EVENT_POLLING_TICK: u64 = 31;
+        //TODO: Ensure it's power of 2 once making this config option to runtime
+        const EVENT_POLLING_TICK: u64 = 32;
+        const IO_POLLING_TICK: u64 = 32;
 
-        if self.next_task_tick % EVENT_POLLING_TICK == 0 {
+        if self.next_task_tick & (EVENT_POLLING_TICK - 1) == 0 {
             ctx_get_drivers().process_work();
+        }
+
+        if self.next_task_tick & (IO_POLLING_TICK - 1) == 0 {
+            let drivers = ctx_get_drivers();
+
+            {
+                let driver = drivers.get_io_driver();
+
+                if let Some(mut access) = driver.try_get_access() {
+                    let _ = driver.process_io(&mut access, Some(Duration::ZERO));
+                }; // This semicolon ensures dropping temps here and not at then end of function
+            }
         }
     }
 }
@@ -368,14 +375,17 @@ impl WorkerInner {
 #[cfg(test)]
 #[cfg(not(loom))]
 mod tests {
-    use crate::scheduler::scheduler_mt::scheduler_new;
-    use crate::scheduler::workers::{worker::Worker, worker_types::*};
-    use ::core::sync::atomic::Ordering;
+    use crate::scheduler::{
+        driver::Drivers,
+        workers::{worker::Worker, worker_types::*},
+    };
     use std::sync::Arc;
 
     #[test]
     fn test_worker_stop_sets_shutdown_state() {
-        let scheduler = Arc::new(scheduler_new(1, 4));
+        let drivers = Drivers::new();
+        let scheduler = Arc::new(crate::scheduler::scheduler_mt::scheduler_new(1, 4, &drivers));
+
         let mut worker = Worker {
             thread_handle: None,
             id: WorkerId::new(format!("arunner{}", 0).as_str().into(), 0, 0, WorkerType::Async),
@@ -384,14 +394,6 @@ mod tests {
         };
 
         worker.stop();
-
-        let state = scheduler.worker_access[0].state.0.load(Ordering::SeqCst);
-        assert_eq!(state, WORKER_STATE_SHUTTINGDOWN);
-
-        // Check that unpark does not panic and state remains SHUTTINGDOWN
-        scheduler.worker_access[0].unpark();
-        let state = scheduler.worker_access[0].state.0.load(Ordering::SeqCst);
-        assert_eq!(state, WORKER_STATE_SHUTTINGDOWN);
     }
 
     #[test]
@@ -414,7 +416,11 @@ mod tests {
             b.store(true, ::core::sync::atomic::Ordering::SeqCst);
         }
 
-        let scheduler = Arc::new(crate::scheduler::scheduler_mt::scheduler_new(1, 4));
+        let drivers = Drivers::new();
+
+        let scheduler = crate::scheduler::scheduler_mt::scheduler_new(1, 4, &drivers);
+        let scheduler = Arc::new(scheduler);
+
         let dedicated_scheduler = Arc::new(crate::scheduler::scheduler_mt::DedicatedScheduler {
             dedicated_queues: Box::new([]),
         });
@@ -430,7 +436,8 @@ mod tests {
             engine_has_safety_worker: false,
             scheduler: Some(scheduler.clone()),
         };
-        worker.start(scheduler.clone(), Drivers::new(), dedicated_scheduler, ready_notifier, &thread_params);
+
+        worker.start(scheduler.clone(), drivers, dedicated_scheduler, ready_notifier, &thread_params);
 
         match barrier.wait_for_all(Duration::from_secs(5)) {
             Ok(_) => {

@@ -27,7 +27,7 @@ use foundation::{
     cell::{UnsafeCell, UnsafeCellExt},
     containers::intrusive_linked_list,
     not_recoverable_error,
-    prelude::{debug, error, trace, CommonErrors, FoundationAtomicU32, FoundationAtomicUsize},
+    prelude::{debug, error, trace, CommonErrors, FoundationAtomicU32},
 };
 
 use crate::{
@@ -101,7 +101,7 @@ impl<S: IoSelector> AsyncRegistration<S> {
 // Internal struct that is shared between AsyncRegistration and IoDriver to dispatch notifications from it
 pub(crate) struct RegistrationInfo {
     // Used to track entry in the tracking map in IO Driver
-    tracking_key: FoundationAtomicUsize,
+    tracking_key: usize,
 
     // Used to track wakers that are waiting for readiness changes
     wakers: Mutex<WakersCollection>,
@@ -138,13 +138,13 @@ impl RegistrationInfo {
     pub(crate) fn new(key: usize) -> Self {
         RegistrationInfo {
             readiness_state: FoundationAtomicU32::new(0),
-            tracking_key: FoundationAtomicUsize::new(key),
+            tracking_key: key,
             wakers: Mutex::new(WakersCollection::default()),
         }
     }
 
     pub(crate) fn tracking_key(&self) -> Option<usize> {
-        let res = self.tracking_key.load(Ordering::Relaxed);
+        let res = self.tracking_key;
         if res == usize::MAX {
             None
         } else {

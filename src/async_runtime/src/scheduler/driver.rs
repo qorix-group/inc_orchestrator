@@ -98,7 +98,7 @@ impl Inner {
             .create()
             .unwrap();
 
-        // TODO: When reworking with IO driver, think over if we want to mark globally that someone is right now sleeping on timer
+        // TODO: Think over if we want to mark globally that someone is right now sleeping on timer
         // Then logic with this time calculations shall not be needed
 
         // This is th last time we promised to wakeup this worker
@@ -113,8 +113,7 @@ impl Inner {
 
         if expire_time.is_none() {
             // No expiration is there, I sleep indefinitely
-            debug!("No next expiration time, parking indefinitely");
-            self.park_on_cv(scheduler, worker);
+            let _ = worker.park(scheduler, &self.io, || {}, None);
             return;
         }
 
@@ -122,120 +121,36 @@ impl Inner {
         let expire_time_u64 = self.time.instant_into_u64(&expire_time_instant);
 
         if (expire_time_u64 == global_promis_next_time_wakeup) && (previous_wakeup_time != expire_time_u64) {
-            debug!("Someone else waiting on timewheel, we will park on cv without timeout");
-            self.park_on_cv(scheduler, worker);
+            debug!("Someone else waiting on timewheel, we will park without timeout");
+            let _ = worker.park(scheduler, &self.io, || {}, None);
             return;
         }
 
-        self.park_on_cv_timeout(scheduler, worker, &expire_time_instant, expire_time_u64);
+        self.park_with_timeout(scheduler, worker, &expire_time_instant, expire_time_u64);
     }
 
-    fn park_on_cv(&self, scheduler: &AsyncScheduler, worker: &WorkerInteractor) {
-        let worker_id = ctx_get_worker_id().worker_id() as usize;
-
-        let mut _guard = worker.mtx.lock().unwrap();
-
-        if !self.park_on_cv_pre_stage(scheduler, worker, worker_id) {
-            // We were notified before we could park, so we just return
-            return;
-        }
-
-        _guard = worker
-            .cv
-            .wait_while(_guard, |_| self.park_on_cv_condition_check(scheduler, worker, worker_id))
-            .unwrap();
-    }
-
-    fn park_on_cv_timeout(&self, scheduler: &AsyncScheduler, worker: &WorkerInteractor, expire_time_instant: &Instant, expire_time_u64: u64) {
-        let worker_id = ctx_get_worker_id().worker_id() as usize;
-
+    fn park_with_timeout(&self, scheduler: &AsyncScheduler, worker: &WorkerInteractor, expire_time_instant: &Instant, expire_time_u64: u64) {
         // We do it before CME to keep state consistent
         let dur = self.time.duration_since_now(expire_time_instant);
         if dur.is_zero() {
-            warn!("Tried to park on cv with duration zero or lower, looks like a worker was stuck for some time, unparking immediately");
+            warn!("Tried to park with duration zero or lower, looks like a worker was stuck for some time, unparking immediately");
             return;
         }
 
-        let mut _guard = worker.mtx.lock().unwrap();
+        let res = worker.park(
+            scheduler,
+            &self.io,
+            || {
+                // We sleep to new timeout
+                self.next_promised_wakeup.store(expire_time_u64, ::core::sync::atomic::Ordering::Relaxed);
+                self.stash_promised_wakeup_time_for_worker(expire_time_u64);
+            },
+            Some(dur),
+        );
 
-        if !self.park_on_cv_pre_stage(scheduler, worker, worker_id) {
-            // We were notified before we could park, so we just return
-            return;
-        }
-
-        // We sleep to new timeout
-        self.next_promised_wakeup.store(expire_time_u64, ::core::sync::atomic::Ordering::Relaxed);
-        self.stash_promised_wakeup_time_for_worker(expire_time_u64);
-
-        let wait_result;
-
-        debug!("Definite sleep decision, try sleep {} ms", dur.as_millis());
-
-        // TODO: To improve accuracy of sleep, we shall switch to select and provide correct unpark condition. This could be done once we work on IoDriver since
-        // some code can be shared between IoDriver and TimeDriver.
-        (_guard, wait_result) = worker
-            .cv
-            .wait_timeout_while(_guard, dur, |_| self.park_on_cv_condition_check(scheduler, worker, worker_id))
-            .unwrap();
-
-        if wait_result.timed_out() {
+        if let Err(CommonErrors::Timeout) = res {
             // We did timeout due to sleep request, so we fulfilled driver promise
             self.clear_last_wakeup_time_for_worker();
-            worker.state.0.store(WORKER_STATE_EXECUTING, ::core::sync::atomic::Ordering::SeqCst);
-            scheduler.transition_from_parked(worker_id);
-            debug!("Woken up from sleep after timeout");
-        }
-    }
-
-    /// # Safety
-    /// This function must be called under mutex lock of the worker.
-    fn park_on_cv_pre_stage(&self, scheduler: &AsyncScheduler, worker: &WorkerInteractor, worker_id: usize) -> bool {
-        match worker.state.0.compare_exchange(
-            WORKER_STATE_EXECUTING,
-            WORKER_STATE_SLEEPING_CV,
-            ::core::sync::atomic::Ordering::SeqCst,
-            ::core::sync::atomic::Ordering::SeqCst,
-        ) {
-            Ok(_) => true,
-            Err(WORKER_STATE_NOTIFIED) => {
-                // We were notified before, so we shall continue
-                scheduler.transition_from_parked(worker_id);
-
-                worker.state.0.store(WORKER_STATE_EXECUTING, ::core::sync::atomic::Ordering::SeqCst);
-                debug!("Notified while try to sleep, searching again");
-                false
-            }
-            Err(WORKER_STATE_SHUTTINGDOWN) => {
-                // If we should shutdown, we simply need to return. And the run loop exits itself.
-                false
-            }
-            Err(s) => {
-                panic!("Inconsistent state when parking: {}", s);
-            }
-        }
-    }
-
-    /// # Safety
-    /// This function must be called under mutex lock of the worker.
-    fn park_on_cv_condition_check(&self, scheduler: &AsyncScheduler, worker: &WorkerInteractor, worker_id: usize) -> bool {
-        match worker.state.0.compare_exchange(
-            WORKER_STATE_NOTIFIED,
-            WORKER_STATE_EXECUTING,
-            ::core::sync::atomic::Ordering::SeqCst,
-            ::core::sync::atomic::Ordering::SeqCst,
-        ) {
-            Ok(_) => {
-                scheduler.transition_from_parked(worker_id);
-                debug!("Woken up from sleep by notification in park_on_cv_timeout");
-                false
-            }
-            Err(WORKER_STATE_SHUTTINGDOWN) => {
-                // break here and run loop will exit
-                false
-            }
-            Err(_) => {
-                true // spurious wake-up
-            }
         }
     }
 
