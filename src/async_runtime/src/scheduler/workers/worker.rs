@@ -70,7 +70,7 @@ struct WorkerInner {
 ///
 ///
 impl Worker {
-    pub(crate) fn new(_prio: Option<u8>, id: WorkerId, engine_has_safety_worker: bool) -> Self {
+    pub(crate) fn new(id: WorkerId, engine_has_safety_worker: bool) -> Self {
         Self {
             thread_handle: None,
             id,
