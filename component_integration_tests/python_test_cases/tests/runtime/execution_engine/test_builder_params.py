@@ -1,9 +1,8 @@
-from abc import abstractmethod
 from typing import Any
 
 import psutil
 import pytest
-from testing_utils import ScenarioResult
+from testing_utils import ScenarioResult, LogContainer
 
 from component_integration_tests.python_test_cases.tests.cit_scenario import (
     CitScenario,
@@ -17,10 +16,6 @@ class TestTaskQueueSize(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
         return "basic.only_shutdown"
-
-    @abstractmethod
-    def queue_size(self, request: pytest.FixtureRequest) -> int:
-        pass
 
     @pytest.fixture(scope="class")
     def test_config(self, queue_size: int) -> dict[str, Any]:
@@ -71,11 +66,7 @@ class TestTaskQueueSize_Invalid(TestTaskQueueSize):
 class TestWorkers(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "basic.only_shutdown"
-
-    @abstractmethod
-    def workers(self, request: pytest.FixtureRequest) -> int:
-        pass
+        return "runtime.worker.num_workers"
 
     @pytest.fixture(scope="class")
     def test_config(self, workers: int) -> dict[str, Any]:
@@ -83,12 +74,29 @@ class TestWorkers(CitScenario):
 
 
 class TestWorkers_Valid(TestWorkers):
-    @pytest.fixture(scope="class", params=[1, 33, 100, 128])
+    @pytest.fixture(scope="class", params=[1, 4, 12, 60, 128])
     def workers(self, request: pytest.FixtureRequest) -> int:
         return request.param
 
-    def test_valid(self, results: ScenarioResult) -> None:
+    def test_valid(
+        self, results: ScenarioResult, logs_info_level: LogContainer, workers: int
+    ) -> None:
         assert results.return_code == ResultCode.SUCCESS
+
+        # Check barrier resulted in timeout.
+        wait_result_logs = logs_info_level.get_logs_by_field(
+            "wait_result", pattern=".*"
+        ).get_logs()
+        assert len(wait_result_logs) == 1
+        assert wait_result_logs[0].wait_result == "timeout"
+
+        # Check number of workers.
+        # Exact 'id' content is not checked.
+        # Test relies on spawning one too many tasks for available workers.
+        # Tracing is no longer active for this extra task, but it's not determinate which one is it.
+        worker_logs = logs_info_level.get_logs_by_field("id", pattern="worker_.*")
+        worker_ids = [log.id for log in worker_logs]
+        assert len(worker_ids) == workers
 
 
 class TestWorkers_Invalid(TestWorkers):
@@ -165,10 +173,6 @@ class TestThreadStackSize(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
         return "basic.only_shutdown"
-
-    @abstractmethod
-    def thread_stack_size(self, request: pytest.FixtureRequest) -> int:
-        pass
 
     @pytest.fixture(scope="class")
     def test_config(self, thread_stack_size: int) -> dict[str, Any]:

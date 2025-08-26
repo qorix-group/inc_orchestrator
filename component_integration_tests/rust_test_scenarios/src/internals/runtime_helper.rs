@@ -7,11 +7,11 @@ use tracing::debug;
 /// Execution engine configuration.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ExecEngineConfig {
-    task_queue_size: u32,
-    workers: usize,
-    thread_priority: Option<u8>,
-    thread_affinity: Option<usize>,
-    thread_stack_size: Option<u64>,
+    pub task_queue_size: u32,
+    pub workers: usize,
+    pub thread_priority: Option<u8>,
+    pub thread_affinity: Option<usize>,
+    pub thread_stack_size: Option<u64>,
 }
 
 /// Runtime configuration.
@@ -40,6 +40,10 @@ impl Runtime {
         };
 
         Self { exec_engines }
+    }
+
+    pub fn exec_engines(&self) -> &Vec<ExecEngineConfig> {
+        &self.exec_engines
     }
 
     pub fn build(&self) -> AsyncRuntime {
