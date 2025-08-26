@@ -304,13 +304,14 @@ impl ExecutionEngineBuilder {
     /// Ensure to configure scheduler type also.
     /// If priority or scheduler type is `None`, then both attributes will be inherited from parent thread.
     pub fn thread_priority(mut self, thread_prio: u8) -> Self {
-        self.thread_params.priority = Some(thread_prio);
+        self.thread_params = self.thread_params.priority(thread_prio);
         self
     }
 
     /// Configures thread affinity for the async workers.
-    pub fn thread_affinity(mut self, thread_affinity: usize) -> Self {
-        self.thread_params.affinity = Some(thread_affinity);
+    /// Input is an array of CPU core ids that the thread can run on.
+    pub fn thread_affinity(mut self, affinity: &[usize]) -> Self {
+        self.thread_params = self.thread_params.affinity(affinity);
         self
     }
 
@@ -318,24 +319,24 @@ impl ExecutionEngineBuilder {
     /// Ensure to configure priority also.
     /// If priority or scheduler type is `None`, then both attributes will be inherited from parent thread.
     pub fn thread_scheduler(mut self, thread_scheduler_type: SchedulerType) -> Self {
-        self.thread_params.scheduler_type = Some(thread_scheduler_type);
+        self.thread_params = self.thread_params.scheduler_type(thread_scheduler_type);
         self
     }
 
     /// Configures the stack size for the async workers. Min is `Limit::MinStackSizeOfThread.value()`
     /// which is OS and platform dependent.
     pub fn thread_stack_size(mut self, thread_stack_size: u64) -> Self {
-        self.thread_params.stack_size = Some(thread_stack_size);
+        self.thread_params = self.thread_params.stack_size(thread_stack_size);
         self
     }
 
     /// Enables the safety worker with the given thread parameters `params`.
     /// If priority or scheduler type is `None`, then both attributes will be inherited from parent thread.
     pub fn enable_safety_worker(mut self, params: ThreadParameters) -> Self {
-        self.with_safe_worker = (true, params);
         if params.priority.is_none() ^ params.scheduler_type.is_none() {
             warn!("Either priority or scheduler type is 'None' for safety worker, both attributes will be inherited from parent thread.");
         }
+        self.with_safe_worker = (true, params);
         self
     }
 
@@ -402,7 +403,6 @@ impl ExecutionEngineBuilder {
         }
         for i in 0..self.async_workers_cnt {
             async_workers.push(Worker::new(
-                self.thread_params.priority,
                 WorkerId::new(format!("arunner{}", i).as_str().into(), 0, i as u8, WorkerType::Async),
                 self.with_safe_worker.0,
             ));
@@ -415,7 +415,7 @@ impl ExecutionEngineBuilder {
         for i in 0..self.dedicated_workers_ids.len() {
             let id = self.dedicated_workers_ids[i].0;
             let real_id = WorkerId::new(id, 0, i as u8, WorkerType::Dedicated);
-            let thread_params = self.dedicated_workers_ids[i].1;
+            let thread_params = self.dedicated_workers_ids[i].1.clone();
             dedicated_workers.push(DedicatedWorker::new(real_id, self.with_safe_worker.0, thread_params));
             unsafe {
                 dedicated_queues[i]

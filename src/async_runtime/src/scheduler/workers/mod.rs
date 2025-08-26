@@ -20,12 +20,39 @@ use crate::scheduler::{workers::worker_types::WorkerId, SchedulerType};
 use ::core::fmt::Debug;
 use iceoryx2_bb_posix::thread::{Thread, ThreadBuilder, ThreadName, ThreadSpawnError};
 
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone)]
 pub struct ThreadParameters {
-    pub priority: Option<u8>,
-    pub scheduler_type: Option<SchedulerType>,
-    pub affinity: Option<usize>,
-    pub stack_size: Option<u64>,
+    pub(crate) priority: Option<u8>,
+    pub(crate) scheduler_type: Option<SchedulerType>,
+    pub(crate) affinity: Option<Box<[usize]>>,
+    pub(crate) stack_size: Option<u64>,
+}
+
+impl ThreadParameters {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn priority(mut self, priority: u8) -> Self {
+        self.priority = Some(priority);
+        self
+    }
+
+    pub fn scheduler_type(mut self, scheduler_type: SchedulerType) -> Self {
+        self.scheduler_type = Some(scheduler_type);
+        self
+    }
+
+    /// An array of CPU core ids that the thread can run on.
+    pub fn affinity(mut self, affinity: &[usize]) -> Self {
+        self.affinity = Some(Box::from(affinity));
+        self
+    }
+
+    pub fn stack_size(mut self, stack_size: u64) -> Self {
+        self.stack_size = Some(stack_size);
+        self
+    }
 }
 
 pub(crate) fn spawn_thread<T, F>(tname: &'static str, id: &WorkerId, f: F, thread_params: &ThreadParameters) -> Result<Thread, ThreadSpawnError>
@@ -54,7 +81,7 @@ where
         tb = tb.scheduler(scheduler_type.into());
     }
 
-    if let Some(affinity) = thread_params.affinity {
+    if let Some(affinity) = &thread_params.affinity {
         tb = tb.affinity(affinity);
     }
 
