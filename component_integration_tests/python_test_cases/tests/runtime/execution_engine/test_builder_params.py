@@ -1,3 +1,4 @@
+import json
 from typing import Any
 
 import psutil
@@ -150,24 +151,150 @@ class TestThreadPriority(CitScenario):
 # region thread_affinity
 
 
-@pytest.mark.skip(reason="Not implemented yet")
 class TestThreadAffinity(CitScenario):
+    NUM_WORKERS = 4
+
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "basic.only_shutdown"
+        return "runtime.worker.thread_affinity"
 
-    @pytest.fixture(scope="class", params=[0, 2**16, 2**32, 2**48, 2**63])
-    def test_config(self, request: pytest.FixtureRequest) -> dict[str, Any]:
+    @pytest.fixture(scope="class")
+    def num_cores(self) -> int:
+        num_cores = psutil.cpu_count()
+        if num_cores is None or num_cores == 0:
+            raise RuntimeError("Undetermined number of cores")
+        return num_cores
+
+    @pytest.fixture(scope="class")
+    def test_config(self, affinity: list[int]) -> dict[str, Any]:
         return {
             "runtime": {
                 "task_queue_size": 256,
-                "workers": 1,
-                "thread_affinity": request.param,
+                "workers": self.NUM_WORKERS,
+                "thread_affinity": affinity,
             }
         }
 
-    def test_valid(self, results: ScenarioResult) -> None:
+
+class TestThreadAffinity_Valid(TestThreadAffinity):
+    TEST_MODES = ["first", "mid", "last", "multiple", "all"]
+
+    @pytest.fixture(scope="class", params=TEST_MODES, ids=TEST_MODES)
+    def affinity(self, request: pytest.FixtureRequest, num_cores: int) -> list[int]:
+        # Available affinity tests are dependent on number of cores available.
+        mode = request.param
+
+        def check_num_cores(num_required: int):
+            if num_cores < num_required:
+                pytest.skip(
+                    reason="Test requires more CPU cores, "
+                    f"required: {num_required}, "
+                    f"available: {num_cores}"
+                )
+
+        match mode:
+            # First available core.
+            case "first":
+                return [0]
+
+            # Middle available core.
+            case "mid":
+                check_num_cores(3)
+                return [num_cores // 2]
+
+            # Last available core.
+            case "last":
+                check_num_cores(2)
+                return [num_cores - 1]
+
+            # Three cores cores - first, middle and last.
+            case "multiple":
+                check_num_cores(4)
+                return [0, num_cores // 2, num_cores - 1]
+
+            # All available cores.
+            case "all":
+                check_num_cores(2)
+                return list(range(num_cores))
+
+            case _:
+                raise RuntimeError(f"Invalid test mode: {mode}")
+
+    def test_valid(
+        self,
+        results: ScenarioResult,
+        logs_info_level: LogContainer,
+        affinity: list[int],
+    ) -> None:
         assert results.return_code == ResultCode.SUCCESS
+
+        # Find logs with worker IDs.
+        worker_logs = logs_info_level.get_logs_by_field(field="id", pattern="worker_.*")
+        assert len(worker_logs) == self.NUM_WORKERS
+
+        # Check affinity of each worker.
+        for worker_log in worker_logs:
+            # Convert affinity string to list.
+            act_affinity = json.loads(worker_log.affinity)
+
+            # Check affinity as expected.
+            assert affinity == act_affinity, (
+                f"Invalid affinity, expected: {affinity}, found: {act_affinity}"
+            )
+
+
+class TestThreadAffinity_OffByOne(TestThreadAffinity):
+    capture_stderr = True
+    expect_command_failure = True
+
+    @pytest.fixture(scope="class")
+    def affinity(self, num_cores: int) -> list[int]:
+        return [num_cores]
+
+    def test_invalid(
+        self,
+        results: ScenarioResult,
+    ) -> None:
+        assert results.return_code == ResultCode.PANIC
+        assert results.stderr is not None
+        assert (
+            "called `Result::unwrap()` on an `Err` value: CpuCoreOutsideOfSupportedCpuRangeForAffinity"
+            in results.stderr
+        )
+
+
+class TestThreadAffinity_LargeCoreId(TestThreadAffinity):
+    capture_stderr = True
+    expect_command_failure = True
+
+    @pytest.fixture(scope="class")
+    def affinity(self) -> list[int]:
+        return [2**63]
+
+    def test_invalid(self, results: ScenarioResult, affinity: list[int]) -> None:
+        assert results.return_code == ResultCode.PANIC
+        assert results.stderr is not None
+        assert (
+            f"index out of bounds: the len is 1024 but the index is {affinity[0]}"
+            in results.stderr
+        )
+
+
+class TestThreadAffinity_AffinityMaskTooLarge(TestThreadAffinity):
+    capture_stderr = True
+    expect_command_failure = True
+
+    @pytest.fixture(scope="class")
+    def affinity(self) -> list[int]:
+        return list(range(1024 + 1))
+
+    def test_invalid(self, results: ScenarioResult, affinity: list[int]) -> None:
+        assert results.return_code == ResultCode.PANIC
+        assert results.stderr is not None
+        assert (
+            f"index out of bounds: the len is 1024 but the index is {len(affinity) - 1}"
+            in results.stderr
+        )
 
 
 # endregion

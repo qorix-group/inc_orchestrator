@@ -10,7 +10,7 @@ pub struct ExecEngineConfig {
     pub task_queue_size: u32,
     pub workers: usize,
     pub thread_priority: Option<u8>,
-    pub thread_affinity: Option<usize>,
+    pub thread_affinity: Option<Vec<usize>>,
     pub thread_stack_size: Option<u64>,
 }
 
@@ -59,8 +59,8 @@ impl Runtime {
             if let Some(thread_priority) = exec_engine.thread_priority {
                 exec_engine_builder = exec_engine_builder.thread_priority(thread_priority);
             }
-            if let Some(thread_affinity) = exec_engine.thread_affinity {
-                exec_engine_builder = exec_engine_builder.thread_affinity(&[thread_affinity]);
+            if let Some(thread_affinity) = &exec_engine.thread_affinity {
+                exec_engine_builder = exec_engine_builder.thread_affinity(&thread_affinity);
             }
             if let Some(thread_stack_size) = exec_engine.thread_stack_size {
                 exec_engine_builder = exec_engine_builder.thread_stack_size(thread_stack_size);
