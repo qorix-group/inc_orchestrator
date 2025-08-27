@@ -60,7 +60,8 @@ impl Scenario for NumWorkers {
 
             // Wait is expected to fail on timeout.
             // There's always one task more than available workers.
-            let wait_s = 3;
+            // Wait time must be longer for more tasks.
+            let wait_s = if num_workers > 32 { 10 } else { 3 };
             let result = mid_barrier.wait_for_notification(Duration::from_secs(wait_s));
 
             // Disable tracing.

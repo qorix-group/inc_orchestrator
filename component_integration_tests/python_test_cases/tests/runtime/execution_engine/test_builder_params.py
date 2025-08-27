@@ -73,11 +73,15 @@ class TestWorkers(CitScenario):
         return {"runtime": {"task_queue_size": 256, "workers": workers}}
 
 
-@pytest.mark.skip(reason="Flaky")
 class TestWorkers_Valid(TestWorkers):
     @pytest.fixture(scope="class", params=[1, 4, 12, 60, 128])
     def workers(self, request: pytest.FixtureRequest) -> int:
         return request.param
+
+    @pytest.fixture(scope="class")
+    def execution_timeout(self) -> float:
+        # Tests with many workers take longer to execute.
+        return 15.0
 
     def test_valid(
         self, results: ScenarioResult, logs_info_level: LogContainer, workers: int
