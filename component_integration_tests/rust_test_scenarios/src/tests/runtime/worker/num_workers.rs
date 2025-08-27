@@ -2,29 +2,28 @@ use crate::internals::execution_barrier::{MultiExecutionBarrier, RuntimeJoiner};
 use crate::internals::runtime_helper::Runtime;
 use async_runtime::spawn;
 use foundation::threading::thread_wait_barrier::ThreadReadyNotifier;
-use std::hint;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 use test_scenarios_rust::scenario::Scenario;
 use tracing::info;
 
-async fn blocking_task(
-    id: usize,
-    trace_ids: Arc<AtomicBool>,
-    counter: Arc<AtomicUsize>,
-    counter_unblock_value: usize,
-    notifier: ThreadReadyNotifier,
-) {
-    // Allow only required workers to trace.
-    if trace_ids.load(Ordering::Acquire) {
+async fn blocking_task(id: usize, block_condition: Arc<(Condvar, Mutex<bool>)>, notifier: ThreadReadyNotifier) {
+    let (cv, mtx) = &*block_condition;
+    let mut block = mtx.lock().unwrap();
+
+    // Allow only first batch of tasks to trace.
+    if *block {
         let id = format!("worker_{id}");
         info!(id);
     }
-    counter.fetch_add(1, Ordering::Release);
+
+    // Notify task done.
+    // This should never be satisfied for all workers.
     notifier.ready();
-    while counter.load(Ordering::Acquire) < counter_unblock_value {
-        hint::spin_loop()
+
+    // Wait until barrier timed out.
+    while *block {
+        block = cv.wait(block).unwrap();
     }
 }
 
@@ -46,8 +45,8 @@ impl Scenario for NumWorkers {
             let mid_barrier = MultiExecutionBarrier::new(num_workers);
             let mut mid_notifiers = mid_barrier.get_notifiers();
 
-            let counter = Arc::new(AtomicUsize::new(0));
-            let trace_ids = Arc::new(AtomicBool::new(true));
+            // Condition variable and mutex containing `block` variable.
+            let block_condition = Arc::new((Condvar::new(), Mutex::new(true)));
 
             // Current worker is spawning tasks for other workers.
             info!(id = "worker_0");
@@ -55,7 +54,7 @@ impl Scenario for NumWorkers {
             // Spawn tasks.
             for id in 1..=num_workers {
                 let notifier = mid_notifiers.pop().unwrap();
-                joiner.add_handle(spawn(blocking_task(id, trace_ids.clone(), counter.clone(), num_workers, notifier)));
+                joiner.add_handle(spawn(blocking_task(id, block_condition.clone(), notifier)));
             }
 
             // Wait is expected to fail on timeout.
@@ -64,8 +63,13 @@ impl Scenario for NumWorkers {
             let wait_s = if num_workers > 32 { 10 } else { 3 };
             let result = mid_barrier.wait_for_notification(Duration::from_secs(wait_s));
 
-            // Disable tracing.
-            trace_ids.store(false, Ordering::Release);
+            // Allow tasks to finish and disable tracing.
+            {
+                let (cv, mtx) = &*block_condition;
+                let mut block = mtx.lock().unwrap();
+                *block = false;
+                cv.notify_all();
+            }
 
             match result {
                 // Expected `RuntimeErrors` are not exactly suitable to express intent.
