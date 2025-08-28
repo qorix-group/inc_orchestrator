@@ -38,9 +38,11 @@ use crate::{
 };
 
 // Takes care about tracking all tasks to be waken, and is shared between core reactor that calls wakes + other interested entities, ie BridgedFd
-#[derive(Clone)] // TODO: Do we need this?!
 pub(crate) struct AsyncRegistration<S: IoSelector = AsyncSelector> {
+    // Handle that is able to register/deregister IO sources in the driver
     handle: IoDriverHandle<S>,
+
+    // Shared between AsyncRegistration and IoDriver so both can access it (here when checking/requesting readiness, in IoDriver when waking up tasks)
     inner: Arc<RegistrationInfo>,
 }
 
@@ -63,15 +65,21 @@ impl<S: IoSelector> AsyncRegistration<S> {
         self.handle.remove_io_source(mio, &self.inner);
     }
 
+    /// Async interface to await for readiness for the given interest. User will be waken once the interest is ready.
     pub(crate) async fn request_readiness(&self, interest: IoEventInterest) -> Result<ReadinessState, CommonErrors> {
         let readiness = ReadinessFuture::new(self, interest);
         Ok(readiness.await)
     }
 
+    /// Clear readiness to indicate that user consumed the readiness for the given interest. This is required to be able again
+    /// await on request_readiness/poll_readiness correctly.
+    ///
+    /// `readiness` shall match the one returned from request_readiness/poll_readiness
     pub(crate) fn clear_readiness(&self, readiness: ReadinessState, interest: IoEventInterest) -> bool {
         self.inner.clear_readiness(readiness, interest)
     }
 
+    /// Same as `request_readiness` but in polling form. This is useful for implementing `AsyncRead` and `AsyncWrite` traits.
     pub(crate) fn poll_readiness(&self, cx: &mut Context<'_>, interest: IoEventInterest) -> Poll<ReadinessState> {
         self.inner.poll_register_interest(interest, cx).into()
     }
@@ -170,7 +178,7 @@ impl RegistrationInfo {
         TracingId(self as *const _)
     }
 
-    // IO Driver exposed API
+    /// Wake API is exposed towards IO driver so it can wake up tasks that are waiting for IO events on this registration
     pub(super) fn wake(&self, state: ReadinessState) {
         // Mark state so before wakeups it's correct, tasks will check it
         let (_, readiness) = self.mark_state(state);
@@ -556,6 +564,7 @@ mod tests {
     use testing::{build_with_location, prelude::MockFnBuilder};
 
     use crate::{
+        io::driver::Registrations,
         mio::{
             registry::Registry,
             types::{IoCall, IoSelector},
@@ -912,7 +921,7 @@ mod tests {
     }
 
     fn create_registration(interest: IoEventInterest) -> Arc<AsyncRegistration<AsyncSelectorMock>> {
-        let handle = IoDriverHandle::<AsyncSelectorMock>::new(Registry::new(AsyncSelectorMock {}));
+        let handle = IoDriverHandle::<AsyncSelectorMock>::new(Registry::new(AsyncSelectorMock {}), Arc::new(Registrations::new()));
         let mut mio = IoMock {};
         Arc::new(AsyncRegistration::new_internal(&mut mio, interest, handle).unwrap())
     }
