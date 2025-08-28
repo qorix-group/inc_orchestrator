@@ -11,6 +11,26 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+//!
+//! IO driver based on MIO selector that is able to integrate with async world.
+//!
+//! The driver [`IoDriver`] is responsible for holding all objects required by MIO, connected registrations [`RegistrationInfo`]
+//! and to provide interface for worker to poll IO events. The driver also provides further striped access to
+//! certain functionalities:
+//!
+//!  - [`IoDriverHandle`] is a proxy that is able to register and deregister IO sources in a safe way.
+//!  - [`IoDriverUnparker`] is a proxy that is able to unpark connected IO Driver. This object is used across worker via [`AsyncScheduler`]
+//!    to wakeup worker that is currently waiting on MIO poll.
+//!
+//! The driver has to entry point contexts that should be looked into:
+//!  - [`IoDriver`] `process_io` is called by worker to poll IO events and wake up all tasks that are registered for IO events that are ready.
+//!  - [`IoDriverHandle`] via `add_io_source` and `remove_io_source` are called by upper layers to register and deregister IO sources in a safe way.
+//!    This can be  called from any other worker thread once user uses some async IO API.
+//!
+//!
+//! Explainer Sequence diagrams can be found in the [sequence diagram](../../doc/io_driver.md)
+//!
+
 // TODO: To be removed once used in IO APIs
 #![allow(dead_code)]
 
@@ -34,7 +54,7 @@ use foundation::prelude::*;
 
 use iceoryx2_bb_container::slotmap::{SlotMap, SlotMapKey};
 
-// Holds MIO object and all parts needed to manage it
+/// Holds MIO object and all parts needed to manage it
 pub struct IoDriver {
     inner: Mutex<IoDriverInner>,
     async_registration: Arc<Registrations>,
@@ -49,13 +69,13 @@ pub(crate) struct IoDriverInner {
 
 /// Proxy handle that let all async code interact with underlying MIO selector in a safe way.
 #[derive(Clone)]
-pub struct IoDriverHandle<T: IoSelector = AsyncSelector> {
-    registry: Registry<T>,
-    async_registration: Arc<Registrations>,
+pub(crate) struct IoDriverHandle<T: IoSelector = AsyncSelector> {
+    registry: Registry<T>,                  // Derived from IoDriver.inner.pool.registry()
+    async_registration: Arc<Registrations>, // Shared with IoDriver to manage registrations
 }
 
 // Proxy that is able to unpark connected IO Driver
-pub struct IoDriverUnparker {
+pub(crate) struct IoDriverUnparker {
     waker: Arc<<AsyncSelector as IoSelector>::Waker>,
 }
 
@@ -64,7 +84,8 @@ struct RegistrationData {
     waiting_release: Vec<SlotMapKey>, // Could be lock free Container from iceoryx to not need mutex on removal.
 }
 
-struct Registrations {
+/// Internal structure that hold all registrations and ensure their lifetime until they are not used anymore.
+pub(super) struct Registrations {
     pending_release_count: FoundationAtomicUsize,
     data: Mutex<RegistrationData>,
 }
@@ -124,13 +145,14 @@ impl Registrations {
 }
 
 impl<T: IoSelector> IoDriverHandle<T> {
-    pub(super) fn new(registry: Registry<T>) -> Self {
+    pub(super) fn new(registry: Registry<T>, async_registration: Arc<Registrations>) -> Self {
         IoDriverHandle {
             registry,
-            async_registration: Arc::new(Registrations::new()),
+            async_registration,
         }
     }
 
+    /// Adds given IO source into the driver so it will be polled for events.
     pub(crate) fn add_io_source<Source>(&self, source: &mut Source, interest: IoEventInterest) -> Result<Arc<RegistrationInfo>, CommonErrors>
     where
         Source: IoRegistryEntry<T> + core::fmt::Debug,
@@ -170,6 +192,9 @@ impl<T: IoSelector> IoDriverHandle<T> {
             })
     }
 
+    /// Removes given IO source from the driver so it will not be polled for events anymore. Once this is called
+    /// ths source is put on pending removal list and will be fully removed before next poll call. This way
+    /// we ensure that if this source was considered in the poll call it will be still valid until we finish processing
     pub(crate) fn remove_io_source<Source>(&self, source: &mut Source, registration: &Arc<RegistrationInfo>)
     where
         Source: IoRegistryEntry<T> + core::fmt::Debug,
@@ -201,6 +226,7 @@ impl Default for IoDriver {
 
 type AccessGuard<'a> = std::sync::MutexGuard<'a, IoDriverInner>;
 
+/// Internal waker IoId used by IoDriverUnparker to wake up the IO driver from poll.
 const WAKER_IO_ID: u64 = 0xAABBCCDD;
 
 impl IoDriverUnparker {
@@ -225,23 +251,25 @@ impl IoDriver {
         }
     }
 
+    /// Provides unparker that is able to unpark (wake up from poll) this IO driver from other threads.
     pub(crate) fn get_unparker(&self) -> IoDriverUnparker {
         IoDriverUnparker { waker: self.waker.clone() }
     }
 
+    /// Provides handle that is able to register and deregister IO sources in this driver.
     pub fn handle(&self) -> IoDriverHandle<AsyncSelector> {
-        IoDriverHandle {
-            registry: self.registry.clone(),
-            async_registration: self.async_registration.clone(),
-        }
+        IoDriverHandle::new(self.registry.clone(), self.async_registration.clone())
     }
 
     pub(crate) fn try_get_access(&self) -> Option<AccessGuard> {
         self.inner.try_lock().ok()
     }
 
+    /// Processes IO events by polling MIO selector and waking up all tasks that are registered for IO events that are ready.
     pub(crate) fn process_io(&self, inner: &mut AccessGuard, timeout: Option<Duration>) -> Result<(), CommonErrors> {
-        // This shall ensure proper lifetime of unsafe section below
+        // Once IO source is deregistered by user, we still keep it in pending removal list until we finish processing
+        // events so we are sure that no invalid reference is used. Once we are coming here, we cleanup pending list
+        // since we are sure it's not used anymore in poll processing
         self.async_registration.cleanup_disposed_registrations();
 
         let binding: &mut IoDriverInner = inner;
@@ -268,7 +296,8 @@ impl IoDriver {
             // SAFETY
             // Those two operations assumes that the lifetime of RegistrationInfo is held
             // by other part of code(Registrations in IoHandle), until this is fully removed
-            // from the mio part and this code have done polling so we are sure we never end up here with invalid reference
+            // from the mio part and this code have done polling so we are sure we never end up here with invalid reference.
+            // We assure this by keeping reference in Registrations until next poll call happens after deregister is called
             unsafe {
                 let info = RegistrationInfo::from_identifier(id);
                 let info_ref = &*info;
