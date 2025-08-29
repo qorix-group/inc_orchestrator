@@ -32,10 +32,10 @@ use crate::{
     mio::types::{IoEventInterest, IoRegistryEntry},
 };
 
-// Bridge between MIO layer and async world that let other upper layers use it in concrete implementations.
-// This is a basic building block for async IO operations in implementations like networking part.
-// User shall only need to use this type to get async IO operations on top of MIO objects. All other work is done by
-// the internals of this type.
+/// Bridge between MIO layer and async world that let other upper layers use it in concrete implementations.
+/// This is a basic building block for async IO operations in implementations like networking part.
+/// User shall only need to use this type to get async IO operations on top of MIO objects. All other work is done by
+/// the internals of this type.
 pub struct BridgedFd<T: IoRegistryEntry<AsyncSelector> + core::fmt::Debug> {
     pub(crate) mio_object: T,
     registration: AsyncRegistration,
