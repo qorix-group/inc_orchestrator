@@ -10,12 +10,12 @@ from component_integration_tests.python_test_cases.tests.cit_scenario import (
 
 
 class TestQueueOverflow(CitScenario):
+    expect_command_failure = True
+    capture_stderr = True
+
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
         return "runtime.worker.basic"
-
-    def capture_stderr(self) -> bool:
-        return True
 
     @pytest.fixture(scope="class", params=[(1, 10), (2, 100), (128, 1000)])
     def test_params(self, request: pytest.FixtureRequest) -> tuple[int, int]:
