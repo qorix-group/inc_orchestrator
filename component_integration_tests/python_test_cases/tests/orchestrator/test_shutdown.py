@@ -75,6 +75,8 @@ class TestTwoProgramsAllShutdowns(TestTwoProgramsSingleShutdown):
 
 
 class TestOneProgramNotShut(CitScenario):
+    expect_command_failure = True
+
     @pytest.fixture(scope="class")
     def scenario_name(self):
         return "orchestration.one_program_not_shut"

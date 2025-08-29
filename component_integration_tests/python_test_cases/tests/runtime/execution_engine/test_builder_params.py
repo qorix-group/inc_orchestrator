@@ -2,7 +2,7 @@ from typing import Any
 
 import psutil
 import pytest
-from testing_utils import ScenarioResult, LogContainer
+from testing_utils import LogContainer, ScenarioResult
 
 from component_integration_tests.python_test_cases.tests.cit_scenario import (
     CitScenario,
@@ -44,12 +44,12 @@ class TestTaskQueueSize_Valid(TestTaskQueueSize):
 
 
 class TestTaskQueueSize_Invalid(TestTaskQueueSize):
+    expect_command_failure = True
+    capture_stderr = True
+
     @pytest.fixture(scope="class", params=[0, 10, 321, 1234, 2**16 - 1, 2**32 - 1])
     def queue_size(self, request: pytest.FixtureRequest) -> int:
         return request.param
-
-    def capture_stderr(self) -> bool:
-        return True
 
     def test_invalid(self, results: ScenarioResult, queue_size: int) -> None:
         assert results.return_code == ResultCode.PANIC
@@ -105,12 +105,12 @@ class TestWorkers_Valid(TestWorkers):
 
 
 class TestWorkers_Invalid(TestWorkers):
+    expect_command_failure = True
+    capture_stderr = True
+
     @pytest.fixture(scope="class", params=[0, 129, 1000])
     def workers(self, request: pytest.FixtureRequest) -> int:
         return request.param
-
-    def capture_stderr(self) -> bool:
-        return True
 
     def test_invalid(self, results: ScenarioResult, workers: int) -> None:
         assert results.return_code == ResultCode.PANIC
@@ -207,12 +207,12 @@ class TestThreadStackSize_TooSmall(TestThreadStackSize):
     # NOTE: it is possible to set stack size over the limit, but too small for requested work.
     # This will cause SIGSEGV due to stack overflow. This is not a bug.
 
+    expect_command_failure = True
+    capture_stderr = True
+
     @pytest.fixture(scope="class", params=[0, 8192])
     def thread_stack_size(self, request: pytest.FixtureRequest) -> int:
         return request.param
-
-    def capture_stderr(self) -> bool:
-        return True
 
     def test_invalid(self, results: ScenarioResult) -> None:
         assert results.return_code == ResultCode.PANIC
