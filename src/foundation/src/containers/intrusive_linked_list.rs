@@ -102,7 +102,8 @@ impl<I: Item> List<I> {
         }
     }
 
-    pub fn pop_if<F>(&mut self, mut f: F)
+    /// Remove all items that are matching the predicate `f` by retuning `true`.
+    pub fn remove_if<F>(&mut self, mut f: F)
     where
         F: FnMut(&I) -> bool,
     {
@@ -127,6 +128,7 @@ impl<I: Item> List<I> {
         }
     }
 
+    /// Remove a specific item from the list. Returns true if the item was found and removed, false otherwise.
     pub fn remove(&mut self, item: ptr::NonNull<I>) -> bool {
         match self.len {
             0 => false, // Nothing to remove.
@@ -164,6 +166,16 @@ impl<I: Item> List<I> {
         }
     }
 
+    /// Number of linked items.
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    /// True if the list is empty, false otherwise.
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
     unsafe fn remove_internal(&mut self, link: ptr::NonNull<Link>) {
         if link == self.head {
             if self.len == 1 {
@@ -178,16 +190,6 @@ impl<I: Item> List<I> {
         }
 
         self.len -= 1;
-    }
-
-    /// Number of linked items.
-    pub fn len(&self) -> usize {
-        self.len
-    }
-
-    /// True if the list is empty, false otherwise.
-    pub fn is_empty(&self) -> bool {
-        self.len == 0
     }
 
     unsafe fn link_to_item(&self, link: ptr::NonNull<Link>) -> ptr::NonNull<I> {
@@ -350,7 +352,7 @@ mod tests {
     }
 
     #[test]
-    fn test_pop_if_removes_matching_items() {
+    fn test_remove_if_removes_matching_items() {
         #[repr(C)]
         struct TestItem {
             value: u32,
@@ -371,7 +373,7 @@ mod tests {
             list.push_back(ptr::NonNull::new(&mut item2 as *mut TestItem).unwrap());
             list.push_back(ptr::NonNull::new(&mut item3 as *mut TestItem).unwrap());
             // Remove all even values
-            list.pop_if(|item| item.value % 2 == 0);
+            list.remove_if(|item| item.value % 2 == 0);
 
             assert_eq!(list.len(), 2);
             let v1 = unsafe { list.pop_front().unwrap().as_ref().value };
@@ -385,7 +387,7 @@ mod tests {
             list.push_back(ptr::NonNull::new(&mut item1 as *mut TestItem).unwrap());
 
             // Remove all even values
-            list.pop_if(|item| item.value % 1 == 0);
+            list.remove_if(|item| item.value % 1 == 0);
 
             assert_eq!(list.len(), 0);
         }

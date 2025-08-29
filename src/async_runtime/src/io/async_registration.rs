@@ -27,7 +27,7 @@ use foundation::{
     cell::{UnsafeCell, UnsafeCellExt},
     containers::intrusive_linked_list,
     not_recoverable_error,
-    prelude::{debug, error, trace, CommonErrors, FixedSizeVec, FoundationAtomicU32, FoundationAtomicUsize},
+    prelude::{debug, error, trace, CommonErrors, FoundationAtomicU32, FoundationAtomicUsize},
 };
 
 use crate::{
@@ -134,28 +134,13 @@ unsafe impl intrusive_linked_list::Item for WakerElems {
     }
 }
 
-impl Default for RegistrationInfo {
-    fn default() -> Self {
+impl RegistrationInfo {
+    pub(crate) fn new(key: usize) -> Self {
         RegistrationInfo {
             readiness_state: FoundationAtomicU32::new(0),
-            tracking_key: FoundationAtomicUsize::new(usize::MAX),
+            tracking_key: FoundationAtomicUsize::new(key),
             wakers: Mutex::new(WakersCollection::default()),
         }
-    }
-}
-
-impl RegistrationInfo {
-    pub(crate) fn insert_tracking_key(&self, key: usize) {
-        assert!(key != usize::MAX, "Tracking key cannot be usize::MAX, this is reserved for unset state");
-
-        let ret = self.tracking_key.compare_exchange(usize::MAX, key, Ordering::Relaxed, Ordering::Relaxed);
-
-        debug_assert!(
-            ret.is_ok(),
-            "Tracking key was already set, this is not allowed. Key: {}, current: {}",
-            key,
-            ret.unwrap_err()
-        );
     }
 
     pub(crate) fn tracking_key(&self) -> Option<usize> {
@@ -212,31 +197,34 @@ impl RegistrationInfo {
 
     fn wake_all(&self, readiness: ReadinessState) {
         const MAX_WAKEUPS: usize = 6; // Limit the number of wakers to wake up out of lock as we cannot allocate here
-        let mut offloader = FixedSizeVec::<Waker, MAX_WAKEUPS>::new();
+
+        //TODO: FixedSizeVec once miri issues are fixed there
+        let mut offloader = [const { Option::<Waker>::None }; MAX_WAKEUPS];
+        let mut iter = offloader.iter_mut();
 
         let mut wakers = self.wakers.lock().unwrap();
         trace!("{:?}: Waking up wakers for readiness: {:?}", self.tracing_id(), readiness);
 
         if readiness.is_readable() {
             if let Some(waker) = wakers.read.take() {
-                offloader.push(waker);
+                *iter.next().unwrap() = Some(waker);
             }
         }
 
         if readiness.is_writable() {
             if let Some(waker) = wakers.write.take() {
-                offloader.push(waker);
+                *iter.next().unwrap() = Some(waker);
             }
         }
 
-        wakers.waiters.pop_if(|elem| {
+        wakers.waiters.remove_if(|elem| {
             if readiness.intersection(elem.interest.into()).is_some() {
                 let waker_opt = elem.waker.as_ref().unwrap();
 
-                if offloader.is_full() {
-                    waker_opt.wake_by_ref();
+                if let Some(slot) = iter.next() {
+                    *slot = Some(waker_opt.clone());
                 } else {
-                    offloader.push(waker_opt.clone());
+                    waker_opt.wake_by_ref();
                 }
 
                 true
@@ -248,8 +236,8 @@ impl RegistrationInfo {
         drop(wakers);
 
         // Notify out of lock
-        while let Some(waker) = offloader.pop() {
-            waker.wake();
+        for e in offloader.into_iter().take_while(|e| e.is_some()) {
+            e.unwrap().wake();
         }
     }
 
@@ -354,6 +342,7 @@ pub struct ReadinessState(u32); // u16 for TICK and u16 for state
 
 const READINESS_STATE_MASK: u32 = 0x0000FFFF; // Mask for the state bits
 const READINESS_TICK_MASK: u32 = 0xFFFF0000; // Mask for the tick bits
+const READINESS_TICK_SHIFT: u32 = READINESS_TICK_MASK.count_ones();
 
 impl ReadinessState {
     #[inline]
@@ -420,7 +409,7 @@ impl ReadinessState {
 
     #[inline]
     fn from_components(state: u16, tick: u16) -> Self {
-        ReadinessState(((tick as u32) << 16) | (state as u32))
+        ReadinessState(((tick as u32) << READINESS_TICK_SHIFT) | (state as u32))
     }
 
     #[inline]
@@ -430,7 +419,7 @@ impl ReadinessState {
 
     #[inline]
     fn extract_tick(&self) -> u16 {
-        ((self.0 & READINESS_TICK_MASK) >> 16) as u16
+        ((self.0 & READINESS_TICK_MASK) >> READINESS_TICK_SHIFT) as u16
     }
 }
 
@@ -578,46 +567,21 @@ mod tests {
 
     #[test]
     fn registration_info_() {
-        let _info = Arc::new(RegistrationInfo::default());
+        let _info = Arc::new(RegistrationInfo::new(12));
     }
 
     #[test]
     fn registration_info_tracing_id() {
-        let info = RegistrationInfo::default();
+        let info = RegistrationInfo::new(12);
         let id = info.tracing_id();
         assert_eq!(format!("{:?}", id), format!("RegistrationInfo({:p})", &info));
     }
 
     #[test]
-    #[should_panic(expected = "Tracking key was already set")]
-    fn registration_info_tracking_key_reinsert_panics_at_debug() {
-        {
-            let info = Arc::new(RegistrationInfo::default());
-            info.insert_tracking_key(42);
-            info.insert_tracking_key(42);
-        }
-    }
-
-    #[test]
-    #[should_panic(expected = "Tracking key cannot be usize::MAX, this is reserved for unset state")]
-    fn registration_info_tracking_key_insert_usize_max_panics() {
-        {
-            let info = Arc::new(RegistrationInfo::default());
-            info.insert_tracking_key(usize::MAX);
-        }
-    }
-
-    #[test]
     fn registration_info_tracking_key() {
         {
-            let info = Arc::new(RegistrationInfo::default());
-            info.insert_tracking_key(42);
-            assert_eq!(info.tracking_key(), Some(42));
-        }
-
-        {
-            let info = Arc::new(RegistrationInfo::default());
-            assert_eq!(info.tracking_key(), None);
+            let info = Arc::new(RegistrationInfo::new(12));
+            assert_eq!(info.tracking_key(), Some(12));
         }
     }
 
@@ -625,7 +589,7 @@ mod tests {
     fn registration_info_clear_readiness() {
         // Nothing to clear (as no common intersection), should return false
         {
-            let info = RegistrationInfo::default();
+            let info = RegistrationInfo::new(12);
             assert!(!info.clear_readiness(
                 ReadinessState::from_components(READINESS_STATE_READABLE as u16, 0),
                 IoEventInterest::READABLE
@@ -634,7 +598,7 @@ mod tests {
 
         // Set means shall be cleared since tick is from same round
         {
-            let info = RegistrationInfo::default();
+            let info = RegistrationInfo::new(12);
             info.wake(ReadinessState::from_components(READINESS_STATE_READABLE as u16, 1));
 
             assert!(info.clear_readiness(
@@ -645,7 +609,7 @@ mod tests {
 
         // Set but tick is from old round, shall not clear
         {
-            let info = RegistrationInfo::default();
+            let info = RegistrationInfo::new(12);
             info.wake(ReadinessState::from_components(READINESS_STATE_READABLE as u16, 1));
 
             assert!(!info.clear_readiness(
@@ -658,12 +622,12 @@ mod tests {
     #[test]
     fn registration_info_is_ready() {
         {
-            let info = RegistrationInfo::default();
+            let info = RegistrationInfo::new(12);
             assert!(info.is_ready(IoEventInterest::READABLE).is_none());
         }
 
         {
-            let info = RegistrationInfo::default();
+            let info = RegistrationInfo::new(12);
             info.wake(ReadinessState::from_components(READINESS_STATE_READABLE as u16, 1));
 
             let res = info.is_ready(IoEventInterest::READABLE);
@@ -673,7 +637,7 @@ mod tests {
         }
 
         {
-            let info = RegistrationInfo::default();
+            let info = RegistrationInfo::new(12);
             info.wake(ReadinessState::from_components(READINESS_STATE_WRITABLE as u16, 1));
             let res = info.is_ready(IoEventInterest::WRITABLE);
 
@@ -687,7 +651,7 @@ mod tests {
         let non_call_waker = MockWaker::new(build_with_location!(MockFnBuilder::new().times(0))).into_arc();
 
         {
-            let info = Arc::new(RegistrationInfo::default());
+            let info = Arc::new(RegistrationInfo::new(12));
 
             let mock_fn = build_with_location!(MockFnBuilder::new().times(1));
             let waker_mock = MockWaker::new(mock_fn).into_arc();
@@ -699,7 +663,7 @@ mod tests {
         }
 
         {
-            let info = Arc::new(RegistrationInfo::default());
+            let info = Arc::new(RegistrationInfo::new(12));
 
             let mock_fn = build_with_location!(MockFnBuilder::new().times(1));
             let waker_mock = MockWaker::new(mock_fn).into_arc();
@@ -711,7 +675,7 @@ mod tests {
         }
 
         {
-            let info = Arc::new(RegistrationInfo::default());
+            let info = Arc::new(RegistrationInfo::new(12));
 
             let mock_fn = build_with_location!(MockFnBuilder::new().times(1));
             let waker_mock = MockWaker::new(mock_fn).into_arc();
@@ -728,7 +692,7 @@ mod tests {
         }
 
         {
-            let info = Arc::new(RegistrationInfo::default());
+            let info = Arc::new(RegistrationInfo::new(12));
 
             let mock_fn = build_with_location!(MockFnBuilder::new().times(0));
             let waker_mock = MockWaker::new(mock_fn).into_arc();
@@ -783,7 +747,7 @@ mod tests {
             interest: IoEventInterest::READABLE | IoEventInterest::WRITABLE,
         };
 
-        let info = Arc::new(RegistrationInfo::default());
+        let info = Arc::new(RegistrationInfo::new(12));
 
         info.wakers
             .lock()
@@ -921,7 +885,7 @@ mod tests {
     }
 
     fn create_registration(interest: IoEventInterest) -> Arc<AsyncRegistration<AsyncSelectorMock>> {
-        let handle = IoDriverHandle::<AsyncSelectorMock>::new(Registry::new(AsyncSelectorMock {}), Arc::new(Registrations::new()));
+        let handle = IoDriverHandle::<AsyncSelectorMock>::new(Registry::new(AsyncSelectorMock {}), Arc::new(Registrations::new(1024)));
         let mut mio = IoMock {};
         Arc::new(AsyncRegistration::new_internal(&mut mio, interest, handle).unwrap())
     }
@@ -1078,6 +1042,7 @@ mod tests {
 
         crate::testing::mock::runtime::step();
         crate::testing::mock::runtime::step();
+
         assert_eq!(1, crate::testing::mock::runtime::remaining_tasks()); // Task stuck there since its not done
     }
 

@@ -86,29 +86,32 @@ struct RegistrationData {
 
 /// Internal structure that hold all registrations and ensure their lifetime until they are not used anymore.
 pub(super) struct Registrations {
-    pending_release_count: FoundationAtomicUsize,
+    pending_release_count: FoundationAtomicBool,
     data: Mutex<RegistrationData>,
 }
 
 impl Registrations {
-    pub fn new() -> Self {
+    pub fn new(count: usize) -> Self {
         Registrations {
-            pending_release_count: FoundationAtomicUsize::new(0),
+            pending_release_count: FoundationAtomicBool::new(false),
             data: Mutex::new(RegistrationData {
-                tracking: SlotMap::new(1234),
-                waiting_release: Vec::new(1234),
+                tracking: SlotMap::new(count),
+                waiting_release: Vec::new(count),
             }),
         }
     }
 
-    fn request_registration_info(&self) -> Result<Arc<RegistrationInfo>, CommonErrors> {
+    fn create_registration_info(&self) -> Result<Arc<RegistrationInfo>, CommonErrors> {
+        let mut item = Arc::<RegistrationInfo>::new_uninit();
+
         let mut data = self.data.lock().unwrap();
+        let key = data.tracking.next_free_key().ok_or(CommonErrors::NoSpaceLeft)?;
 
-        let item = Arc::new(RegistrationInfo::default());
+        Arc::get_mut(&mut item).unwrap().write(RegistrationInfo::new(key.value()));
+        let item = unsafe { item.assume_init() };
 
-        let key = data.tracking.insert(item.clone()).ok_or(CommonErrors::NoSpaceLeft)?;
-
-        item.insert_tracking_key(key.value());
+        let key_ret = data.tracking.insert(item.clone()).ok_or(CommonErrors::NoSpaceLeft)?;
+        debug_assert!(key == key_ret, "SlotMap returned key should be the same as provided in next_free_key");
 
         Ok(item)
     }
@@ -116,11 +119,11 @@ impl Registrations {
     fn schedule_registration_for_disposal(&self, key: SlotMapKey) {
         let mut data = self.data.lock().unwrap();
         data.waiting_release.push(key);
-        self.pending_release_count.fetch_add(1, Ordering::SeqCst);
+        self.pending_release_count.store(true, Ordering::Relaxed);
     }
 
     fn cleanup_disposed_registrations(&self) {
-        if self.pending_release_count.load(Ordering::SeqCst) == 0 {
+        if !self.pending_release_count.load(Ordering::Acquire) {
             return;
         }
 
@@ -130,8 +133,8 @@ impl Registrations {
             data.tracking.remove(key);
         }
 
-        //Consider ordering change
-        self.pending_release_count.store(0, Ordering::SeqCst);
+        // Ordering does not matter, since the only synchronized access is done in this function and this can be called only once at a time
+        self.pending_release_count.store(false, Ordering::Relaxed);
     }
 
     // # Caveats
@@ -158,7 +161,7 @@ impl<T: IoSelector> IoDriverHandle<T> {
         Source: IoRegistryEntry<T> + core::fmt::Debug,
     {
         self.async_registration
-            .request_registration_info()
+            .create_registration_info()
             .and_then(|info| match self.registry.register(source, info.identifier(), interest) {
                 Ok(_) => {
                     info!(
@@ -220,7 +223,8 @@ impl<T: IoSelector> IoDriverHandle<T> {
 
 impl Default for IoDriver {
     fn default() -> Self {
-        IoDriver::new(AsyncSelector::new(1234))
+        // TODO: This shall be routed to AsyncRuntime builder, once we have configuration exposed there
+        IoDriver::new(AsyncSelector::new(1024))
     }
 }
 
@@ -238,14 +242,18 @@ impl IoDriverUnparker {
 impl IoDriver {
     pub(crate) fn new(selector: AsyncSelector) -> Self {
         let poll = Poll::new(selector);
-        let waker = poll.create_waker(IoId::new(WAKER_IO_ID)).unwrap(); //TODO: handle error;
+        let waker = poll
+            .create_waker(IoId::new(WAKER_IO_ID))
+            .expect("Failed to create waker for IO driver, this should never happen");
+
+        let max_fd_supported = poll.get_safe_poll_events_capacity();
 
         IoDriver {
-            async_registration: Arc::new(Registrations::new()),
+            async_registration: Arc::new(Registrations::new(max_fd_supported)),
             registry: poll.registry().clone(),
             inner: Mutex::new(IoDriverInner {
                 pool: poll,
-                events: Vec::new(1000),
+                events: Vec::new(max_fd_supported),
             }),
             waker: Arc::new(waker),
         }
@@ -261,7 +269,7 @@ impl IoDriver {
         IoDriverHandle::new(self.registry.clone(), self.async_registration.clone())
     }
 
-    pub(crate) fn try_get_access(&self) -> Option<AccessGuard> {
+    pub(crate) fn try_get_access(&self) -> Option<AccessGuard<'_>> {
         self.inner.try_lock().ok()
     }
 

@@ -32,6 +32,14 @@ pub struct MockRuntime {
     sched: Arc<SchedulerMock>,
 }
 
+impl Drop for MockRuntime {
+    fn drop(&mut self) {
+        // Make sure not only drop is called on Task but we also aport it since it might hold resources
+        while let Some(task) = self.tasks.pop_front() {
+            task.abort();
+        }
+    }
+}
 thread_local! {
     static MOCK_RUNTIME: RefCell<Option<MockRuntime>> = RefCell::new(None);
 }
