@@ -66,9 +66,23 @@ unsafe fn to_nonnull(ptr: *const Link) -> ptr::NonNull<Link> {
 ///
 /// # Safety
 ///
-/// The user needs to guarantee that an object implementing the trait outlives the list it's inserted into.
+/// The implementation of [`link_field_offset()`](Item::link_field_offset) must return
+/// the real offset of the [`Link`].
 pub unsafe trait Item {
-    /// The offset of the [`Link`] field on the implementing object.
+    /// Returns the offset of the [`Link`] field on the implementing object in bytes.
+    ///
+    /// This method should be implemented using [`offset_of!`](core::mem::offset_of),
+    /// like this:
+    ///
+    /// ```
+    /// # use foundation::containers::intrusive_linked_list::{Item, Link};
+    /// # struct MyStruct { link: Link }
+    /// unsafe impl Item for MyStruct {
+    ///     fn link_field_offset() -> usize {
+    ///         core::mem::offset_of!(Self, link)
+    ///     }
+    /// }
+    /// ```
     fn link_field_offset() -> usize;
 }
 
@@ -111,7 +125,9 @@ impl<I: Item> List<I> {
         self.len += 1;
     }
 
-    /// Remove an item from the front of the list. Return the item if the list wasn't empty.
+    /// Removes the item from the front of the list.
+    ///
+    /// Returns the item if the list wasn't empty.
     pub fn pop_front(&mut self) -> Option<ptr::NonNull<I>> {
         if self.len > 0 {
             self.len -= 1;
@@ -130,7 +146,7 @@ impl<I: Item> List<I> {
         }
     }
 
-    /// Remove all items that are matching the predicate `f` by retuning `true`.
+    /// Removes all items that match the predicate `f` by returning `true`.
     pub fn remove_if<F>(&mut self, mut f: F)
     where
         F: FnMut(&I) -> bool,
@@ -196,12 +212,12 @@ impl<I: Item> List<I> {
         }
     }
 
-    /// Number of linked items.
+    /// The number of linked items.
     pub fn len(&self) -> usize {
         self.len
     }
 
-    /// True if the list is empty, false otherwise.
+    /// Returns `true` if the list is empty, `false` otherwise.
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
@@ -295,7 +311,7 @@ mod tests {
 
         unsafe impl Item for TestItem {
             fn link_field_offset() -> usize {
-                std::mem::offset_of!(TestItem, link)
+                std::mem::offset_of!(Self, link)
             }
         }
 
@@ -352,7 +368,7 @@ mod tests {
 
         unsafe impl Item for TestItem {
             fn link_field_offset() -> usize {
-                std::mem::offset_of!(TestItem, link)
+                std::mem::offset_of!(Self, link)
             }
         }
 
@@ -402,7 +418,7 @@ mod tests {
         }
         unsafe impl Item for TestItem {
             fn link_field_offset() -> usize {
-                std::mem::offset_of!(TestItem, link)
+                std::mem::offset_of!(Self, link)
             }
         }
 
@@ -448,7 +464,7 @@ mod tests {
         }
         unsafe impl Item for TestItem {
             fn link_field_offset() -> usize {
-                std::mem::offset_of!(TestItem, link)
+                std::mem::offset_of!(Self, link)
             }
         }
         let item1 = TestItem {
