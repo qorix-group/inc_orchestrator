@@ -31,7 +31,10 @@ _EXAMPLE_DEPS = _COMMON_DEPS + [
 rust_library(
     name = "liborchestration",
     srcs = glob(["src/**/*.rs"]),
-    crate_features = ["iceoryx-ipc"],
+    crate_features = [
+        "iceoryx-ipc",
+        "orch_tracing",
+    ],
     crate_name = "orchestration",
     visibility = ["//visibility:public"],
     deps = _COMMON_DEPS,
@@ -43,6 +46,7 @@ rust_test(
     srcs = glob(["src/**/*.rs"]),
     crate_features = [
         "iceoryx-ipc",
+        "orch_tracing",
     ],
     proc_macro_deps = [
         "//src/testing_macros:test_macro_utils",
