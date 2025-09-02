@@ -11,17 +11,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-pub(crate) type AsyncSelector = crate::mio::selector::unix::poll::Selector;
-pub(crate) mod driver;
-pub(crate) mod utils;
+pub type NetResult<T> = std::io::Result<T>;
 
-mod read_buf;
-pub use read_buf::ReadBuf;
+mod tcp_listener;
+mod tcp_stream;
+mod udp_socket;
+mod utils;
 
-// Exported building blocks for async IO
-pub mod async_registration;
-pub mod bridgedfd;
-
-mod traits;
-
-pub use traits::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+pub use tcp_listener::TcpListener;
+pub use tcp_stream::TcpStream;
+pub use udp_socket::UdpSocket;
