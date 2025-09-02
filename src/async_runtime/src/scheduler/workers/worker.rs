@@ -229,7 +229,6 @@ impl WorkerInner {
 
     fn try_pick_work(&mut self) -> (Option<TaskRef>, bool) {
         self.next_task_tick = self.next_task_tick.wrapping_add(1);
-        // ctx_get_drivers().process_io();
 
         self.maybe_run_driver();
 
@@ -374,6 +373,7 @@ impl WorkerInner {
 
 #[cfg(test)]
 #[cfg(not(loom))]
+#[allow(dead_code, unused_imports)]
 mod tests {
     use crate::scheduler::{
         driver::Drivers,
@@ -382,6 +382,7 @@ mod tests {
     use std::sync::Arc;
 
     #[test]
+    #[cfg(not(miri))] // Provenance issues
     fn test_worker_stop_sets_shutdown_state() {
         let drivers = Drivers::new();
         let scheduler = Arc::new(crate::scheduler::scheduler_mt::scheduler_new(1, 4, &drivers));

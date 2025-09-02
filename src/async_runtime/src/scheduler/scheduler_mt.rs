@@ -286,6 +286,7 @@ impl SchedulerTrait for DedicatedSchedulerLocalInner {
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 pub(crate) fn scheduler_new(workers_cnt: usize, local_queue_size: u32, drivers: &super::driver::Drivers) -> AsyncScheduler {
     // artificially construct a scheduler
 
@@ -297,12 +298,10 @@ pub(crate) fn scheduler_new(workers_cnt: usize, local_queue_size: u32, drivers: 
 
         queues.push(c.clone());
 
-        unsafe {
-            worker_interactors[i].as_mut_ptr().write(WorkerInteractor::new(
-                c,
-                WorkerId::new(format!("{}", i).into(), 0, i as u8, WorkerType::Async),
-            ));
-        }
+        worker_interactors[i].write(WorkerInteractor::new(
+            c,
+            WorkerId::new(format!("{}", i).into(), 0, i as u8, WorkerType::Async),
+        ));
     }
 
     let safety_worker_queue = Some(Arc::new(TriggerQueue::new(64)));
@@ -319,12 +318,14 @@ pub(crate) fn scheduler_new(workers_cnt: usize, local_queue_size: u32, drivers: 
 
 #[cfg(test)]
 #[cfg(not(loom))]
+#[allow(unused_imports)]
 mod tests {
     use crate::scheduler::driver::Drivers;
 
     use super::*;
 
     #[test]
+    #[cfg(not(miri))] // Provenance issues
     fn should_transition_to_searching_test() {
         let drivers = Drivers::new();
         // scheduler with one worker and a queue size of 2

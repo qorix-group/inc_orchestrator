@@ -92,8 +92,6 @@ impl Deref for WorkerInteractor {
     }
 }
 
-unsafe impl Send for WorkerInteractor {}
-
 pub(crate) struct WorkerState(pub FoundationAtomicU8);
 
 impl WorkerState {
@@ -147,9 +145,12 @@ impl ParkerTrait for WorkerInteractor {
         if let Some(mut io) = driver.try_get_access() {
             let mut _guard = self.mtx.lock().unwrap();
 
-            if !self.park_pre_stage(scheduler, WORKER_STATE_SLEEPING_IO) {
-                // We were notified before we could park, so we just return
-                return Ok(());
+            // Needs to be called under lock
+            unsafe {
+                if !self.park_pre_stage(scheduler, WORKER_STATE_SLEEPING_IO) {
+                    // We were notified before we could park, so we just return
+                    return Ok(());
+                }
             }
 
             // Call user code if he needs it under specific conditions
@@ -252,9 +253,12 @@ impl WorkerInteractor {
     fn park_on_cv(&self, scheduler: &AsyncScheduler, after_park_decision: impl FnOnce()) -> Result<(), CommonErrors> {
         let mut _guard = self.mtx.lock().unwrap();
 
-        if !self.park_pre_stage(scheduler, WORKER_STATE_SLEEPING_CV) {
-            // We were notified before we could park, so we just return
-            return Ok(());
+        // Needs to be called under lock
+        unsafe {
+            if !self.park_pre_stage(scheduler, WORKER_STATE_SLEEPING_CV) {
+                // We were notified before we could park, so we just return
+                return Ok(());
+            }
         }
 
         // Call user code if he needs it under specific conditions
@@ -264,7 +268,11 @@ impl WorkerInteractor {
 
         _guard = self
             .cv
-            .wait_while(_guard, |_| self.park_condition_check_and_transition(scheduler, "from park_on_cv"))
+            .wait_while(
+                _guard,
+                // Needs to be called under lock
+                |_| unsafe { self.park_condition_check_and_transition(scheduler, "from park_on_cv") },
+            )
             .unwrap();
         Ok(())
     }
@@ -277,9 +285,12 @@ impl WorkerInteractor {
     ) -> Result<(), CommonErrors> {
         let mut _guard = self.mtx.lock().unwrap();
 
-        if !self.park_pre_stage(scheduler, WORKER_STATE_SLEEPING_CV) {
-            // We were notified before we could park, so we just return
-            return Ok(());
+        // Needs to be called under lock
+        unsafe {
+            if !self.park_pre_stage(scheduler, WORKER_STATE_SLEEPING_CV) {
+                // We were notified before we could park, so we just return
+                return Ok(());
+            }
         }
 
         // Call user code if he needs it under specific conditions
@@ -291,9 +302,12 @@ impl WorkerInteractor {
 
         (_guard, wait_result) = self
             .cv
-            .wait_timeout_while(_guard, dur, |_| {
-                self.park_condition_check_and_transition(scheduler, "from park_on_cv_timeout")
-            })
+            .wait_timeout_while(
+                _guard,
+                dur,
+                // Needs to be called under lock
+                |_| unsafe { self.park_condition_check_and_transition(scheduler, "from park_on_cv_timeout") },
+            )
             .unwrap();
 
         if wait_result.timed_out() {
@@ -308,7 +322,7 @@ impl WorkerInteractor {
 
     /// # Safety
     /// This function must be called under mutex lock of the worker.
-    fn park_pre_stage(&self, scheduler: &AsyncScheduler, sleep_reason: u8) -> bool {
+    unsafe fn park_pre_stage(&self, scheduler: &AsyncScheduler, sleep_reason: u8) -> bool {
         match self.state.0.compare_exchange(
             WORKER_STATE_EXECUTING,
             sleep_reason,
@@ -339,7 +353,7 @@ impl WorkerInteractor {
     ///
     /// This function takes care to transition the worker state from NOTIFIED to EXECUTING, sync scheduler
     /// and return `true` if state was not NOTIFIED or SHUTTINGDOWN
-    fn park_condition_check_and_transition(&self, scheduler: &AsyncScheduler, info: &str) -> bool {
+    unsafe fn park_condition_check_and_transition(&self, scheduler: &AsyncScheduler, info: &str) -> bool {
         match self.state.0.compare_exchange(
             WORKER_STATE_NOTIFIED,
             WORKER_STATE_EXECUTING,

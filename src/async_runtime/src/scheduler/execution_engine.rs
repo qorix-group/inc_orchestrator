@@ -391,11 +391,7 @@ impl ExecutionEngineBuilder {
 
             let id = WorkerId::new(format!("arunner{}", i).as_str().into(), 0, i as u8, WorkerType::Async);
 
-            unsafe {
-                worker_interactors[i]
-                    .as_mut_ptr()
-                    .write(WorkerInteractor::new(async_queues[i].clone(), id));
-            }
+            worker_interactors[i].write(WorkerInteractor::new(async_queues[i].clone(), id));
 
             async_workers.push(Worker::new(id, self.with_safe_worker.0));
         }
@@ -467,6 +463,7 @@ mod tests {
         }
     }
 
+    #[allow(dead_code)]
     fn create_engine(workers: usize) -> ExecutionEngine {
         ExecutionEngineBuilder::new().workers(workers).task_queue_size(8).build()
     }
@@ -499,6 +496,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(miri))] // Provenance issues
     fn create_with_correct_task_queue_size_works() {
         ExecutionEngineBuilder::new().task_queue_size(2).build();
         ExecutionEngineBuilder::new().task_queue_size(8).build();
@@ -507,6 +505,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(miri))] // Provenance issues
     fn create_with_correct_num_of_workers() {
         ExecutionEngineBuilder::new().workers(1).build();
         ExecutionEngineBuilder::new().workers(MAX_NUM_OF_WORKERS).build();
@@ -514,6 +513,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(miri))] // Provenance issues
     fn create_with_wrong_num_of_workers_fails() {
         let mut result1 = panic::catch_unwind(|| {
             ExecutionEngineBuilder::new().workers(0).build();
@@ -591,6 +591,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(miri))] // Provenance issues
     fn test_wait_for_without_task_should_fail() {
         let mut engine = create_engine(1);
         let err = engine.wait_for().unwrap_err();
@@ -598,6 +599,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(miri))] // Provenance issues
     fn test_stop_is_idempotent() {
         let mut engine = create_engine(2);
         engine.stop();
