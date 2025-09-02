@@ -67,6 +67,10 @@ impl<T: IoSelector> UdpSocketBridge<T> {
         self.inner.io_call(|socket| socket.recv(buf))
     }
 
+    pub fn recv_from(&self, buf: &mut [u8]) -> IoResult<(usize, SocketAddr)> {
+        self.inner.io_call(|socket| socket.recv_from(buf))
+    }
+
     pub fn ttl(&self) -> IoResult<u32> {
         self.inner.as_inner().ttl()
     }
