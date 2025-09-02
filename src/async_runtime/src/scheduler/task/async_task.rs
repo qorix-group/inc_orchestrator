@@ -618,7 +618,6 @@ mod tests {
         core::types::{box_future, ArcInternal},
         safety::SafetyResult,
         scheduler::{
-            execution_engine::ExecutionEngineBuilder,
             scheduler_mt::SchedulerTrait,
             task::async_task::{TaskId, TaskRef},
         },
@@ -662,7 +661,7 @@ mod tests {
         // This code only proves to compile different Future constructs
         {
             let boxed = box_future(dummy());
-            let scheduler = ExecutionEngineBuilder::new().build().get_async_scheduler();
+            let scheduler = create_mock_scheduler();
             let task = ArcInternal::new(AsyncTask::new(boxed, 1, scheduler));
             let id = task.id();
             assert_eq!(id.0 & 0xFF, 1); // Test some internals
@@ -670,7 +669,7 @@ mod tests {
 
         {
             let boxed = box_future(dummy_ret());
-            let scheduler = ExecutionEngineBuilder::new().build().get_async_scheduler();
+            let scheduler = create_mock_scheduler();
             let task = AsyncTask::new(boxed, 2, scheduler);
             let id = task.id();
             assert_eq!(id.0 & 0xFF, 2); // Test some internals
@@ -681,7 +680,7 @@ mod tests {
             let boxed = box_future(async {
                 println!("some test");
             });
-            let scheduler = ExecutionEngineBuilder::new().build().get_async_scheduler();
+            let scheduler = create_mock_scheduler();
             let task = AsyncTask::new(boxed, 2, scheduler);
             let id = task.id();
             assert_eq!(id.0 & 0xFF, 2); // Test some internals
@@ -695,7 +694,7 @@ mod tests {
             let boxed = box_future(async move {
                 println!("some test 1 {:?}", v);
             });
-            let scheduler = ExecutionEngineBuilder::new().build().get_async_scheduler();
+            let scheduler = create_mock_scheduler();
             let task = AsyncTask::new(boxed, 2, scheduler);
             let id = task.id();
             assert_eq!(id.0 & 0xFF, 2); // Test some internals
@@ -707,7 +706,8 @@ mod tests {
     #[test]
     fn test_taskref_counting() {
         let boxed = box_future(dummy());
-        let scheduler = ExecutionEngineBuilder::new().build().get_async_scheduler();
+        let scheduler = create_mock_scheduler();
+
         let task = ArcInternal::new(AsyncTask::new(boxed, 1, scheduler));
         let id = task.id();
         assert_eq!(id.0 & 0xFF, 1); // Test some internals
@@ -825,7 +825,7 @@ mod tests {
     #[test]
     fn task_taskref_can_be_send_to_another_thread() {
         let boxed = box_future(dummy());
-        let scheduler = ExecutionEngineBuilder::new().build().get_async_scheduler();
+        let scheduler = create_mock_scheduler();
         let task = ArcInternal::new(AsyncTask::new(boxed, 1, scheduler));
         let id = task.id();
         assert_eq!(id.0 & 0xFF, 1); // Test some internals

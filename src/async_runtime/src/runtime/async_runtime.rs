@@ -270,6 +270,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(miri))] // Provenance issues
     fn test_async_runtime_wait_for_without_task() {
         let (builder, engine_id) = AsyncRuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(8).workers(1));
         let mut runtime = builder.build().unwrap();
@@ -318,6 +319,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(miri))] // Provenance issues
     fn test_async_runtime_builder_build_preserves_order() {
         // three builders with worker_count as a distinguishable property
         let builder1 = ExecutionEngineBuilder::new().workers(1);
