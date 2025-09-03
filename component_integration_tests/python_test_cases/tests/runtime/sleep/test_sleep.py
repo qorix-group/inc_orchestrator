@@ -93,7 +93,7 @@ class TestZeroSleep(CitScenario):
     ):
         task_id = test_config["test"]["non_blocking_sleep_tasks"][0]["id"]
 
-        entries = logs_info_level.get_logs_by_field(field="id", value=task_id)
+        entries = logs_info_level.get_logs(field="id", value=task_id)
         assert len(entries) == 2, "Expected two entries for the task."
 
         begin_entry = entries[0]
@@ -136,27 +136,21 @@ class TestMultipleSleepsWithRegularTasks(CitScenario):
     def test_task_completeness(
         self, test_config: dict[str, Any], logs_info_level: LogContainer
     ):
-        non_blocking_sleep_tasks = logs_info_level.get_logs_by_field(
+        non_blocking_sleep_tasks = logs_info_level.get_logs(
             field="id", pattern="non_blocking_sleep*"
         )
 
-        begin_tasks = non_blocking_sleep_tasks.get_logs_by_field(
-            field="location", value="begin"
-        )
+        begin_tasks = non_blocking_sleep_tasks.get_logs(field="location", value="begin")
         assert len(begin_tasks) == len(
             test_config["test"]["non_blocking_sleep_tasks"]
         ), "Not all non-blocking sleep tasks started."
 
-        end_tasks = non_blocking_sleep_tasks.get_logs_by_field(
-            field="location", value="end"
-        )
+        end_tasks = non_blocking_sleep_tasks.get_logs(field="location", value="end")
         assert len(end_tasks) == len(test_config["test"]["non_blocking_sleep_tasks"]), (
             "Not all non-blocking sleep tasks finished."
         )
 
-        non_sleep_tasks = logs_info_level.get_logs_by_field(
-            field="id", pattern="non_sleep*"
-        )
+        non_sleep_tasks = logs_info_level.get_logs(field="id", pattern="non_sleep*")
         assert len(non_sleep_tasks) == len(test_config["test"]["non_sleep_tasks"]), (
             "Not all non-sleep tasks executed."
         )
@@ -165,7 +159,7 @@ class TestMultipleSleepsWithRegularTasks(CitScenario):
         self, test_config: dict[str, Any], logs_info_level: LogContainer
     ):
         for task in test_config["test"]["non_blocking_sleep_tasks"]:
-            entries = logs_info_level.get_logs_by_field(field="id", value=task["id"])
+            entries = logs_info_level.get_logs(field="id", value=task["id"])
             assert len(entries) == 2, "Expected two entries for the task."
 
             begin_entry = entries[0]
@@ -242,23 +236,21 @@ class TestMultipleSleepsWithBlockedWorkers(CitScenario):
     def test_task_completeness(
         self, test_config: dict[str, Any], logs_info_level: LogContainer
     ):
-        non_blocking_sleep_tasks = logs_info_level.get_logs_by_field(
+        non_blocking_sleep_tasks = logs_info_level.get_logs(
             field="id", pattern="non_blocking_sleep*"
         )
         assert len(non_blocking_sleep_tasks) == len(
             test_config["test"]["non_blocking_sleep_tasks"] * 2  # For begin and end
         ), "Not all non-blocking sleep tasks executed."
 
-        blocking_sleep_tasks = logs_info_level.get_logs_by_field(
+        blocking_sleep_tasks = logs_info_level.get_logs(
             field="id", pattern="^blocking_sleep*"
         )
         assert len(blocking_sleep_tasks) == len(
             test_config["test"]["blocking_sleep_tasks"] * 2  # For begin and end
         ), "Not all blocking sleep tasks executed."
 
-        non_sleep_tasks = logs_info_level.get_logs_by_field(
-            field="id", pattern="non_sleep*"
-        )
+        non_sleep_tasks = logs_info_level.get_logs(field="id", pattern="non_sleep*")
         assert len(non_sleep_tasks) == len(test_config["test"]["non_sleep_tasks"]), (
             "Not all non-sleep tasks executed."
         )
@@ -267,7 +259,7 @@ class TestMultipleSleepsWithBlockedWorkers(CitScenario):
         self, test_config: dict[str, Any], logs_info_level: LogContainer
     ):
         for task in test_config["test"]["non_blocking_sleep_tasks"]:
-            entries = logs_info_level.get_logs_by_field(field="id", value=task["id"])
+            entries = logs_info_level.get_logs(field="id", value=task["id"])
             assert len(entries) == 2, "Expected two entries for the task."
 
             begin_entry = entries[0]

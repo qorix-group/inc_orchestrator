@@ -5,7 +5,7 @@ Test scenario runner for component integration tests.
 from pathlib import Path
 
 import pytest
-from testing_utils import Scenario, LogContainer, BuildTools, CargoTools
+from testing_utils import Scenario, LogContainer, BuildTools, CargoTools, ScenarioResult
 
 
 class ResultCode:
@@ -31,6 +31,28 @@ class CitScenario(Scenario):
         """
         return CargoTools()
 
+    def expect_command_failure(self, *args, **kwargs) -> bool:
+        """
+        Expect command failure (e.g., non-zero return code or hang).
+        """
+        return False
+
+    @pytest.fixture(scope="class")
+    def results(
+        self,
+        command: list[str],
+        execution_timeout: float,
+        *args,
+        **kwargs,
+    ) -> ScenarioResult:
+        result = self._run_command(command, execution_timeout, args, kwargs)
+        success = result.return_code == 0 and not result.hang
+        if self.expect_command_failure() and success:
+            raise RuntimeError(f"Command execution succeeded unexpectedly: {result=}")
+        if not self.expect_command_failure() and not success:
+            raise RuntimeError(f"Command execution failed unexpectedly: {result=}")
+        return result
+
     @pytest.fixture(scope="class")
     def logs_target(self, target_path: Path, logs: LogContainer) -> LogContainer:
         """
@@ -43,7 +65,7 @@ class CitScenario(Scenario):
         logs : LogContainer
             Unfiltered logs.
         """
-        return logs.get_logs_by_field(field="target", pattern=f"{target_path.name}.*")
+        return logs.get_logs(field="target", pattern=f"{target_path.name}.*")
 
     @pytest.fixture(scope="class")
     def logs_info_level(self, logs_target: LogContainer) -> LogContainer:
@@ -55,7 +77,7 @@ class CitScenario(Scenario):
         logs_target : LogContainer
             Logs with messages generated strictly by the tested code.
         """
-        return logs_target.get_logs_by_field(field="level", value="INFO")
+        return logs_target.get_logs(field="level", value="INFO")
 
     @pytest.fixture(autouse=True)
     def print_to_report(

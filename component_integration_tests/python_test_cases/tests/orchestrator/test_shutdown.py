@@ -75,8 +75,6 @@ class TestTwoProgramsAllShutdowns(TestTwoProgramsSingleShutdown):
 
 
 class TestOneProgramNotShut(CitScenario):
-    expect_command_failure = True
-
     @pytest.fixture(scope="class")
     def scenario_name(self):
         return "orchestration.one_program_not_shut"
@@ -92,6 +90,9 @@ class TestOneProgramNotShut(CitScenario):
     @pytest.fixture(scope="class")
     def execution_timeout(self, request, *args, **kwargs):
         return 1.0
+
+    def expect_command_failure(self) -> bool:
+        return True
 
     def test_infinite_design_was_executed(self, logs_info_level: LogContainer):
         assert logs_info_level.contains_log(
@@ -134,7 +135,7 @@ class TestShutdownBeforeStart(TestSingleProgramSingleShutdown):
         "Behavior to be clarified - https://github.com/qorix-group/inc_orchestrator_internal/issues/148"
     )
     def test_execution_order(self, logs_info_level: LogContainer):
-        actions = logs_info_level.get_logs_by_field(
+        actions = logs_info_level.get_logs(
             field="message", pattern="Action1 was executed"
         )
         shutdown = logs_info_level.find_log(
