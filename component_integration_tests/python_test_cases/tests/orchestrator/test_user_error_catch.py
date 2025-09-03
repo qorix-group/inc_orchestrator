@@ -19,7 +19,7 @@ class TestUnrecoverableCatchSequence(CitScenario):
         }
 
     def test_execution_order(self, test_config, logs_info_level: LogContainer):
-        results = logs_info_level.get_logs()
+        results = list(logs_info_level)
         assert len(results) == 2, "Expected 2 messages in total"
 
         error_code = test_config["test"]["error_code"]
@@ -52,7 +52,7 @@ class TestRecoverableFailedCatchSequence(CitScenario):
         }
 
     def test_execution_order(self, test_config, logs_info_level: LogContainer):
-        results = logs_info_level.get_logs()
+        results = list(logs_info_level)
         assert len(results) == 2, "Expected 2 messages in total"
 
         error_code = test_config["test"]["error_code"]
@@ -87,7 +87,7 @@ class TestRecoverableCatchSequence(CitScenario):
         }
 
     def test_execution_order(self, test_config, logs_info_level: LogContainer):
-        results = logs_info_level.get_logs()
+        results = list(logs_info_level)
         assert len(results) == 3, "Expected 3 messages in total"
 
         error_code = test_config["test"]["error_code"]
@@ -151,7 +151,7 @@ class TestRecoverableCatchInMultipleRuns(CitScenario):
     def test_execution_count(self, test_config, logs_info_level: LogContainer):
         expected_iter_count = test_config["test"]["run_count"]
 
-        logs = logs_info_level.get_logs()
+        logs = list(logs_info_level)
         for _ in range(expected_iter_count):
             log = logs.pop(0)
             assert log.id == "user_error_task", (
@@ -213,7 +213,7 @@ class TestConcurrencyCatch(CitScenario):
             "Expected user error task to be executed"
         )
 
-        last_message = logs_info_level.get_logs().pop(-1)
+        last_message = list(logs_info_level).pop(-1)
         catch_message = logs_info_level.find_log(field="id", value="catch")
         assert last_message == catch_message, (
             "Expected last message to be the catch block"
@@ -282,7 +282,7 @@ class TestDoubleRecoverableErrorCatch(TestDoubleMixedErrorCatch):
         }
 
     def test_execution_continuation(self, logs_info_level: LogContainer):
-        last_message = logs_info_level.get_logs()[-1]
+        last_message = logs_info_level[-1]
         assert last_message.id == "log_after_catch_task", (
             "Expected 'log_after_catch_task' to be executed after catch block"
         )

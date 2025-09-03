@@ -45,12 +45,15 @@ class TestTaskQueueSize_Valid(TestTaskQueueSize):
 
 
 class TestTaskQueueSize_Invalid(TestTaskQueueSize):
-    expect_command_failure = True
-    capture_stderr = True
-
     @pytest.fixture(scope="class", params=[0, 10, 321, 1234, 2**16 - 1, 2**32 - 1])
     def queue_size(self, request: pytest.FixtureRequest) -> int:
         return request.param
+
+    def capture_stderr(self) -> bool:
+        return True
+
+    def expect_command_failure(self) -> bool:
+        return True
 
     def test_invalid(self, results: ScenarioResult, queue_size: int) -> None:
         assert results.return_code == ResultCode.PANIC
@@ -90,9 +93,7 @@ class TestWorkers_Valid(TestWorkers):
         assert results.return_code == ResultCode.SUCCESS
 
         # Check barrier resulted in timeout.
-        wait_result_logs = logs_info_level.get_logs_by_field(
-            "wait_result", pattern=".*"
-        ).get_logs()
+        wait_result_logs = logs_info_level.get_logs("wait_result", pattern=".*")
         assert len(wait_result_logs) == 1
         assert wait_result_logs[0].wait_result == "timeout"
 
@@ -100,18 +101,21 @@ class TestWorkers_Valid(TestWorkers):
         # Exact 'id' content is not checked.
         # Test relies on spawning one too many tasks for available workers.
         # Tracing is no longer active for this extra task, but it's not determinate which one is it.
-        worker_logs = logs_info_level.get_logs_by_field("id", pattern="worker_.*")
+        worker_logs = logs_info_level.get_logs("id", pattern="worker_.*")
         worker_ids = [log.id for log in worker_logs]
         assert len(worker_ids) == workers
 
 
 class TestWorkers_Invalid(TestWorkers):
-    expect_command_failure = True
-    capture_stderr = True
-
     @pytest.fixture(scope="class", params=[0, 129, 1000])
     def workers(self, request: pytest.FixtureRequest) -> int:
         return request.param
+
+    def capture_stderr(self) -> bool:
+        return True
+
+    def expect_command_failure(self) -> bool:
+        return True
 
     def test_invalid(self, results: ScenarioResult, workers: int) -> None:
         assert results.return_code == ResultCode.PANIC
@@ -229,7 +233,7 @@ class TestThreadAffinity_Valid(TestThreadAffinity):
         assert results.return_code == ResultCode.SUCCESS
 
         # Find logs with worker IDs.
-        worker_logs = logs_info_level.get_logs_by_field(field="id", pattern="worker_.*")
+        worker_logs = logs_info_level.get_logs(field="id", pattern="worker_.*")
         assert len(worker_logs) == self.NUM_WORKERS
 
         # Check affinity of each worker.
@@ -244,12 +248,15 @@ class TestThreadAffinity_Valid(TestThreadAffinity):
 
 
 class TestThreadAffinity_OffByOne(TestThreadAffinity):
-    capture_stderr = True
-    expect_command_failure = True
-
     @pytest.fixture(scope="class")
     def affinity(self, num_cores: int) -> list[int]:
         return [num_cores]
+
+    def capture_stderr(self) -> bool:
+        return True
+
+    def expect_command_failure(self) -> bool:
+        return True
 
     def test_invalid(
         self,
@@ -264,12 +271,15 @@ class TestThreadAffinity_OffByOne(TestThreadAffinity):
 
 
 class TestThreadAffinity_LargeCoreId(TestThreadAffinity):
-    capture_stderr = True
-    expect_command_failure = True
-
     @pytest.fixture(scope="class")
     def affinity(self) -> list[int]:
         return [2**63]
+
+    def capture_stderr(self) -> bool:
+        return True
+
+    def expect_command_failure(self) -> bool:
+        return True
 
     def test_invalid(self, results: ScenarioResult, affinity: list[int]) -> None:
         assert results.return_code == ResultCode.PANIC
@@ -281,12 +291,15 @@ class TestThreadAffinity_LargeCoreId(TestThreadAffinity):
 
 
 class TestThreadAffinity_AffinityMaskTooLarge(TestThreadAffinity):
-    capture_stderr = True
-    expect_command_failure = True
-
     @pytest.fixture(scope="class")
     def affinity(self) -> list[int]:
         return list(range(1024 + 1))
+
+    def capture_stderr(self) -> bool:
+        return True
+
+    def expect_command_failure(self) -> bool:
+        return True
 
     def test_invalid(self, results: ScenarioResult, affinity: list[int]) -> None:
         assert results.return_code == ResultCode.PANIC
@@ -334,12 +347,15 @@ class TestThreadStackSize_TooSmall(TestThreadStackSize):
     # NOTE: it is possible to set stack size over the limit, but too small for requested work.
     # This will cause SIGSEGV due to stack overflow. This is not a bug.
 
-    expect_command_failure = True
-    capture_stderr = True
-
     @pytest.fixture(scope="class", params=[0, 8192])
     def thread_stack_size(self, request: pytest.FixtureRequest) -> int:
         return request.param
+
+    def capture_stderr(self) -> bool:
+        return True
+
+    def expect_command_failure(self) -> bool:
+        return True
 
     def test_invalid(self, results: ScenarioResult) -> None:
         assert results.return_code == ResultCode.PANIC

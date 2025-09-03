@@ -36,8 +36,8 @@ class TestSingleRuntimeMultipleExecEngine(CitScenario):
         }
 
     def test_all_tasks_executed(self, logs_info_level: LogContainer) -> None:
-        task_logs = logs_info_level.get_logs_by_field("task_id", pattern="task_*")
-        act_tasks = {entry.task_id for entry in task_logs.get_logs()}
+        task_logs = logs_info_level.get_logs("task_id", pattern="task_*")
+        act_tasks = {entry.task_id for entry in task_logs}
         exp_tasks = set(self._tasks)
 
         tasks_diff = act_tasks.symmetric_difference(exp_tasks)
@@ -52,11 +52,9 @@ class TestSingleRuntimeMultipleExecEngine(CitScenario):
             engine_id = tasks_data["engine_id"]
             task_ids = tasks_data["task_ids"]
 
-            engine_logs = logs_info_level.get_logs_by_field(
-                "engine_id", value=engine_id
-            )
-            task_logs = engine_logs.get_logs_by_field("task_id", pattern="task_*")
-            act_tasks = {entry.task_id for entry in task_logs.get_logs()}
+            engine_logs = logs_info_level.get_logs("engine_id", value=engine_id)
+            task_logs = engine_logs.get_logs("task_id", pattern="task_*")
+            act_tasks = {entry.task_id for entry in task_logs}
             exp_tasks = set(task_ids)
 
             tasks_diff = act_tasks.symmetric_difference(exp_tasks)

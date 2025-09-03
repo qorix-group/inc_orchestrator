@@ -11,8 +11,6 @@ from component_integration_tests.python_test_cases.tests.cit_scenario import (
 
 
 class TestProgramRun(CitScenario):
-    expect_command_failure = True
-
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
         return "basic.program_run"
@@ -32,11 +30,14 @@ class TestProgramRun(CitScenario):
     def execution_timeout(self, request, *args, **kwargs):
         return 0.5
 
+    def expect_command_failure(self) -> bool:
+        return True
+
     def test_program_run(self, logs_info_level: LogContainer):
         assert logs_info_level.contains_log(field="id", value="start"), (
             "Program did not start as expected"
         )
-        task_logs = logs_info_level.get_logs_by_field(field="id", value="basic_task")
+        task_logs = logs_info_level.get_logs(field="id", value="basic_task")
         assert len(task_logs) > 1, "Program did not execute tasks as expected"
 
     def test_program_run_until_timeout(
@@ -78,7 +79,7 @@ class TestProgramRunCycle(TestProgramRun):
         return 0.5
 
     def test_delay_betweeen_runs(self, logs_info_level: LogContainer, run_delay: int):
-        task_logs = logs_info_level.get_logs_by_field(field="id", value="basic_task")
+        task_logs = logs_info_level.get_logs(field="id", value="basic_task")
         execution_timestamps = [log.timestamp for log in task_logs]
         execution_delays = [
             (t2 - t1).total_seconds() * 1000  # convert to ms
@@ -126,7 +127,7 @@ class TestProgramRunNTimes(CitScenario):
     ):
         expected_run_count = test_config["test"]["run_count"]
 
-        run_logs = logs_info_level.get_logs_by_field(field="id", value="basic_task")
+        run_logs = logs_info_level.get_logs(field="id", value="basic_task")
 
         assert len(run_logs) == expected_run_count, (
             f"Expected {expected_run_count} runs, but got {len(run_logs)}"
@@ -158,7 +159,7 @@ class TestProgramRunNTimesCycle(TestProgramRunNTimes):
         }
 
     def test_delay_betweeen_runs(self, logs_info_level: LogContainer, run_delay: int):
-        task_logs = logs_info_level.get_logs_by_field(field="id", value="basic_task")
+        task_logs = logs_info_level.get_logs(field="id", value="basic_task")
         execution_timestamps = [log.timestamp for log in task_logs]
         execution_delays = [
             (t2 - t1).total_seconds() * 1000  # convert to ms
@@ -258,7 +259,7 @@ class TestProgramRunNTimesMetered(TestProgramRunNTimes):
     ):
         # Meter is a debug utility and accuracy is not checked
         expected_meter_outputs = test_config["test"]["run_count"]
-        meter_outputs = logs_info_level.get_logs_by_field(
+        meter_outputs = logs_info_level.get_logs(
             field="meter_id", pattern=r"simple_run_program"
         )
 
@@ -296,7 +297,7 @@ class TestProgramRunNTimesCycleMetered(TestProgramRunNTimesCycle):
     ):
         # Meter is a debug utility and accuracy is not checked
         expected_meter_outputs = test_config["test"]["run_count"]
-        meter_outputs = logs_info_level.get_logs_by_field(
+        meter_outputs = logs_info_level.get_logs(
             field="meter_id", pattern=r"simple_run_program"
         )
 

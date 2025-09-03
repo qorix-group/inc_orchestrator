@@ -21,7 +21,7 @@ class TestSPSCChannelSendReceive(CitScenario):
     def test_if_sends_succeeded(
         self, test_config: dict[str, Any], logs_info_level: LogContainer
     ):
-        send_logs = logs_info_level.get_logs_by_field("id", value="send_task")
+        send_logs = logs_info_level.get_logs("id", value="send_task")
         assert len(send_logs) == len(test_config["test"]["data_to_send"]), (
             "Not all data was sent successfully."
         )
@@ -35,7 +35,7 @@ class TestSPSCChannelSendReceive(CitScenario):
     def test_if_receives_succeeded(
         self, test_config: dict[str, Any], logs_info_level: LogContainer
     ):
-        receive_logs = logs_info_level.get_logs_by_field("id", value="receive_task")
+        receive_logs = logs_info_level.get_logs("id", value="receive_task")
         assert len(receive_logs) == len(test_config["test"]["data_to_send"]), (
             "Not all data was received successfully."
         )
@@ -72,7 +72,7 @@ class TestSPSCChannelOverflow(CitScenario):
     ):
         QUEUE_SIZE = 5  # Compile time constant in backend code
 
-        data_logs = logs_info_level.get_logs_by_field("data", pattern="")
+        data_logs = logs_info_level.get_logs("data")
         assert len(data_logs) == QUEUE_SIZE, "Message count not equal to queue size."
 
         expected_data = test_config["test"]["data_to_send"]
@@ -88,7 +88,7 @@ class TestSPSCChannelOverflow(CitScenario):
         all_data_size = len(test_config["test"]["data_to_send"])
         expected_overflow_count = all_data_size - QUEUE_SIZE
 
-        overflow_logs = logs_info_level.get_logs_by_field("error", value="NoSpaceLeft")
+        overflow_logs = logs_info_level.get_logs("error", value="NoSpaceLeft")
         assert len(overflow_logs) == expected_overflow_count, (
             "Queue overflow message count mismatch."
         )
@@ -161,18 +161,16 @@ class TestSPSCChannelSenderDroppedInTheMiddle(CitScenario):
     def test_valid_transfer(
         self, test_config: dict[str, Any], logs_info_level: LogContainer
     ):
-        send_logs = logs_info_level.get_logs_by_field(
-            "id", value="send_task"
-        ).get_logs_by_field("data", pattern="")
+        send_logs = logs_info_level.get_logs("id", value="send_task").get_logs("data")
 
         expected_valid_msg_count = len(test_config["test"]["data_to_send"])
         assert len(send_logs) == expected_valid_msg_count, (
             "Not all data was sent successfully before receiver was dropped."
         )
 
-        receive_logs = logs_info_level.get_logs_by_field(
-            "id", value="receive_task"
-        ).get_logs_by_field("data", pattern="")
+        receive_logs = logs_info_level.get_logs("id", value="receive_task").get_logs(
+            "data"
+        )
         assert len(receive_logs) == expected_valid_msg_count, (
             "Not all data was received successfully before receiver was dropped."
         )
@@ -185,9 +183,9 @@ class TestSPSCChannelSenderDroppedInTheMiddle(CitScenario):
     def test_receive_errors(
         self, test_config: dict[str, Any], logs_info_level: LogContainer
     ):
-        receive_error_logs = logs_info_level.get_logs_by_field(
+        receive_error_logs = logs_info_level.get_logs(
             "id", value="receive_task"
-        ).get_logs_by_field("error", value="Provider dropped")
+        ).get_logs("error", value="Provider dropped")
 
         expected_error_count = test_config["test"]["overread_count"]
         assert len(receive_error_logs) == expected_error_count, (
@@ -215,16 +213,14 @@ class TestSPSCChannelReceiverDroppedInTheMiddle(CitScenario):
     def test_valid_transfer(
         self, test_config: dict[str, Any], logs_info_level: LogContainer
     ):
-        send_logs = logs_info_level.get_logs_by_field(
-            "id", value="send_task"
-        ).get_logs_by_field("data", pattern="")
+        send_logs = logs_info_level.get_logs("id", value="send_task").get_logs("data")
 
         expected_valid_msg_count = len(test_config["test"]["first_step_data"])
         assert len(send_logs) == expected_valid_msg_count, (
             "Not all data was sent successfully before receiver was dropped."
         )
 
-        receive_logs = logs_info_level.get_logs_by_field("id", value="receive_task")
+        receive_logs = logs_info_level.get_logs("id", value="receive_task")
         for send_log, receive_log in zip(send_logs, receive_logs):
             assert send_log.data == receive_log.data, (
                 f"Sent data {send_log.data} does not match received data {receive_log.data}."
@@ -233,9 +229,9 @@ class TestSPSCChannelReceiverDroppedInTheMiddle(CitScenario):
     def test_send_errors(
         self, test_config: dict[str, Any], logs_info_level: LogContainer
     ):
-        send_error_logs = logs_info_level.get_logs_by_field(
-            "id", value="send_task"
-        ).get_logs_by_field("error", value="GenericError")
+        send_error_logs = logs_info_level.get_logs("id", value="send_task").get_logs(
+            "error", value="GenericError"
+        )
 
         expected_error_count = len(test_config["test"]["second_step_data"])
         assert len(send_error_logs) == expected_error_count, (
