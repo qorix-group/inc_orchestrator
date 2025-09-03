@@ -23,9 +23,7 @@ class TestSingleConcurrency1W256Q(CitScenario):
             ]
             execution_order = [
                 log.message
-                for log in logs_info_level.get_logs_by_field(
-                    field="message", pattern=function
-                )
+                for log in logs_info_level.get_logs(field="message", pattern=function)
             ]
 
             assert execution_order == expected_order, (
@@ -109,7 +107,7 @@ class TestMultipleConcurrency1W256Q(CitScenario):
     ):
         # Check if all branches in Concurrency1 were executed before starting Concurrency2
         # Find all functions starts from Concurrency2 and pick the first one by timestamp
-        functions_starts_from_concurrency2 = logs_info_level.get_logs_by_field(
+        functions_starts_from_concurrency2 = logs_info_level.get_logs(
             field="message", pattern="Start of 'Function(4|5|6)' function"
         )
         concurrency2_start = functions_starts_from_concurrency2[0]
@@ -164,13 +162,13 @@ class TestMultipleConcurrency1W256Q(CitScenario):
 
     def test_concurrency1_execution_order(self, logs_info_level: LogContainer):
         # Find all functions starts from Concurrency1 and pick the first one by timestamp
-        functions_starts_from_concurrency1 = logs_info_level.get_logs_by_field(
+        functions_starts_from_concurrency1 = logs_info_level.get_logs(
             field="message", pattern="Start of 'Function(1|2|3)' function"
         )
         concurrency1_start = functions_starts_from_concurrency1[0]
 
         # Find all functions ends from Concurrency1 and pick the last one by timestamp
-        functions_ends_from_concurrency1 = logs_info_level.get_logs_by_field(
+        functions_ends_from_concurrency1 = logs_info_level.get_logs(
             field="message", pattern="End of 'Function(1|2|3)' function"
         )
         concurrency1_end = functions_ends_from_concurrency1[-1]
@@ -194,12 +192,12 @@ class TestMultipleConcurrency1W256Q(CitScenario):
             field="message", value="IntermediateAction was executed"
         )
         # Find all functions starts from Concurrency2 and pick the first one by timestamp
-        functions_starts_from_concurrency2 = logs_info_level.get_logs_by_field(
+        functions_starts_from_concurrency2 = logs_info_level.get_logs(
             field="message", pattern="Start of 'Function(4|5|6)' function"
         )
         concurrency2_start = functions_starts_from_concurrency2[0]
         # Find all functions ends from Concurrency2 and pick the last one by timestamp
-        functions_ends_from_concurrency2 = logs_info_level.get_logs_by_field(
+        functions_ends_from_concurrency2 = logs_info_level.get_logs(
             field="message", pattern="End of 'Function(4|5|6)' function"
         )
         concurrency2_end = functions_ends_from_concurrency2[-1]
@@ -248,7 +246,7 @@ class TestNestedConcurrency1W256Q(CitScenario):
             field="message", value="FinishAction was executed"
         )
 
-        functions_end_from_inner_concurrency = logs_info_level.get_logs_by_field(
+        functions_end_from_inner_concurrency = logs_info_level.get_logs(
             field="message", pattern="End of 'InnerFunction.*' function"
         )
         inner_concurrency_end = functions_end_from_inner_concurrency[-1]
@@ -264,7 +262,7 @@ class TestNestedConcurrency1W256Q(CitScenario):
             field="message", value="FinishAction was executed"
         )
 
-        functions_end_from_outer_concurrency = logs_info_level.get_logs_by_field(
+        functions_end_from_outer_concurrency = logs_info_level.get_logs(
             field="message", pattern="End of 'OuterFunction.*' function"
         )
         outer_concurrency_end = functions_end_from_outer_concurrency[-1]

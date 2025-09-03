@@ -65,9 +65,7 @@ class TestNestedSequence1W256Q(CitScenario):
         ]
         execution_order = [
             log.message
-            for log in logs_info_level.get_logs_by_field(
-                field="message", pattern="was executed"
-            )
+            for log in logs_info_level.get_logs(field="message", pattern="was executed")
         ]
         assert execution_order == expected_order, (
             "Actions were not executed in the expected order"

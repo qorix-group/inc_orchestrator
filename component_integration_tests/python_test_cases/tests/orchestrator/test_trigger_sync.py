@@ -22,7 +22,7 @@ class TestOneTriggerOneSyncTwoPrograms(CitScenario):
         return {"runtime": {"task_queue_size": 256, "workers": 4}}
 
     def test_execution_order(self, logs_info_level: LogContainer):
-        results = logs_info_level.get_logs()
+        results = list(logs_info_level)
         assert len(results) == 3, "Expected 3 messages in total"
 
         sleep_begin_msg = results.pop(0)
@@ -42,12 +42,12 @@ class TestOneTriggerOneSyncTwoPrograms(CitScenario):
         )
 
     def test_execution_delay(self, logs_info_level: LogContainer):
-        sleep_begin_msg = logs_info_level.get_logs_by_field(
+        sleep_begin_msg = logs_info_level.get_logs(
             "id", value=BLOCKING_TASK_ID
         ).find_log("location", value="begin")
-        sleep_end_msg = logs_info_level.get_logs_by_field(
-            "id", value=BLOCKING_TASK_ID
-        ).find_log("location", value="end")
+        sleep_end_msg = logs_info_level.get_logs("id", value=BLOCKING_TASK_ID).find_log(
+            "location", value="end"
+        )
 
         assert sleep_end_msg.timestamp - sleep_begin_msg.timestamp >= timedelta(
             milliseconds=BLOCKING_TASK_DELAY_MS
@@ -72,7 +72,7 @@ class TestOneTriggerTwoSyncsThreePrograms(CitScenario):
     ):
         print(scenario_name)
         print(test_config)
-        results = logs_info_level.get_logs()
+        results = list(logs_info_level)
         assert len(results) == 4, "Expected 4 messages in total"
 
         sleep_begin_msg = results.pop(0)
@@ -99,12 +99,12 @@ class TestOneTriggerTwoSyncsThreePrograms(CitScenario):
         )
 
     def test_execution_delay(self, logs_info_level: LogContainer):
-        sleep_begin_msg = logs_info_level.get_logs_by_field(
+        sleep_begin_msg = logs_info_level.get_logs(
             "id", value=BLOCKING_TASK_ID
         ).find_log("location", value="begin")
-        sleep_end_msg = logs_info_level.get_logs_by_field(
-            "id", value=BLOCKING_TASK_ID
-        ).find_log("location", value="end")
+        sleep_end_msg = logs_info_level.get_logs("id", value=BLOCKING_TASK_ID).find_log(
+            "location", value="end"
+        )
 
         assert sleep_end_msg.timestamp - sleep_begin_msg.timestamp >= timedelta(
             milliseconds=BLOCKING_TASK_DELAY_MS
@@ -131,7 +131,7 @@ class TestTriggerSyncOneAfterAnother(CitScenario):
         return {"runtime": {"task_queue_size": 256, "workers": 1}}
 
     def test_execution_order(self, logs_info_level: LogContainer):
-        results = logs_info_level.get_logs()
+        results = list(logs_info_level)
         assert len(results) == 2, "Expected 2 messages in total"
 
         basic_task_a_msg = results.pop(0)

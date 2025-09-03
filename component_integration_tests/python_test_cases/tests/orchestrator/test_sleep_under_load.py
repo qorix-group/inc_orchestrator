@@ -58,7 +58,7 @@ class TestShortSleepUnderLoad2W256Q(CitScenario):
         test_config: dict,
         sleep_name: str,
     ):
-        [sleep_start, sleep_finish] = logs_info_level.get_logs_by_field(
+        [sleep_start, sleep_finish] = logs_info_level.get_logs(
             field="id",
             value=sleep_name,
         )

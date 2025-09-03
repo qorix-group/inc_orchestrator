@@ -10,9 +10,6 @@ from component_integration_tests.python_test_cases.tests.cit_scenario import (
 
 
 class TestDoubleSameCatchHandler(CitScenario):
-    expect_command_failure = True
-    capture_stderr = True
-
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
         return "orchestration.double_same_handler_error"
@@ -20,6 +17,12 @@ class TestDoubleSameCatchHandler(CitScenario):
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
         return {"runtime": {"task_queue_size": 256, "workers": 4}}
+
+    def capture_stderr(self) -> bool:
+        return True
+
+    def expect_command_failure(self) -> bool:
+        return True
 
     def test_double_handler_panic(self, results: ScenarioResult):
         assert results.return_code == ResultCode.PANIC

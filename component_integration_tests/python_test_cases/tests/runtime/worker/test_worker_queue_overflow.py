@@ -10,9 +10,6 @@ from component_integration_tests.python_test_cases.tests.cit_scenario import (
 
 
 class TestQueueOverflow(CitScenario):
-    expect_command_failure = True
-    capture_stderr = True
-
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
         return "runtime.worker.basic"
@@ -29,6 +26,12 @@ class TestQueueOverflow(CitScenario):
             "runtime": {"workers": 1, "task_queue_size": queue_size},
             "test": {"tasks": [f"task_{i}" for i in range(num_tasks)]},
         }
+
+    def capture_stderr(self) -> bool:
+        return True
+
+    def expect_command_failure(self) -> bool:
+        return True
 
     def test_queue_overflow(self, results: ScenarioResult) -> None:
         # SIGKILL is raised intermittently.
