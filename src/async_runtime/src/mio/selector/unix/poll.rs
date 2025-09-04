@@ -454,7 +454,7 @@ impl Inner {
 
         loop {
             // loom::sync::Condvar doesn't implement wait_while.
-            while self.num_of_accesses.load(FoundationOrdering::SeqCst) != 0 {
+            while self.num_of_accesses.load(FoundationOrdering::Acquire) != 0 {
                 fds = self.accesses_finished.wait(fds).unwrap();
             }
 
@@ -525,16 +525,28 @@ impl Inner {
     }
 
     fn access_fds<R, T: FnOnce(&mut Fds) -> Result<R>>(&self, accessor: T) -> Result<R> {
-        self.num_of_accesses.fetch_add(1, FoundationOrdering::SeqCst);
+        self.num_of_accesses.fetch_add(1, FoundationOrdering::AcqRel);
+        let prev_num_of_accesses;
 
         self.poll_waker.wake();
         let result = {
             let mut fds = self.fds.lock().unwrap();
-            accessor(&mut fds)
+            let res = accessor(&mut fds);
+
+            // Ensure that the final modification that can be observed by select happens under lock. This
+            // makes sure that select will not go into w case where:
+            // - this fn is past the lock
+            // - the select observed that num_of_accesses != 0 and went into wait on CV branch and get scheduled out
+            // - this fn decrement atomic to 0 and does notification
+            // - select is scheduled goes into wait on CV and misses the notification
+            //
+            // This is missed-wakeup issue, oposition to spurious-wakeup
+            prev_num_of_accesses = self.num_of_accesses.fetch_sub(1, FoundationOrdering::AcqRel);
+            res
         };
         self.poll_waker.clear();
 
-        if self.num_of_accesses.fetch_sub(1, FoundationOrdering::SeqCst) == 1 {
+        if prev_num_of_accesses == 1 {
             self.accesses_finished.notify_one();
         }
 
