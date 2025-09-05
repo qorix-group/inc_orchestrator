@@ -9,7 +9,7 @@ from component_integration_tests.python_test_cases.tests.cit_scenario import Cit
 class TestSPSCChannelSendReceive(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.channel.spsc_send_receive"
+        return "runtime.channel.spsc.send_receive"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -50,7 +50,7 @@ class TestSPSCChannelSendReceive(CitScenario):
 class TestSPSCChannelOverflow(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.channel.spsc_send_only"
+        return "runtime.channel.spsc.send_only"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -97,7 +97,7 @@ class TestSPSCChannelOverflow(CitScenario):
 class TestSPSCChannelReceiverDropped(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.channel.spsc_drop_receiver"
+        return "runtime.channel.spsc.drop_receiver"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -123,7 +123,7 @@ class TestSPSCChannelReceiverDropped(CitScenario):
 class TestSPSCChannelSenderDropped(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.channel.spsc_drop_sender"
+        return "runtime.channel.spsc.drop_sender"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -149,7 +149,7 @@ class TestSPSCChannelSenderDropped(CitScenario):
 class TestSPSCChannelSenderDroppedInTheMiddle(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.channel.spsc_drop_sender_in_the_middle"
+        return "runtime.channel.spsc.drop_sender_in_the_middle"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -201,7 +201,7 @@ class TestSPSCChannelSenderDroppedInTheMiddle(CitScenario):
 class TestSPSCChannelReceiverDroppedInTheMiddle(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.channel.spsc_drop_receiver_in_the_middle"
+        return "runtime.channel.spsc.drop_receiver_in_the_middle"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -247,7 +247,7 @@ class TestSPSCChannelReceiverDroppedInTheMiddle(CitScenario):
 class TestSPSCChannelHeavyLoad(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.channel.spsc_heavy_load"
+        return "runtime.channel.spsc.heavy_load"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
