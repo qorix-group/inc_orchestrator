@@ -12,7 +12,7 @@ from component_integration_tests.python_test_cases.tests.cit_scenario import (
 class TestSPMCBroadcastChannelSendReceive(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.channel.spmc_broadcast_send_receive"
+        return "runtime.channel.spmc_broadcast.send_receive"
 
     @pytest.fixture(scope="class", params=[1, 2, 3, 4, 8])
     def workers(self, request: pytest.FixtureRequest) -> int:
@@ -54,7 +54,7 @@ class TestSPMCBroadcastChannelSendReceive(CitScenario):
 class TestSPMCBroadcastChannelOverflow(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.channel.spmc_broadcast_create_receivers_only"
+        return "runtime.channel.spmc_broadcast.create_receivers_only"
 
     @pytest.fixture(scope="class", params=["clone", "subscribe"])
     def population_method(self, request: pytest.FixtureRequest) -> str:
@@ -87,7 +87,7 @@ class TestSPMCBroadcastChannelOverflow(CitScenario):
 class TestSPMCBroadcastChannelZeroMaxReceivers(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.channel.spmc_broadcast_create_receivers_only"
+        return "runtime.channel.spmc_broadcast.create_receivers_only"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -114,7 +114,7 @@ class TestSPMCBroadcastChannelZeroMaxReceivers(CitScenario):
 class TestSPMCBroadcastChannelBigMaxReceivers(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.channel.spmc_broadcast_create_receivers_only"
+        return "runtime.channel.spmc_broadcast.create_receivers_only"
 
     @pytest.fixture(
         scope="class",
@@ -166,7 +166,7 @@ class TestSPMCBroadcastChannelBigMaxReceivers(CitScenario):
 class TestSPMCBroadcastChannelNumOfSubscribers(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.channel.spmc_broadcast_num_of_subscribers"
+        return "runtime.channel.spmc_broadcast.num_of_subscribers"
 
     @pytest.fixture(scope="class", params=["clone", "subscribe"])
     def population_method(self, request: pytest.FixtureRequest) -> str:
@@ -231,7 +231,7 @@ class TestSPMCBroadcastChannelNumOfSubscribers(CitScenario):
 class TestSPMCBroadcastChannelDropAddReceiver(TestSPMCBroadcastChannelSendReceive):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.channel.spmc_broadcast_drop_add_receiver"
+        return "runtime.channel.spmc_broadcast.drop_add_receiver"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -248,7 +248,7 @@ class TestSPMCBroadcastChannelDropAddReceiver(TestSPMCBroadcastChannelSendReceiv
 class TestSPMCBroadcastChannelOneLaggingReceiver(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.channel.spmc_broadcast_send_receive_one_lagging"
+        return "runtime.channel.spmc_broadcast.send_receive_one_lagging"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -317,7 +317,7 @@ class TestSPMCBroadcastChannelOneLaggingReceiver(CitScenario):
 class TestSPMCBroadcastChannelWithDroppingReceivers(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.channel.spmc_broadcast_variable_receivers"
+        return "runtime.channel.spmc_broadcast.variable_receivers"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -373,7 +373,7 @@ class TestSPMCBroadcastChannelWithDroppingReceivers(CitScenario):
 class TestSPMCBroadcastChannelWithDroppingSender(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.channel.spmc_broadcast_drop_sender"
+        return "runtime.channel.spmc_broadcast.drop_sender"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -415,7 +415,7 @@ class TestSPMCBroadcastChannelWithDroppingSender(CitScenario):
 class TestSPMCBroadcastChannelHeavyLoad(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.channel.spmc_broadcast_heavy_load"
+        return "runtime.channel.spmc_broadcast.heavy_load"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:

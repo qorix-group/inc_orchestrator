@@ -57,7 +57,7 @@ pub struct SPSCSendReceive;
 
 impl Scenario for SPSCSendReceive {
     fn name(&self) -> &str {
-        "spsc_send_receive"
+        "send_receive"
     }
 
     ///
@@ -84,7 +84,7 @@ pub struct SPSCSendOnly;
 
 impl Scenario for SPSCSendOnly {
     fn name(&self) -> &str {
-        "spsc_send_only"
+        "send_only"
     }
 
     ///
@@ -110,7 +110,7 @@ pub struct SPSCDropReceiver;
 
 impl Scenario for SPSCDropReceiver {
     fn name(&self) -> &str {
-        "spsc_drop_receiver"
+        "drop_receiver"
     }
 
     ///
@@ -136,7 +136,7 @@ pub struct SPSCDropSender;
 
 impl Scenario for SPSCDropSender {
     fn name(&self) -> &str {
-        "spsc_drop_sender"
+        "drop_sender"
     }
 
     ///
@@ -174,7 +174,7 @@ pub struct SPSCDropSenderInTheMiddle;
 
 impl Scenario for SPSCDropSenderInTheMiddle {
     fn name(&self) -> &str {
-        "spsc_drop_sender_in_the_middle"
+        "drop_sender_in_the_middle"
     }
 
     ///
@@ -245,7 +245,7 @@ impl SPSCDropReceiverInTheMiddle {
 
 impl Scenario for SPSCDropReceiverInTheMiddle {
     fn name(&self) -> &str {
-        "spsc_drop_receiver_in_the_middle"
+        "drop_receiver_in_the_middle"
     }
 
     ///
@@ -339,7 +339,7 @@ impl SPSCHeavyLoad {
 
 impl Scenario for SPSCHeavyLoad {
     fn name(&self) -> &str {
-        "spsc_heavy_load"
+        "heavy_load"
     }
 
     ///

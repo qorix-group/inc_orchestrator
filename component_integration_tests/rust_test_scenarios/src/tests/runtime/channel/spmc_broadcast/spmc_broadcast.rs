@@ -84,7 +84,7 @@ pub struct SPMCBroadcastSendReceive;
 
 impl Scenario for SPMCBroadcastSendReceive {
     fn name(&self) -> &str {
-        "spmc_broadcast_send_receive"
+        "send_receive"
     }
 
     ///
@@ -176,7 +176,7 @@ impl SPMCBroadcastCreateReceiversOnly {
 
 impl Scenario for SPMCBroadcastCreateReceiversOnly {
     fn name(&self) -> &str {
-        "spmc_broadcast_create_receivers_only"
+        "create_receivers_only"
     }
 
     ///
@@ -254,7 +254,7 @@ impl SPMCBroadcastNumOfSubscribers {
 
 impl Scenario for SPMCBroadcastNumOfSubscribers {
     fn name(&self) -> &str {
-        "spmc_broadcast_num_of_subscribers"
+        "num_of_subscribers"
     }
 
     ///
@@ -285,7 +285,7 @@ pub struct SPMCBroadcastDropAddReceiver;
 
 impl Scenario for SPMCBroadcastDropAddReceiver {
     fn name(&self) -> &str {
-        "spmc_broadcast_drop_add_receiver"
+        "drop_add_receiver"
     }
 
     ///
@@ -364,7 +364,7 @@ impl SPMCBroadcastSendReceiveOneLagging {
 
 impl Scenario for SPMCBroadcastSendReceiveOneLagging {
     fn name(&self) -> &str {
-        "spmc_broadcast_send_receive_one_lagging"
+        "send_receive_one_lagging"
     }
 
     ///
@@ -481,7 +481,7 @@ impl SPMCBroadcastVariableReceivers {
 
 impl Scenario for SPMCBroadcastVariableReceivers {
     fn name(&self) -> &str {
-        "spmc_broadcast_variable_receivers"
+        "variable_receivers"
     }
 
     ///
@@ -529,7 +529,7 @@ pub struct SPMCBroadcastDropSender;
 
 impl Scenario for SPMCBroadcastDropSender {
     fn name(&self) -> &str {
-        "spmc_broadcast_drop_sender"
+        "drop_sender"
     }
 
     ///
@@ -620,7 +620,7 @@ impl SPMCBroadcastHeavyLoad {
 
 impl Scenario for SPMCBroadcastHeavyLoad {
     fn name(&self) -> &str {
-        "spmc_broadcast_heavy_load"
+        "heavy_load"
     }
 
     ///
