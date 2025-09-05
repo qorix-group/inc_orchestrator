@@ -117,6 +117,9 @@ class TestProgramRunNTimes(CitScenario):
             "Program did not stop as expected"
         )
 
+    @pytest.mark.skip(
+        reason="Flaky test, needs investigation: https://github.com/qorix-group/inc_orchestrator_internal/issues/278"
+    )
     def test_program_run_given_times(
         self, logs_info_level: LogContainer, test_config: dict[str, Any]
     ):
@@ -153,6 +156,9 @@ class TestProgramRunNTimesCycle(TestProgramRunNTimes):
             },
         }
 
+    @pytest.mark.skip(
+        reason="Flaky test, needs investigation: https://github.com/qorix-group/inc_orchestrator_internal/issues/278"
+    )
     def test_delay_betweeen_runs(self, logs_info_level: LogContainer, run_delay: int):
         task_logs = logs_info_level.get_logs(field="id", value="basic_task")
         execution_timestamps = [log.timestamp for log in task_logs]
