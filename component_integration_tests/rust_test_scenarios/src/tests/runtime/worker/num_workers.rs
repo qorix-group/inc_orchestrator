@@ -9,7 +9,7 @@ use tracing::info;
 
 async fn blocking_task(id: usize, block_condition: Arc<(Condvar, Mutex<bool>)>, notifier: ThreadReadyNotifier) {
     let (cv, mtx) = &*block_condition;
-    let mut block = mtx.lock().unwrap();
+    let mut block = mtx.lock().expect("Unable to lock mutex");
 
     // Allow only first batch of tasks to trace.
     if *block {
@@ -23,7 +23,7 @@ async fn blocking_task(id: usize, block_condition: Arc<(Condvar, Mutex<bool>)>, 
 
     // Wait until barrier timed out.
     while *block {
-        block = cv.wait(block).unwrap();
+        block = cv.wait(block).expect("Unable to wait - poisoned mutex?");
     }
 }
 
@@ -36,7 +36,7 @@ impl Scenario for NumWorkers {
 
     fn run(&self, input: Option<String>) -> Result<(), String> {
         let builder = Runtime::new(&input);
-        let exec_engine = builder.exec_engines().first().unwrap();
+        let exec_engine = builder.exec_engines().first().expect("No execution engine configuration found");
         let num_workers = exec_engine.workers;
         let mut rt = builder.build();
 
@@ -53,7 +53,7 @@ impl Scenario for NumWorkers {
 
             // Spawn tasks.
             for id in 1..=num_workers {
-                let notifier = mid_notifiers.pop().unwrap();
+                let notifier = mid_notifiers.pop().expect("Failed to pop notifier");
                 joiner.add_handle(spawn(blocking_task(id, block_condition.clone(), notifier)));
             }
 
@@ -66,7 +66,7 @@ impl Scenario for NumWorkers {
             // Allow tasks to finish and disable tracing.
             {
                 let (cv, mtx) = &*block_condition;
-                let mut block = mtx.lock().unwrap();
+                let mut block = mtx.lock().expect("Unable to lock mutex");
                 *block = false;
                 cv.notify_all();
             }

@@ -74,7 +74,7 @@ fn prepare_receivers<const SIZE: usize>(
 ) -> Vec<spmc_broadcast::Receiver<u64, SIZE>> {
     let mut receivers = Vec::with_capacity(count);
     for _ in 0..count - 1 {
-        receivers.push(base_receiver.try_clone().unwrap());
+        receivers.push(base_receiver.try_clone().expect("Failed to clone receiver"));
     }
     receivers.push(base_receiver);
     receivers
@@ -303,7 +303,7 @@ impl Scenario for SPMCBroadcastDropAddReceiver {
         let mut receivers = prepare_receivers(logic.receivers.len(), receiver);
 
         receivers.pop();
-        receivers.push(receivers[0].try_clone().unwrap());
+        receivers.push(receivers[0].try_clone().expect("Failed to clone receiver"));
 
         let mut joiner = RuntimeJoiner::new();
         let _ = rt.block_on(async move {
@@ -379,7 +379,7 @@ impl Scenario for SPMCBroadcastSendReceiveOneLagging {
         let mut receivers = prepare_receivers(logic.receivers.len(), receiver);
 
         // Receiver that will not read any data must stay valid
-        let _receivers_tail = receivers.pop().unwrap();
+        let _receivers_tail = receivers.pop().expect("Failed to pop receiver");
 
         let send_receive_counter = Arc::new(AtomicUsize::new(0));
         let exit_task_flag = Arc::new(AtomicBool::new(false));
@@ -442,7 +442,8 @@ impl SPMCBroadcastVariableReceivers {
 
         send_on_read_val.push(0);
         for i in (1..=active_receiver_count).rev() {
-            send_on_read_val.push(send_on_read_val.last().unwrap() + i); // Send after all active receivers read previous batch
+            let last_value = send_on_read_val.last().expect("No value found");
+            send_on_read_val.push(last_value + i); // Send after all active receivers read previous batch
         }
         send_on_read_val
     }

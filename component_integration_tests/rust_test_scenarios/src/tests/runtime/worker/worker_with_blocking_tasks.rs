@@ -22,8 +22,9 @@ struct TestInput {
 
 impl TestInput {
     pub fn new(inputs: &Option<String>) -> Self {
-        let v: Value = serde_json::from_str(inputs.as_deref().unwrap()).unwrap();
-        serde_json::from_value(v["test"].clone()).unwrap()
+        let input_string = inputs.as_ref().expect("Test input is expected");
+        let v: Value = serde_json::from_str(input_string).expect("Failed to parse input string");
+        serde_json::from_value(v["test"].clone()).expect("Failed to parse \"test\" field")
     }
 }
 
@@ -71,14 +72,10 @@ impl Scenario for WorkerWithBlockingTasks {
             let counter = Arc::new(AtomicUsize::new(0));
             let all_tasks_count: usize = logic.blocking_tasks.len() + logic.non_blocking_tasks.len();
             for name in logic.blocking_tasks.as_slice() {
-                joiner.add_handle(spawn(blocking_task(
-                    name.to_string(),
-                    counter.clone(),
-                    all_tasks_count,
-                    mid_notifiers.pop().unwrap(),
-                )));
+                let notifier = mid_notifiers.pop().expect("Failed to pop notifier");
+                joiner.add_handle(spawn(blocking_task(name.to_string(), counter.clone(), all_tasks_count, notifier)));
             }
-            mid_barrier.wait_for_notification(Duration::from_secs(5)).unwrap();
+            mid_barrier.wait_for_notification(Duration::from_secs(5)).expect("Failed to join tasks");
 
             for name in logic.non_blocking_tasks.as_slice() {
                 joiner.add_handle(spawn(non_blocking_task(name.to_string(), counter.clone())));

@@ -6,7 +6,7 @@ use test_scenarios_rust::test_context::TestContext;
 
 use crate::tests::root_scenario_group;
 
-fn main() {
+fn main() -> Result<(), String> {
     let raw_arguments: Vec<String> = std::env::args().collect();
 
     // Root group.
@@ -14,5 +14,5 @@ fn main() {
 
     // Run.
     let test_context = TestContext::new(root_group);
-    run_cli_app(&raw_arguments, &test_context);
+    run_cli_app(&raw_arguments, &test_context)
 }

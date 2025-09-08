@@ -22,8 +22,9 @@ struct TestInput {
 
 impl TestInput {
     pub fn new(inputs: &Option<String>) -> Self {
-        let v: Value = serde_json::from_str(inputs.as_deref().unwrap()).unwrap();
-        serde_json::from_value(v["test"].clone()).unwrap()
+        let input_string = inputs.as_ref().expect("Test input is expected");
+        let v: Value = serde_json::from_str(input_string).expect("Failed to parse input string");
+        serde_json::from_value(v["test"].clone()).expect("Failed to parse \"test\" field")
     }
 }
 
@@ -98,7 +99,7 @@ impl Scenario for SPSCSendOnly {
         let (sender, _receiver) = spsc::create_channel::<u64, QUEUE_SIZE>();
 
         let _ = rt.block_on(async move {
-            spawn(send_task(sender, logic.data_to_send.clone())).await.unwrap();
+            spawn(send_task(sender, logic.data_to_send.clone())).await.expect("Failed to spawn task");
             Ok(0)
         });
 
@@ -124,7 +125,7 @@ impl Scenario for SPSCDropReceiver {
         drop(receiver);
 
         let _ = rt.block_on(async move {
-            spawn(send_task(sender, logic.data_to_send.clone())).await.unwrap();
+            spawn(send_task(sender, logic.data_to_send.clone())).await.expect("Failed to spawn task");
             Ok(0)
         });
 
@@ -150,7 +151,9 @@ impl Scenario for SPSCDropSender {
         drop(sender);
 
         let _ = rt.block_on(async move {
-            spawn(receive_task(receiver, logic.data_to_send.len())).await.unwrap();
+            spawn(receive_task(receiver, logic.data_to_send.len()))
+                .await
+                .expect("Failed to spawn task");
             Ok(0)
         });
 
@@ -166,8 +169,9 @@ struct DcSenderTestInput {
 
 impl DcSenderTestInput {
     pub fn new(inputs: &Option<String>) -> Self {
-        let v: Value = serde_json::from_str(inputs.as_deref().unwrap()).unwrap();
-        serde_json::from_value(v["test"].clone()).unwrap()
+        let input_string = inputs.as_ref().expect("Test input is expected");
+        let v: Value = serde_json::from_str(input_string).expect("Failed to parse input string");
+        serde_json::from_value(v["test"].clone()).expect("Failed to parse \"test\" field")
     }
 }
 pub struct SPSCDropSenderInTheMiddle;
@@ -205,8 +209,9 @@ struct DcReceiverTestInput {
 
 impl DcReceiverTestInput {
     pub fn new(inputs: &Option<String>) -> Self {
-        let v: Value = serde_json::from_str(inputs.as_deref().unwrap()).unwrap();
-        serde_json::from_value(v["test"].clone()).unwrap()
+        let input_string = inputs.as_ref().expect("Test input is expected");
+        let v: Value = serde_json::from_str(input_string).expect("Failed to parse input string");
+        serde_json::from_value(v["test"].clone()).expect("Failed to parse \"test\" field")
     }
 }
 
@@ -266,10 +271,12 @@ impl Scenario for SPSCDropReceiverInTheMiddle {
                 sync.clone(),
             ));
 
-            spawn(receive_task(receiver, logic.first_step_data.len())).await.unwrap();
+            spawn(receive_task(receiver, logic.first_step_data.len()))
+                .await
+                .expect("Failed to spawn receive task");
             sync.store(true, Ordering::Release);
 
-            handle.await.unwrap();
+            handle.await.expect("Failed to spawn send task");
             Ok(0)
         });
 
@@ -284,8 +291,9 @@ struct HeavyTestInput {
 
 impl HeavyTestInput {
     pub fn new(inputs: &Option<String>) -> Self {
-        let v: Value = serde_json::from_str(inputs.as_deref().unwrap()).unwrap();
-        serde_json::from_value(v["test"].clone()).unwrap()
+        let input_string = inputs.as_ref().expect("Test input is expected");
+        let v: Value = serde_json::from_str(input_string).expect("Failed to parse input string");
+        serde_json::from_value(v["test"].clone()).expect("Failed to parse \"test\" field")
     }
 }
 pub struct SPSCHeavyLoad;

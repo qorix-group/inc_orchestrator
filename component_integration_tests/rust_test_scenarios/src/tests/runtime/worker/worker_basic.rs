@@ -15,8 +15,9 @@ struct TestInput {
 
 impl TestInput {
     pub fn new(inputs: &Option<String>) -> Self {
-        let v: Value = serde_json::from_str(inputs.as_deref().unwrap()).unwrap();
-        serde_json::from_value(v["test"].clone()).unwrap()
+        let input_string = inputs.as_ref().expect("Test input is expected");
+        let v: Value = serde_json::from_str(input_string).expect("Failed to parse input string");
+        serde_json::from_value(v["test"].clone()).expect("Failed to parse \"test\" field")
     }
 }
 

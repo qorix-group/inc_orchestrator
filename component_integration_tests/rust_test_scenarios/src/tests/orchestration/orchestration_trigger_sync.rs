@@ -85,7 +85,7 @@ impl Scenario for OneTriggerOneSyncTwoPrograms {
         let mut deployment = orch.get_deployment_mut();
         deployment.bind_events_as_local(&["evt_sync".into()]).expect("Failed to specify event");
 
-        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
         let _ = rt.block_on(async move {
@@ -182,7 +182,7 @@ impl Scenario for OneTriggerTwoSyncsThreePrograms {
         let mut deployment = orch.get_deployment_mut();
         deployment.bind_events_as_local(&["evt_sync".into()]).expect("Failed to specify event");
 
-        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
         let _ = rt.block_on(async move {
@@ -248,7 +248,7 @@ impl Scenario for TriggerAndSyncInNestedBranches {
         let mut deployment = orch.get_deployment_mut();
         deployment.bind_events_as_local(&["evt_sync".into()]).expect("Failed to specify event");
 
-        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
         let _ = rt.block_on(async move {
@@ -306,7 +306,7 @@ impl Scenario for TriggerSyncOneAfterAnother {
         let mut deployment = orch.get_deployment_mut();
         deployment.bind_events_as_local(&["evt_sync".into()]).expect("Failed to specify event");
 
-        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
         let _ = rt.block_on(async move {
