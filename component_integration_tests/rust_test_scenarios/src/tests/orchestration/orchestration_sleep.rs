@@ -56,8 +56,9 @@ struct TestInput {
 
 impl TestInput {
     pub fn new(inputs: &Option<String>) -> Self {
-        let v: Value = serde_json::from_str(inputs.as_ref().unwrap()).unwrap();
-        serde_json::from_value(v["test"].clone()).unwrap()
+        let input_string = inputs.as_ref().expect("Test input is expected");
+        let v: Value = serde_json::from_str(input_string).expect("Failed to parse input string");
+        serde_json::from_value(v["test"].clone()).expect("Failed to parse \"test\" field")
     }
 }
 
@@ -118,11 +119,12 @@ impl Scenario for SleepUnderLoad {
 
         let orch = Orchestration::new().add_design(design).design_done();
 
-        let mut program_manager: orchestration::api::OrchProgramManager = orch.into_program_manager().unwrap();
+        let mut program_manager: orchestration::api::OrchProgramManager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
         let _ = rt.block_on(async move {
-            let _ = programs.pop().unwrap().run_n(1).await;
+            let mut program = programs.pop().expect("Failed to pop program");
+            let _ = program.run_n(1).await;
             Ok(0)
         });
         Ok(())

@@ -57,11 +57,12 @@ impl Scenario for CatchDoubleSameHandlerError {
             .add_design(self.create_design().expect("Failed to create design"))
             .design_done();
 
-        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
         let _ = rt.block_on(async move {
-            let _ = programs.pop().unwrap().run_n(1).await;
+            let mut program = programs.pop().expect("Failed to pop program");
+            let _ = program.run_n(1).await;
             Ok(0)
         });
 
@@ -114,11 +115,12 @@ impl Scenario for CatchDoubleDiffHandlerError {
             .add_design(self.create_design().expect("Failed to create design"))
             .design_done();
 
-        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
         let _ = rt.block_on(async move {
-            let _ = programs.pop().unwrap().run_n(1).await;
+            let mut program = programs.pop().expect("Failed to pop program");
+            let _ = program.run_n(1).await;
             Ok(0)
         });
 
