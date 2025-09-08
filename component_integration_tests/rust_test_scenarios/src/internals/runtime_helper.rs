@@ -60,7 +60,7 @@ impl Runtime {
                 exec_engine_builder = exec_engine_builder.thread_priority(thread_priority);
             }
             if let Some(thread_affinity) = &exec_engine.thread_affinity {
-                exec_engine_builder = exec_engine_builder.thread_affinity(&thread_affinity);
+                exec_engine_builder = exec_engine_builder.thread_affinity(thread_affinity);
             }
             if let Some(thread_stack_size) = exec_engine.thread_stack_size {
                 exec_engine_builder = exec_engine_builder.thread_stack_size(thread_stack_size);

@@ -135,9 +135,8 @@ impl CatchSequenceUserError {
                 )
                 .catch(|e| {
                     catch_checkpoint(&e);
-                    ()
                 })
-                .build(&design),
+                .build(design),
             );
 
             Ok(())
@@ -168,7 +167,7 @@ impl CatchSequenceUserError {
                             recoverable_catch_checkpoint(&e, is_recoverable);
                             is_recoverable
                         })
-                        .build(&design),
+                        .build(design),
                     )
                     .with_step(Invoke::from_tag(&log_after_catch_tag, design.config()))
                     .build(),
@@ -261,9 +260,8 @@ impl CatchNestedSequenceUserError {
                 )
                 .catch(|e| {
                     catch_checkpoint(&e);
-                    ()
                 })
-                .build(&design),
+                .build(design),
             );
 
             Ok(())
@@ -314,7 +312,7 @@ impl ConcurrencyTestInput {
 pub struct CatchConcurrencyUserError;
 
 impl CatchConcurrencyUserError {
-    fn create_design(&self, valid_tasks: &Vec<String>, error_code: u64) -> Result<Design, CommonErrors> {
+    fn create_design(&self, valid_tasks: &[String], error_code: u64) -> Result<Design, CommonErrors> {
         let mut design = Design::new("concurrency_catch_design".into(), DesignConfig::default());
 
         let task_a_name = valid_tasks[0].clone();
@@ -338,16 +336,15 @@ impl CatchConcurrencyUserError {
                                 .with_branch(Invoke::from_tag(&user_error_tag, design.config()))
                                 .with_branch(Invoke::from_tag(&just_log_b_tag, design.config()))
                                 .with_branch(Invoke::from_tag(&just_log_c_tag, design.config()))
-                                .build(&design),
+                                .build(design),
                         )
                         .with_step(Invoke::from_tag(&just_log_tag, design.config()))
                         .build(),
                 )
                 .catch(|e| {
                     catch_checkpoint(&e);
-                    ()
                 })
-                .build(&design),
+                .build(design),
             );
 
             Ok(())
@@ -392,7 +389,7 @@ impl Scenario for CatchConcurrencyUserError {
 pub struct CatchNestedConcurrencyUserError;
 
 impl CatchNestedConcurrencyUserError {
-    fn create_design(&self, valid_tasks: &Vec<String>, error_code: u64) -> Result<Design, CommonErrors> {
+    fn create_design(&self, valid_tasks: &[String], error_code: u64) -> Result<Design, CommonErrors> {
         let mut design = Design::new("nested_concurrency_catch_design".into(), DesignConfig::default());
 
         let task_a_name = valid_tasks[0].clone();
@@ -413,17 +410,16 @@ impl CatchNestedConcurrencyUserError {
                             ConcurrencyBuilder::new()
                                 .with_branch(Invoke::from_tag(&user_error_tag, design.config()))
                                 .with_branch(Invoke::from_tag(&just_log_a_tag, design.config()))
-                                .build(&design),
+                                .build(design),
                         )
                         .with_branch(Invoke::from_tag(&just_log_b_tag, design.config()))
                         .with_branch(Invoke::from_tag(&just_log_c_tag, design.config()))
-                        .build(&design),
+                        .build(design),
                 )
                 .catch(|e| {
                     catch_checkpoint(&e);
-                    ()
                 })
-                .build(&design),
+                .build(design),
             );
 
             Ok(())
@@ -480,7 +476,7 @@ impl ErrorCodesTestInput {
 pub struct CatchDoubleMixedUserError;
 
 impl CatchDoubleMixedUserError {
-    fn create_design(&self, error_codes: &Vec<u64>) -> Result<Design, CommonErrors> {
+    fn create_design(&self, error_codes: &[u64]) -> Result<Design, CommonErrors> {
         let mut design = Design::new("double_mixed_catch_design".into(), DesignConfig::default());
 
         let error_code_recoverable = error_codes[0];
@@ -509,7 +505,7 @@ impl CatchDoubleMixedUserError {
                                 .with_branch(Invoke::from_tag(&user_error_a_tag, design.config()))
                                 .with_branch(Invoke::from_tag(&user_error_b_tag, design.config()))
                                 .with_branch(Invoke::from_tag(&just_log_tag, design.config()))
-                                .build(&design),
+                                .build(design),
                         )
                         .catch_recoverable(move |e| match e {
                             HandlerErrors::UserErr(error_code) => {
@@ -529,7 +525,7 @@ impl CatchDoubleMixedUserError {
                                 panic!("Unexpected error type: {e:?}");
                             }
                         })
-                        .build(&design),
+                        .build(design),
                     )
                     .with_step(Invoke::from_tag(&log_after_catch_tag, design.config()))
                     .build(),
@@ -574,7 +570,7 @@ impl Scenario for CatchDoubleMixedUserError {
 pub struct CatchDoubleRecoverableUserError;
 
 impl CatchDoubleRecoverableUserError {
-    fn create_design(&self, error_codes: &Vec<u64>) -> Result<Design, CommonErrors> {
+    fn create_design(&self, error_codes: &[u64]) -> Result<Design, CommonErrors> {
         let mut design = Design::new("double_recoverable_catch_design".into(), DesignConfig::default());
 
         let error_code_a = error_codes[0];
@@ -601,14 +597,14 @@ impl CatchDoubleRecoverableUserError {
                                 .with_branch(Invoke::from_tag(&user_error_a_tag, design.config()))
                                 .with_branch(Invoke::from_tag(&user_error_b_tag, design.config()))
                                 .with_branch(Invoke::from_tag(&just_log_tag, design.config()))
-                                .build(&design),
+                                .build(design),
                         )
                         .catch_recoverable(move |e| {
                             let is_recoverable = true;
                             recoverable_catch_checkpoint(&e, is_recoverable);
                             is_recoverable
                         })
-                        .build(&design),
+                        .build(design),
                     )
                     .with_step(Invoke::from_tag(&log_after_catch_tag, design.config()))
                     .build(),
@@ -674,18 +670,16 @@ impl DoubleCatchSequence {
                             )
                             .catch(|e| {
                                 info!(id = "unexpected_catch", "Caught user error while only timeout error filter is set! {e:?}");
-                                ()
                             })
-                            .build(&design),
+                            .build(design),
                         )
                         .with_step(Invoke::from_tag(&just_log_tag, design.config()))
                         .build(),
                 )
                 .catch(|e| {
                     catch_checkpoint(&e);
-                    ()
                 })
-                .build(&design),
+                .build(design),
             );
 
             Ok(())
