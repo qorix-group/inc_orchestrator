@@ -28,14 +28,14 @@ impl CatchDoubleSameHandlerError {
                         .with_step(
                             ConcurrencyBuilder::new()
                                 .with_branch(Invoke::from_tag(&dummy_tag, design.config()))
-                                .build(&design),
+                                .build(design),
                         )
                         .with_step(Invoke::from_tag(&dummy_tag, design.config()))
                         .build(),
                 )
                 .catch(|_e| ())
                 .catch(|_e| ())
-                .build(&design),
+                .build(design),
             );
 
             Ok(())
@@ -85,14 +85,14 @@ impl CatchDoubleDiffHandlerError {
                         .with_step(
                             ConcurrencyBuilder::new()
                                 .with_branch(Invoke::from_tag(&dummy_tag, design.config()))
-                                .build(&design),
+                                .build(design),
                         )
                         .with_step(Invoke::from_tag(&dummy_tag, design.config()))
                         .build(),
                 )
                 .catch(|_e| ())
                 .catch_recoverable(|_e| false)
-                .build(&design),
+                .build(design),
             );
 
             Ok(())

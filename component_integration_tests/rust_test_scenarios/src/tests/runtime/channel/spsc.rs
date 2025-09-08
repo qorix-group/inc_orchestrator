@@ -233,7 +233,7 @@ impl SPSCDropReceiverInTheMiddle {
             Self::send_data(&sender, *data);
         }
 
-        while sync.load(Ordering::Acquire) == false {
+        while !sync.load(Ordering::Acquire) {
             hint::spin_loop();
         }
 
