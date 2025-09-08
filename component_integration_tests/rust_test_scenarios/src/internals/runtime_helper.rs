@@ -32,8 +32,9 @@ pub struct Runtime {
 
 impl Runtime {
     pub fn new(inputs: &Option<String>) -> Self {
-        let v: Value = serde_json::from_str(inputs.as_deref().unwrap()).unwrap();
-        let runtime_config: RuntimeConfig = serde_json::from_value(v["runtime"].clone()).unwrap();
+        let input_string = inputs.as_ref().expect("Test input is expected");
+        let v: Value = serde_json::from_str(input_string).expect("Failed to parse input string");
+        let runtime_config: RuntimeConfig = serde_json::from_value(v["runtime"].clone()).expect("Failed to parse \"runtime\" field");
         let exec_engines = match runtime_config {
             RuntimeConfig::Object(cfg) => vec![cfg],
             RuntimeConfig::Array(cfgs) => cfgs,
@@ -70,6 +71,6 @@ impl Runtime {
             async_rt_builder = builder;
         }
 
-        async_rt_builder.build().unwrap()
+        async_rt_builder.build().expect("Failed to build async runtime")
     }
 }

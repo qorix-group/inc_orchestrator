@@ -40,8 +40,9 @@ struct DesignTypeTestInput {
 
 impl DesignTypeTestInput {
     pub fn new(inputs: &Option<String>) -> Self {
-        let v: Value = serde_json::from_str(inputs.as_ref().unwrap()).unwrap();
-        serde_json::from_value(v["test"].clone()).unwrap()
+        let input_string = inputs.as_ref().expect("Test input is expected");
+        let v: Value = serde_json::from_str(input_string).expect("Failed to parse input string");
+        serde_json::from_value(v["test"].clone()).expect("Failed to parse \"test\" field")
     }
 }
 
@@ -89,33 +90,35 @@ impl Scenario for ProgramRun {
             .add_design(simple_run_design().expect("Failed to create simple design"))
             .design_done();
 
-        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
         match logic.run_type.as_str() {
             "run" => {
                 let _ = rt.block_on(async move {
-                    let _ = programs.pop().unwrap().run().await;
+                    let mut program = programs.pop().expect("Failed to pop program");
+                    let _ = program.run().await;
                     Ok(0)
                 });
             }
             "run_cycle" => {
                 let _ = rt.block_on(async move {
-                    let _ = programs.pop().unwrap().run_cycle(std::time::Duration::from_millis(logic.run_delay)).await;
+                    let mut program = programs.pop().expect("Failed to pop program");
+                    let _ = program.run_cycle(std::time::Duration::from_millis(logic.run_delay)).await;
                     Ok(0)
                 });
             }
             "run_n" => {
                 let _ = rt.block_on(async move {
-                    let _ = programs.pop().unwrap().run_n(logic.run_count as usize).await;
+                    let mut program = programs.pop().expect("Failed to pop program");
+                    let _ = program.run_n(logic.run_count as usize).await;
                     Ok(0)
                 });
             }
             "run_n_cycle" => {
                 let _ = rt.block_on(async move {
-                    let _ = programs
-                        .pop()
-                        .unwrap()
+                    let mut program = programs.pop().expect("Failed to pop program");
+                    let _ = program
                         .run_n_cycle(logic.run_count as usize, std::time::Duration::from_millis(logic.run_delay))
                         .await;
                     Ok(0)
@@ -145,21 +148,21 @@ impl Scenario for ProgramRunMetered {
             .add_design(simple_run_design().expect("Failed to create simple design"))
             .design_done();
 
-        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
         match logic.run_type.as_str() {
             "run_metered" => {
                 let _ = rt.block_on(async move {
-                    let _ = programs.pop().unwrap().run_metered::<InfoMeter>().await;
+                    let mut program = programs.pop().expect("Failed to pop program");
+                    let _ = program.run_metered::<InfoMeter>().await;
                     Ok(0)
                 });
             }
             "run_cycle_metered" => {
                 let _ = rt.block_on(async move {
-                    let _ = programs
-                        .pop()
-                        .unwrap()
+                    let mut program = programs.pop().expect("Failed to pop program");
+                    let _ = program
                         .run_cycle_metered::<InfoMeter>(std::time::Duration::from_millis(logic.run_delay))
                         .await;
                     Ok(0)
@@ -167,15 +170,15 @@ impl Scenario for ProgramRunMetered {
             }
             "run_n_metered" => {
                 let _ = rt.block_on(async move {
-                    let _ = programs.pop().unwrap().run_n_metered::<InfoMeter>(logic.run_count as usize).await;
+                    let mut program = programs.pop().expect("Failed to pop program");
+                    let _ = program.run_n_metered::<InfoMeter>(logic.run_count as usize).await;
                     Ok(0)
                 });
             }
             "run_n_cycle_metered" => {
                 let _ = rt.block_on(async move {
-                    let _ = programs
-                        .pop()
-                        .unwrap()
+                    let mut program = programs.pop().expect("Failed to pop program");
+                    let _ = program
                         .run_n_cycle_metered::<InfoMeter>(logic.run_count as usize, std::time::Duration::from_millis(logic.run_delay))
                         .await;
                     Ok(0)

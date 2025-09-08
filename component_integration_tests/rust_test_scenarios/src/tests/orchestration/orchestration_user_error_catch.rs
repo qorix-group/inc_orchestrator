@@ -110,8 +110,9 @@ struct DesignTypeTestInput {
 
 impl DesignTypeTestInput {
     pub fn new(inputs: &Option<String>) -> Self {
-        let v: Value = serde_json::from_str(inputs.as_ref().unwrap()).unwrap();
-        serde_json::from_value(v["test"].clone()).unwrap()
+        let input_string = inputs.as_ref().expect("Test input is expected");
+        let v: Value = serde_json::from_str(input_string).expect("Failed to parse input string");
+        serde_json::from_value(v["test"].clone()).expect("Failed to parse \"test\" field")
     }
 }
 
@@ -211,11 +212,12 @@ impl Scenario for CatchSequenceUserError {
             _ => return Err("Unknown design type".to_string()),
         };
 
-        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
         let _ = rt.block_on(async move {
-            let _ = programs.pop().unwrap().run_n(logic.run_count as usize).await;
+            let mut program = programs.pop().expect("Failed to pop program");
+            let _ = program.run_n(logic.run_count as usize).await;
             Ok(0)
         });
 
@@ -230,8 +232,9 @@ struct ErrorCodeTestInput {
 
 impl ErrorCodeTestInput {
     pub fn new(inputs: &Option<String>) -> Self {
-        let v: Value = serde_json::from_str(inputs.as_ref().unwrap()).unwrap();
-        serde_json::from_value(v["test"].clone()).unwrap()
+        let input_string = inputs.as_ref().expect("Test input is expected");
+        let v: Value = serde_json::from_str(input_string).expect("Failed to parse input string");
+        serde_json::from_value(v["test"].clone()).expect("Failed to parse \"test\" field")
     }
 }
 
@@ -284,11 +287,12 @@ impl Scenario for CatchNestedSequenceUserError {
             .add_design(self.create_design(logic.error_code).expect("Failed to create design"))
             .design_done();
 
-        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
         let _ = rt.block_on(async move {
-            let _ = programs.pop().unwrap().run_n(1).await;
+            let mut program = programs.pop().expect("Failed to pop program");
+            let _ = program.run_n(1).await;
             Ok(0)
         });
 
@@ -304,8 +308,9 @@ struct ConcurrencyTestInput {
 
 impl ConcurrencyTestInput {
     pub fn new(inputs: &Option<String>) -> Self {
-        let v: Value = serde_json::from_str(inputs.as_ref().unwrap()).unwrap();
-        serde_json::from_value(v["test"].clone()).unwrap()
+        let input_string = inputs.as_ref().expect("Test input is expected");
+        let v: Value = serde_json::from_str(input_string).expect("Failed to parse input string");
+        serde_json::from_value(v["test"].clone()).expect("Failed to parse \"test\" field")
     }
 }
 
@@ -374,11 +379,12 @@ impl Scenario for CatchConcurrencyUserError {
             )
             .design_done();
 
-        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
         let _ = rt.block_on(async move {
-            let _ = programs.pop().unwrap().run_n(1).await;
+            let mut program = programs.pop().expect("Failed to pop program");
+            let _ = program.run_n(1).await;
             Ok(0)
         });
 
@@ -449,11 +455,12 @@ impl Scenario for CatchNestedConcurrencyUserError {
             )
             .design_done();
 
-        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
         let _ = rt.block_on(async move {
-            let _ = programs.pop().unwrap().run_n(1).await;
+            let mut program = programs.pop().expect("Failed to pop program");
+            let _ = program.run_n(1).await;
             Ok(0)
         });
 
@@ -468,8 +475,9 @@ struct ErrorCodesTestInput {
 
 impl ErrorCodesTestInput {
     pub fn new(inputs: &Option<String>) -> Self {
-        let v: Value = serde_json::from_str(inputs.as_ref().unwrap()).unwrap();
-        serde_json::from_value(v["test"].clone()).unwrap()
+        let input_string = inputs.as_ref().expect("Test input is expected");
+        let v: Value = serde_json::from_str(input_string).expect("Failed to parse input string");
+        serde_json::from_value(v["test"].clone()).expect("Failed to parse \"test\" field")
     }
 }
 
@@ -555,11 +563,12 @@ impl Scenario for CatchDoubleMixedUserError {
             .add_design(self.create_design(&logic.error_codes).expect("Failed to create design"))
             .design_done();
 
-        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
         let _ = rt.block_on(async move {
-            let _ = programs.pop().unwrap().run_n(1).await;
+            let mut program = programs.pop().expect("Failed to pop program");
+            let _ = program.run_n(1).await;
             Ok(0)
         });
 
@@ -634,11 +643,12 @@ impl Scenario for CatchDoubleRecoverableUserError {
             .add_design(self.create_design(&logic.error_codes).expect("Failed to create design"))
             .design_done();
 
-        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
         let _ = rt.block_on(async move {
-            let _ = programs.pop().unwrap().run_n(1).await;
+            let mut program = programs.pop().expect("Failed to pop program");
+            let _ = program.run_n(1).await;
             Ok(0)
         });
 
@@ -702,11 +712,12 @@ impl Scenario for DoubleCatchSequence {
             .add_design(self.create_design(logic.error_code).expect("Failed to create design"))
             .design_done();
 
-        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
         let _ = rt.block_on(async move {
-            let _ = programs.pop().unwrap().run_n(1).await;
+            let mut program = programs.pop().expect("Failed to pop program");
+            let _ = program.run_n(1).await;
             Ok(0)
         });
 

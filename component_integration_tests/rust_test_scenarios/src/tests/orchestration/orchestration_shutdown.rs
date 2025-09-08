@@ -131,7 +131,7 @@ impl Scenario for SingleProgramSingleShutdown {
             .expect("Failed to bind shutdown event");
 
         // Create programs
-        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
         // Get shutdown notifier
@@ -141,7 +141,8 @@ impl Scenario for SingleProgramSingleShutdown {
 
         // Put programs into runtime and run them
         let _ = rt.spawn(async move {
-            let _ = programs.pop().unwrap().run().await;
+            let mut program = programs.pop().expect("Failed to pop program");
+            let _ = program.run().await;
             Ok(0)
         });
 
@@ -185,7 +186,7 @@ impl Scenario for TwoProgramsSingleShutdown {
             .expect("Failed to bind shutdown event");
 
         // Create programs
-        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
         // Get shutdown notifier
@@ -255,7 +256,7 @@ impl Scenario for TwoProgramsTwoShutdowns {
             .expect("Failed to bind shutdown event 2");
 
         // Create programs
-        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
         // Get shutdown notifiers
@@ -321,7 +322,7 @@ impl Scenario for GetAllShutdowns {
             .expect("Failed to bind shutdown event 2");
 
         // Create programs
-        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
         // Get shutdown notifiers
@@ -375,7 +376,7 @@ impl Scenario for OneProgramNotShut {
             .expect("Failed to bind shutdown event 2");
 
         // Create programs
-        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
         // Get shutdown notifiers
@@ -423,7 +424,7 @@ impl Scenario for ShutdownBeforeStart {
             .expect("Failed to bind shutdown event");
 
         // Create programs
-        let mut program_manager = orch.into_program_manager().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
         // Get shutdown notifier
@@ -437,7 +438,8 @@ impl Scenario for ShutdownBeforeStart {
 
         // Put programs into runtime and run them
         let _ = rt.spawn(async move {
-            let _ = programs.pop().unwrap().run().await;
+            let mut program = programs.pop().expect("Failed to pop program");
+            let _ = program.run().await;
             Ok(0)
         });
 
