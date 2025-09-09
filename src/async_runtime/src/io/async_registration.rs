@@ -552,6 +552,7 @@ impl<S: IoSelector> Drop for ReadinessFuture<'_, S> {
 #[cfg(test)]
 #[cfg(not(loom))]
 mod tests {
+    use core::time::Duration;
     use std::os::fd::AsRawFd;
 
     use testing::{build_with_location, prelude::MockFnBuilder};
@@ -824,7 +825,7 @@ mod tests {
         fn select<Container: crate::mio::types::IoSelectorEventContainer>(
             &self,
             _events: &mut Container,
-            _timeout: Option<std::time::Duration>,
+            _timeout: Option<Duration>,
         ) -> crate::mio::types::Result<()> {
             Ok(())
         }
@@ -1456,6 +1457,7 @@ mod tests {
     fn readiness_state_clone_and_copy() {
         let state1 = create_state_with_bits(0x1234_5678);
         let state2 = state1; // Copy
+        #[allow(clippy::clone_on_copy)]
         let state3 = state1.clone(); // Clone
 
         assert_eq!(state1, state2);

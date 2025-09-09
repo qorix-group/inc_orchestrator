@@ -28,7 +28,7 @@ fn example_component_design() -> Result<Design, CommonErrors> {
 
     // Create a program with trigger action
     design.add_program("ExampleProgram", move |design_instance, builder| {
-        builder.with_run_action(TriggerBuilder::from_design("InternalEvent", &design_instance));
+        builder.with_run_action(TriggerBuilder::from_design("InternalEvent", design_instance));
 
         Ok(())
     });

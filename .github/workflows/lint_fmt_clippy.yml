@@ -52,8 +52,8 @@ jobs:
           command: xtask
           args: check_lic
 
-      - name: check clippy errors (without warnings)
+      - name: check clippy errors
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: -- -D warnings
+          args: --all-features --all-targets -- -D warnings

@@ -42,9 +42,9 @@ fn collision_detection_component_design() -> Result<Design, CommonErrors> {
     design.add_program("CollisionDetectionProgram", move |design_instance, builder| {
         builder.with_run_action(
             SequenceBuilder::new()
-                .with_step(Invoke::from_design("collision_detection", &design_instance))
-                .with_step(TriggerBuilder::from_design("ForwardCollisionEvent", &design_instance))
-                .with_step(Invoke::from_design("some_work".into(), &design_instance))
+                .with_step(Invoke::from_design("collision_detection", design_instance))
+                .with_step(TriggerBuilder::from_design("ForwardCollisionEvent", design_instance))
+                .with_step(Invoke::from_design("some_work", design_instance))
                 .build(),
         );
 
@@ -79,7 +79,7 @@ fn main() {
 
     // Bind design event to the system event
     deployment
-        .bind_events_as_global("ADASEmergencyBrakeEvent".into(), &["ForwardCollisionEvent".into()])
+        .bind_events_as_global("ADASEmergencyBrakeEvent", &["ForwardCollisionEvent".into()])
         .expect("Failed to specify event");
 
     // Create programs

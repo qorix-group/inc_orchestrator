@@ -446,15 +446,12 @@ impl ExecutionEngineBuilder {
 #[allow(unused_imports)]
 mod tests {
     use super::*;
-    use ::core::time::Duration;
-    use std::{future, thread};
-    use std::{
-        panic,
-        sync::{
-            atomic::{AtomicUsize, Ordering},
-            Arc,
-        },
-    };
+    use core::future;
+    use core::sync::atomic::{AtomicUsize, Ordering};
+    use core::time::Duration;
+    use std::panic;
+    use std::sync::Arc;
+    use std::thread;
 
     // used from async_runtime.rs unit test
     impl ExecutionEngine {

@@ -248,7 +248,7 @@ mod tests {
                 assert_eq!(i, *e);
 
                 i += 1;
-                *e = *e + 1;
+                *e += 1;
                 assert_eq!(i, *e);
             }
         }
@@ -309,8 +309,8 @@ mod tests {
     }
 
     fn check_data(data: &[usize], count: usize, start_val: usize) {
-        for i in 0..count {
-            assert_eq!(data[i], start_val + i);
+        for (i, item) in data.iter().enumerate().take(count) {
+            assert_eq!(*item, start_val + i);
         }
     }
 

@@ -12,6 +12,7 @@
 //
 
 use async_runtime::{runtime::async_runtime::AsyncRuntimeBuilder, scheduler::execution_engine::*};
+use core::time::Duration;
 use foundation::prelude::*;
 use logging_tracing::{TraceScope, TracingLibraryBuilder};
 use orchestration::{
@@ -19,7 +20,7 @@ use orchestration::{
     common::DesignConfig,
     prelude::Invoke,
 };
-use std::{thread, time::Duration};
+use std::thread;
 
 mod common;
 

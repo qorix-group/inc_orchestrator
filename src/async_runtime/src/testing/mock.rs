@@ -41,7 +41,7 @@ impl Drop for MockRuntime {
     }
 }
 thread_local! {
-    static MOCK_RUNTIME: RefCell<Option<MockRuntime>> = RefCell::new(None);
+    static MOCK_RUNTIME: RefCell<Option<MockRuntime>> = const { RefCell::new(None) };
 }
 
 static DEV_CODE_ALLOW_ROUTING_OVER_MOCK: atomic::AtomicBool = atomic::AtomicBool::new(false);
@@ -96,12 +96,9 @@ pub mod runtime {
             let waker = create_waker(task.clone());
             let mut ctx = Context::from_waker(&waker);
 
-            match task.poll(&mut ctx) {
-                _ => {
-                    if !task.is_done() {
-                        to_enqueue.push(task);
-                    }
-                }
+            task.poll(&mut ctx);
+            if !task.is_done() {
+                to_enqueue.push(task);
             }
         }
 
@@ -128,8 +125,10 @@ pub mod runtime {
 
     ///
     /// Allows to run development process with RUNTIME MOCK compiled in so it will route to real runtime.
-    /// THIS IS ONLY ALLOWED IN DEV CODE, NOT IN PRODUCTION.
     ///
+    /// # Safety
+    ///
+    /// THIS IS ONLY ALLOWED IN DEV CODE, NOT IN PRODUCTION.
     pub unsafe fn allow_routing_over_mock() {
         DEV_CODE_ALLOW_ROUTING_OVER_MOCK.store(true, atomic::Ordering::Relaxed);
         println!(

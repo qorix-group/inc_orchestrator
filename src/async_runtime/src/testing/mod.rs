@@ -110,10 +110,9 @@ pub async fn test_function_ret<T>(ret: T) -> T {
     ret
 }
 
-pub(crate) fn get_dummy_task_waker() -> (
-    Waker,
-    Arc<AsyncTask<(), Box<dyn Future<Output = ()> + Send + 'static>, Arc<SchedulerMock>>>,
-) {
+pub(crate) type WakerTask = Arc<AsyncTask<(), Box<dyn Future<Output = ()> + Send + 'static>, Arc<SchedulerMock>>>;
+
+pub(crate) fn get_dummy_task_waker() -> (Waker, WakerTask) {
     let task = Arc::new(AsyncTask::new(box_future(async {}), 0, create_mock_scheduler()));
 
     (create_waker(TaskRef::new(task.clone())), task)
@@ -123,7 +122,7 @@ pub fn get_task_based_waker() -> Waker {
     get_dummy_task_waker().0
 }
 
-pub(crate) fn get_waker_from_task(task: &Arc<AsyncTask<(), Box<dyn Future<Output = ()> + Send + 'static>, Arc<SchedulerMock>>>) -> Waker {
+pub(crate) fn get_waker_from_task(task: &WakerTask) -> Waker {
     create_waker(TaskRef::new(task.clone()))
 }
 

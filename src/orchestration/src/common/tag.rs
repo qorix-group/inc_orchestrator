@@ -255,7 +255,7 @@ mod tests {
         let tag2: Tag = String::from("same_string").into();
         let tag3: Tag = String::from("different_string").into();
 
-        assert_eq!(tag1 == tag2, true);
-        assert_eq!(tag1 == tag3, false);
+        assert!(tag1 == tag2);
+        assert!(tag1 != tag3);
     }
 }

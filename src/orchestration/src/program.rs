@@ -324,11 +324,8 @@ mod tests {
         prelude::{Invoke, InvokeResult},
     };
     use async_runtime::testing;
-    use std::{
-        sync::{Arc, Mutex},
-        //task::Waker,
-        time::Duration,
-    };
+    use core::time::Duration;
+    use std::sync::{Arc, Mutex};
     use testing_macros::ensure_clear_mock_runtime;
 
     #[test]

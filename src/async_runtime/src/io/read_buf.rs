@@ -210,7 +210,7 @@ impl<'a> ReadBuf<'a> {
 #[cfg(not(loom))]
 mod tests {
     use super::*;
-    use std::mem::MaybeUninit;
+    use core::mem::MaybeUninit;
 
     #[test]
     fn new_and_capacity() {

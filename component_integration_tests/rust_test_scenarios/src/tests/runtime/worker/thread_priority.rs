@@ -109,7 +109,7 @@ impl Scenario for ThreadPriority {
                 cv.notify_all();
             }
 
-            result.expect(format!("Failed to join tasks after {wait_s} seconds").as_str());
+            result.expect("Failed to join tasks in given time");
 
             Ok(joiner.wait_for_all().await)
         });

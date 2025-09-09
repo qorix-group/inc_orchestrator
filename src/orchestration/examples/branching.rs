@@ -30,33 +30,33 @@ fn program_component_design() -> Result<Design, CommonErrors> {
 
     // This program will trigger an event if the condition is correctly evaluated to true, then sync on the event.
     // If the logic fails, then either an error will be produced, or the program will hang on the sync.
-    design.add_program("ExampleProgram1".into(), move |design_instance, builder| {
+    design.add_program("ExampleProgram1", move |design_instance, builder| {
         builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(IfElse::from_design(
                     "always_true_condition",
-                    TriggerBuilder::from_design("Event1", &design_instance),
-                    Invoke::from_design("always_produce_error", &design_instance),
-                    &design_instance,
+                    TriggerBuilder::from_design("Event1", design_instance),
+                    Invoke::from_design("always_produce_error", design_instance),
+                    design_instance,
                 ))
-                .with_step(SyncBuilder::from_design("Event1", &design_instance))
-                .with_step(Invoke::from_design("test1_sync_func", &design_instance))
+                .with_step(SyncBuilder::from_design("Event1", design_instance))
+                .with_step(Invoke::from_design("test1_sync_func", design_instance))
                 .build(),
         );
         Ok(())
     });
 
     // This program will produce an error if the condition is correctly evaluated to false.
-    design.add_program("ExampleProgram2".into(), move |design_instance, builder| {
+    design.add_program("ExampleProgram2", move |design_instance, builder| {
         builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(IfElse::from_design(
                     "always_false_condition",
-                    Invoke::from_design("test1_sync_func", &design_instance),
-                    Invoke::from_design("always_produce_error", &design_instance),
-                    &design_instance,
+                    Invoke::from_design("test1_sync_func", design_instance),
+                    Invoke::from_design("always_produce_error", design_instance),
+                    design_instance,
                 ))
-                .with_step(Invoke::from_design("test2_sync_func", &design_instance))
+                .with_step(Invoke::from_design("test2_sync_func", design_instance))
                 .build(),
         );
         Ok(())

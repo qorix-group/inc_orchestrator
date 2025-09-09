@@ -12,7 +12,7 @@
 //
 #![allow(dead_code)]
 
-use std::sync::atomic::{AtomicU32, Ordering};
+use core::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 use async_runtime::futures::{sleep, yield_now};
@@ -56,14 +56,14 @@ pub async fn test1_async_func() -> InvokeResult {
     info!("'test1_async_func' function resuming....");
     let rv = busy_sleep();
     info!("End of 'test1_async_func' function.");
-    return rv;
+    rv
 }
 
 pub async fn test2_async_func() -> InvokeResult {
     info!("Start of 'test2_async_func' function.");
     let rv = busy_sleep();
     info!("End of 'test2_async_func' function.");
-    return rv;
+    rv
 }
 
 pub async fn test3_async_func() -> InvokeResult {
@@ -74,7 +74,7 @@ pub async fn test3_async_func() -> InvokeResult {
     info!("'test3_async_func' function resuming....");
     let rv = busy_sleep();
     info!("End of 'test3_async_func' function.");
-    return rv;
+    rv
 }
 
 pub async fn test4_async_func() -> InvokeResult {

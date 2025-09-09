@@ -408,13 +408,14 @@ mod tests {
     fn test_worker_stop() {
         use crate::scheduler::driver::Drivers;
         use crate::{box_future, AsyncTask, FoundationAtomicBool, TaskRef};
-        use ::core::time::Duration;
+        use core::sync::atomic;
+        use core::time::Duration;
         use foundation::prelude::debug;
         use foundation::threading::thread_wait_barrier::ThreadWaitBarrier;
         use std::sync::Arc;
 
         async fn test_fn(b: Arc<FoundationAtomicBool>) {
-            b.store(true, ::core::sync::atomic::Ordering::SeqCst);
+            b.store(true, atomic::Ordering::SeqCst);
         }
 
         let drivers = Drivers::new();
@@ -450,7 +451,7 @@ mod tests {
         }
 
         // First, test that tasks are executed normally
-        let first_task_executed = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let first_task_executed = Arc::new(atomic::AtomicBool::new(false));
         let first_task_executed_clone = first_task_executed.clone();
 
         let task = Arc::new(AsyncTask::new(box_future(test_fn(first_task_executed_clone)), 0, scheduler.clone()));
@@ -459,7 +460,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(100));
 
         assert!(
-            first_task_executed.load(::core::sync::atomic::Ordering::SeqCst),
+            first_task_executed.load(atomic::Ordering::SeqCst),
             "First task was not executed while worker was still active"
         );
 
@@ -467,7 +468,7 @@ mod tests {
         worker.stop();
 
         // Try to execute a second task after stopping
-        let second_task_executed = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let second_task_executed = Arc::new(atomic::AtomicBool::new(false));
         let second_task_executed_clone = second_task_executed.clone();
 
         let task = Arc::new(AsyncTask::new(box_future(test_fn(second_task_executed_clone)), 0, scheduler.clone()));
@@ -478,7 +479,7 @@ mod tests {
 
         // The second task should NOT have been executed
         assert!(
-            !second_task_executed.load(::core::sync::atomic::Ordering::SeqCst),
+            !second_task_executed.load(atomic::Ordering::SeqCst),
             "Second task was executed even though worker was stopped"
         );
     }
