@@ -174,7 +174,6 @@ impl ProgramData {
 }
 
 #[cfg(test)]
-
 mod tests {
     // Tests are disabled in Miri due to limitations of using OS calls that are done in Iceroxy2 backend.
     // Currently we do not have any constructor that can inject IPC provider (subject to change in the near future).
@@ -188,7 +187,7 @@ mod tests {
         let id = Tag::from_str_static("design1");
         let config = DesignConfig::default();
 
-        let design = Design::new(id, config.clone());
+        let design = Design::new(id, config);
 
         assert_eq!(design.id(), id);
         assert_eq!(*design.config(), config);
@@ -206,7 +205,7 @@ mod tests {
 
         let tag = Tag::from_str_static("invoke_fn");
 
-        let result = design.register_invoke_fn(tag.clone(), action);
+        let result = design.register_invoke_fn(tag, action);
 
         assert!(result.is_ok());
         let orchestration_tag = result.unwrap();
@@ -222,11 +221,11 @@ mod tests {
         let tag = Tag::from_str_static("invoke_fn");
 
         // Register the function once
-        let result = design.register_invoke_fn(tag.clone(), action.clone());
+        let result = design.register_invoke_fn(tag, action);
         assert!(result.is_ok());
 
         // Attempt to register the same function again
-        let duplicate_result = design.register_invoke_fn(tag.clone(), action);
+        let duplicate_result = design.register_invoke_fn(tag, action);
         assert!(duplicate_result.is_err());
         assert_eq!(duplicate_result.unwrap_err(), CommonErrors::AlreadyDone);
     }
@@ -240,10 +239,10 @@ mod tests {
         let tag = Tag::from_str_static("orchestration_tag");
 
         // Register the function
-        let _ = design.register_invoke_fn(tag.clone(), action);
+        let _ = design.register_invoke_fn(tag, action);
 
         // Retrieve the orchestration tag
-        let orchestration_tag = design.get_orchestration_tag(tag.clone());
+        let orchestration_tag = design.get_orchestration_tag(tag);
         assert!(orchestration_tag.is_ok());
         assert_eq!(*orchestration_tag.unwrap().tag(), tag);
     }

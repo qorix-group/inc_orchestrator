@@ -31,7 +31,7 @@ fn catch_error_component_design() -> Result<Design, CommonErrors> {
     register_all_common_into_design(&mut design)?; // Register our common functions, events, etc
 
     // Create a program describing task chain
-    design.add_program("CatchErrorProgramDesign".into(), move |design_instance, builder| {
+    design.add_program("CatchErrorProgramDesign", move |design_instance, builder| {
         builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(
@@ -40,36 +40,36 @@ fn catch_error_component_design() -> Result<Design, CommonErrors> {
                         ConcurrencyBuilder::new()
                             .with_branch(
                                 SequenceBuilder::new()
-                                    .with_step(Invoke::from_design("test2_sync_func", &design_instance))
-                                    .with_step(Invoke::from_design("test3_sync_func", &design_instance))
+                                    .with_step(Invoke::from_design("test2_sync_func", design_instance))
+                                    .with_step(Invoke::from_design("test3_sync_func", design_instance))
                                     .build(),
                             )
                             .with_branch(
                                 SequenceBuilder::new()
-                                    .with_step(Invoke::from_design("test1_sync_func", &design_instance))
-                                    .with_step(Invoke::from_design("error_after_third_run", &design_instance))
+                                    .with_step(Invoke::from_design("test1_sync_func", design_instance))
+                                    .with_step(Invoke::from_design("error_after_third_run", design_instance))
                                     .build(),
                             )
-                            .build(&design_instance),
+                            .build(design_instance),
                     )
                     .catch(|e| {
                         // Handle the error, e.g., log it or take some action
                         error!("Caught error: {:?}. This is not recoverable and we will stop execution", e);
                     })
-                    .build(&design_instance),
+                    .build(design_instance),
                 )
-                .with_step(Invoke::from_design("test4_sync_func", &design_instance))
+                .with_step(Invoke::from_design("test4_sync_func", design_instance))
                 .with_step(
                     CatchBuilder::new(
                         ErrorFilter::UserErrors.into(),
-                        Invoke::from_design("always_produce_error", &design_instance),
+                        Invoke::from_design("always_produce_error", design_instance),
                     )
                     .catch_recoverable(|e| {
                         // Handle the error, e.g., log it or take some action
                         info!("Caught error: {:?}. This is catched and we continue executing", e);
                         true
                     })
-                    .build(&design_instance),
+                    .build(design_instance),
                 )
                 .build(),
         );

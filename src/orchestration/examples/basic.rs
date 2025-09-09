@@ -11,7 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::time::Duration;
+use core::time::Duration;
 
 use async_runtime::{prelude::ThreadParameters, runtime::async_runtime::AsyncRuntimeBuilder, scheduler::execution_engine::*};
 use foundation::prelude::*;
@@ -36,16 +36,16 @@ fn example_component_design() -> Result<Design, CommonErrors> {
     design.add_program("ExampleDesignProgram", move |design_instance, builder| {
         builder.with_run_action(
             SequenceBuilder::new()
-                .with_step(SyncBuilder::from_design("cyclic_evt", &design_instance))
-                .with_step(Invoke::from_design("test1_sync_func", &design_instance))
-                .with_step(Invoke::from_design("test2_sync_func", &design_instance))
+                .with_step(SyncBuilder::from_design("cyclic_evt", design_instance))
+                .with_step(Invoke::from_design("test1_sync_func", design_instance))
+                .with_step(Invoke::from_design("test2_sync_func", design_instance))
                 .with_step(
                     ConcurrencyBuilder::new()
-                        .with_branch(Invoke::from_design("test3_sync_func", &design_instance))
-                        .with_branch(Invoke::from_design("test4_sync_func", &design_instance))
-                        .build(&design_instance),
+                        .with_branch(Invoke::from_design("test3_sync_func", design_instance))
+                        .with_branch(Invoke::from_design("test4_sync_func", design_instance))
+                        .build(design_instance),
                 )
-                .with_step(Invoke::from_design("test4_async_func", &design_instance))
+                .with_step(Invoke::from_design("test4_async_func", design_instance))
                 .build(),
         );
 

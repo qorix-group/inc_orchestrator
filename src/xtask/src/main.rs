@@ -124,7 +124,13 @@ fn main() {
 }
 
 fn clippy(envs: HashMap<String, String>, cli_env_vars: HashMap<String, String>, passthrough_args: &[String]) {
-    run_build("clippy", &["clippy"], envs, cli_env_vars, passthrough_args);
+    run_build(
+        "clippy",
+        &["clippy", "--all-targets", "--all-features"],
+        envs,
+        cli_env_vars,
+        passthrough_args,
+    );
 }
 
 fn test(envs: HashMap<String, String>, cli_env_vars: HashMap<String, String>, passthrough_args: &[String]) {

@@ -271,7 +271,7 @@ impl<OutType> DerefMut for ReusableBoxFuture<OutType> {
 #[cfg(test)]
 #[cfg(not(loom))]
 mod tests {
-    use std::panic::{AssertUnwindSafe, RefUnwindSafe, UnwindSafe};
+    use core::panic::{AssertUnwindSafe, RefUnwindSafe, UnwindSafe};
 
     use foundation::prelude::FoundationAtomicU16;
 

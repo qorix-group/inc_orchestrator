@@ -171,12 +171,12 @@ impl AsyncRuntime {
 #[allow(unused_imports)]
 mod tests {
     use super::*;
+    use core::sync::atomic::{AtomicUsize, Ordering};
+    use core::time::Duration;
     use foundation::threading::thread_wait_barrier::ThreadWaitBarrier;
-    use std::sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    };
-    use std::{fs, thread, time::Duration};
+    use std::fs;
+    use std::sync::Arc;
+    use std::thread;
 
     fn count_threads() -> usize {
         fs::read_dir("/proc/self/task").unwrap().count()
@@ -335,7 +335,7 @@ mod tests {
         let runtime = builder.build().unwrap();
 
         // Check that the default engine (index 0) is the one that was added first (worker_count = 1)
-        assert_eq!(runtime.engines.get(0).unwrap().worker_count(), 1);
+        assert_eq!(runtime.engines.first().unwrap().worker_count(), 1);
 
         // Check the order of engines
         for (i, engine) in runtime.engines.iter().enumerate() {

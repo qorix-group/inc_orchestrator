@@ -29,11 +29,11 @@ fn program1_component_design() -> Result<Design, CommonErrors> {
     register_all_common_into_design(&mut design)?; // Register our common functions, events, etc
 
     // Create a program describing task chain
-    design.add_program("ExampleDesign1".into(), move |design_instance, builder| {
+    design.add_program("ExampleDesign1", move |design_instance, builder| {
         builder.with_run_action(
             SequenceBuilder::new()
-                .with_step(SyncBuilder::from_design("Event1", &design_instance))
-                .with_step(Invoke::from_design("test1_sync_func", &design_instance))
+                .with_step(SyncBuilder::from_design("Event1", design_instance))
+                .with_step(Invoke::from_design("test1_sync_func", design_instance))
                 .build(),
         );
         Ok(())
@@ -48,11 +48,11 @@ fn program2_component_design() -> Result<Design, CommonErrors> {
     register_all_common_into_design(&mut design)?; // Register our common functions, events, etc
 
     // Create a program describing task chain
-    design.add_program("ExampleDesign2".into(), move |design_instance, builder| {
+    design.add_program("ExampleDesign2", move |design_instance, builder| {
         builder.with_run_action(
             SequenceBuilder::new()
-                .with_step(Invoke::from_design("test4_sync_func", &design_instance))
-                .with_step(TriggerBuilder::from_design("Event1", &design_instance))
+                .with_step(Invoke::from_design("test4_sync_func", design_instance))
+                .with_step(TriggerBuilder::from_design("Event1", design_instance))
                 .build(),
         );
         Ok(())

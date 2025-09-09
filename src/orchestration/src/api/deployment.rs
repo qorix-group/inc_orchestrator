@@ -144,6 +144,7 @@ impl Deployment<'_> {
 mod tests {
     use super::*;
     use crate::common::DesignConfig;
+    use core::marker::PhantomData;
     use foundation::containers::growable_vec::GrowableVec;
 
     fn setup_api_single_design() -> OrchestrationApi<crate::api::_DesignTag> {
@@ -157,7 +158,7 @@ mod tests {
             designs: foundation::containers::growable_vec::GrowableVec::default(),
             events: crate::events::events_provider::EventsProvider::default(),
             shutdown_events: GrowableVec::default(),
-            _p: std::marker::PhantomData,
+            _p: PhantomData,
         };
         api.designs.push(design);
         api.design_done()
@@ -174,7 +175,7 @@ mod tests {
             designs: foundation::containers::growable_vec::GrowableVec::default(),
             events: crate::events::events_provider::EventsProvider::default(),
             shutdown_events: GrowableVec::default(),
-            _p: std::marker::PhantomData,
+            _p: PhantomData,
         };
         api.designs.push(design);
 

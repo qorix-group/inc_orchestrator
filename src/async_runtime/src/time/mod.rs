@@ -349,13 +349,11 @@ impl Drop for Inner {
 #[cfg(test)]
 #[cfg(not(loom))]
 mod tests {
-
-    use std::{
-        collections::HashSet,
-        sync::Mutex,
-        task::Wake,
-        time::{Duration, SystemTime, UNIX_EPOCH},
-    };
+    use core::time::Duration;
+    use std::collections::HashSet;
+    use std::sync::Mutex;
+    use std::task::Wake;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     use testing::prelude::{CallableTrait, *};
 
@@ -540,7 +538,7 @@ mod tests {
         fn next_u32(&mut self) -> u64 {
             // Constants from Numerical Recipes
             self.state = self.state.wrapping_mul(6364136223846793005).wrapping_add(1);
-            (self.state >> 32) as u64
+            self.state >> 32
         }
 
         /// Generates a random number in the range [0, max)
@@ -549,7 +547,7 @@ mod tests {
         }
     }
 
-    fn are_unique<T: Ord>(sorted: &Vec<T>) -> bool {
+    fn are_unique<T: Ord>(sorted: &[T]) -> bool {
         sorted.windows(2).all(|w| w[0] != w[1])
     }
 
@@ -585,7 +583,7 @@ mod tests {
         for (i, t) in timeouts.iter().enumerate() {
             match driver.register_timeout_internal(*t, waker.clone()) {
                 Ok(_) => {}
-                Err(e) => assert!(false, "Failed to register timeout at {} with {:?}, iter {}", t, e, i),
+                Err(e) => panic!("Failed to register timeout at {} with {:?}, iter {}", t, e, i),
             }
         }
 
@@ -600,7 +598,7 @@ mod tests {
             let current = timeouts[i];
             let next = timeouts[i + 1];
 
-            let before = prev + rng.next_u32() as u64 % (current - prev);
+            let before = prev + rng.next_u32() % (current - prev);
 
             driver.process_internal(before);
             assert_eq!(current_call_times, mock.times(), "Polled in {} should timeout in {}", before, current); // Nothing shall change
@@ -610,7 +608,7 @@ mod tests {
 
             assert_eq!(current_call_times, mock.times(), "Polled in {} should timeout in {}", current, current); // Shall fire
 
-            let after = current + rng.next_u32() as u64 % (next - current);
+            let after = current + rng.next_u32() % (next - current);
             driver.process_internal(after);
             assert_eq!(current_call_times, mock.times(), "Polled in {} already timeout at {}", after, current); // Nothing shall change
 
@@ -622,10 +620,10 @@ mod tests {
         match sorted.binary_search(x) {
             Ok(index) => {
                 let mut reps = 0;
-                let mut start = sorted[index..].iter();
-                let mut startr = sorted[index..].iter().rev();
+                let start = sorted[index..].iter();
+                let startr = sorted[index..].iter().rev();
 
-                while let Some(v) = start.next() {
+                for v in start {
                     if *v == *x {
                         reps += 1;
                     } else {
@@ -633,7 +631,7 @@ mod tests {
                     }
                 }
 
-                while let Some(v) = startr.next() {
+                for v in startr {
                     if *v == *x {
                         reps += 1;
                     } else {
@@ -673,7 +671,7 @@ mod tests {
         for (i, t) in timeouts.iter().enumerate() {
             match driver.register_timeout_internal(*t, waker.clone()) {
                 Ok(_) => {}
-                Err(e) => assert!(false, "Failed to register timeout at {} with {:?}, iter {}", t, e, i),
+                Err(e) => panic!("Failed to register timeout at {} with {:?}, iter {}", t, e, i),
             }
         }
 
@@ -712,7 +710,7 @@ mod tests {
                 let mut numbers = generate_unique_numbers(rng.gen_range(10) as usize, rng);
 
                 for n in numbers.iter_mut() {
-                    *n = *n / (slot_taken * level_range); // align to slot beginning
+                    *n /= slot_taken * level_range; // align to slot beginning
 
                     *n += rng.gen_range(slot_range); // randomize offset in slot
                 }
@@ -744,7 +742,7 @@ mod tests {
         for (i, t) in timeouts.iter().enumerate() {
             match driver.register_timeout_internal(*t, waker.clone()) {
                 Ok(_) => {}
-                Err(e) => assert!(false, "Failed to register timeout at {} with {:?}, iter {}", t, e, i),
+                Err(e) => panic!("Failed to register timeout at {} with {:?}, iter {}", t, e, i),
             }
         }
 

@@ -35,8 +35,8 @@ fn braking_component_design() -> Result<Design, CommonErrors> {
     design.add_program("BrakingProgram", move |design_instance, builder| {
         builder.with_run_action(
             SequenceBuilder::new()
-                .with_step(SyncBuilder::from_design("BrakeEvent", &design_instance))
-                .with_step(Invoke::from_design("apply_brake", &design_instance))
+                .with_step(SyncBuilder::from_design("BrakeEvent", design_instance))
+                .with_step(Invoke::from_design("apply_brake", design_instance))
                 .build(),
         );
 
@@ -71,7 +71,7 @@ fn main() {
 
     // Bind design event to the system event
     deployment
-        .bind_events_as_global("ADASEmergencyBrakeEvent".into(), &["BrakeEvent".into()])
+        .bind_events_as_global("ADASEmergencyBrakeEvent", &["BrakeEvent".into()])
         .expect("Failed to specify event");
 
     // Create programs

@@ -286,7 +286,8 @@ unsafe impl<I: Item + Send> Send for List<I> {}
 #[cfg(test)]
 #[cfg(not(loom))]
 mod tests {
-    use std::{cell::RefCell, rc::Rc};
+    use core::cell::RefCell;
+    use std::rc::Rc;
 
     use super::*;
 
@@ -442,14 +443,23 @@ mod tests {
         }
 
         {
-            let item1 = TestItem { value: 1, link: Link::new() };
+            let item1 = TestItem { value: 2, link: Link::new() };
+            let item2 = TestItem { value: 2, link: Link::new() };
+            let item3 = TestItem { value: 4, link: Link::new() };
+            let item4 = TestItem {
+                value: 16,
+                link: Link::new(),
+            };
             let mut list: List<TestItem> = Default::default();
             unsafe {
                 list.push_back(&item1);
+                list.push_back(&item2);
+                list.push_back(&item3);
+                list.push_back(&item4);
             }
 
             // Remove all even values
-            list.remove_if(|item| item.value % 1 == 0);
+            list.remove_if(|item| item.value % 2 == 0);
 
             assert_eq!(list.len(), 0);
         }
@@ -491,8 +501,8 @@ mod tests {
         let vals = [unsafe { list.pop_front().unwrap().as_ref().value }, unsafe {
             list.pop_front().unwrap().as_ref().value
         }];
-        assert_eq!(vals.contains(&10), true);
-        assert_eq!(vals.contains(&30), true);
+        assert!(vals.contains(&10));
+        assert!(vals.contains(&30));
         // Remove non-existent item
         let item4 = TestItem {
             value: 40,

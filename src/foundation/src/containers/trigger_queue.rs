@@ -163,11 +163,10 @@ impl<T> TriggerQueue<T> {
 #[cfg(not(loom))]
 mod tests {
     use super::*;
-    use std::{
-        sync::{atomic::Ordering, Arc},
-        thread,
-        time::Duration,
-    };
+    use core::sync::atomic::Ordering;
+    use core::time::Duration;
+    use std::sync::Arc;
+    use std::thread;
 
     pub fn collect_from_iterator<I, T>(iter: I, size: usize) -> Vec<T>
     where
@@ -419,7 +418,7 @@ mod tests {
         let queue = TriggerQueue::<i32>::new(128);
 
         // Initially state should be false (not sleeping)
-        assert_eq!(queue.state.load(Ordering::SeqCst), false);
+        assert!(!queue.state.load(Ordering::SeqCst));
 
         // Set up a thread that will wait
         let queue_arc = Arc::new(queue);
@@ -430,7 +429,7 @@ mod tests {
             let result = queue_clone.pop_blocking_with_timeout(Duration::from_millis(500));
 
             // After timeout, state should be false again
-            assert_eq!(queue_clone.state.load(Ordering::SeqCst), false);
+            assert!(!queue_clone.state.load(Ordering::SeqCst));
 
             result
         });
@@ -439,7 +438,7 @@ mod tests {
         thread::sleep(Duration::from_millis(100));
 
         // State should be true (sleeping)
-        assert_eq!(queue_arc.state.load(Ordering::SeqCst), true);
+        assert!(queue_arc.state.load(Ordering::SeqCst));
 
         // Wait for thread to finish
         let _ = handle.join().unwrap();

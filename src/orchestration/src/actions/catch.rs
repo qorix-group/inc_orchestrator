@@ -294,7 +294,7 @@ mod tests {
     use testing::prelude::CallableTrait;
 
     use super::*;
-    use std::{
+    use core::{
         sync::atomic::{AtomicBool, Ordering},
         task::Poll,
     };
@@ -318,7 +318,7 @@ mod tests {
                 handler_called_clone.store(true, Ordering::SeqCst);
             })
             .build(&design);
-        assert!(handler_called.load(Ordering::SeqCst) == false); // Handler should not be called during build
+        assert!(!handler_called.load(Ordering::SeqCst)); // Handler should not be called during build
     }
 
     #[test]
@@ -336,7 +336,7 @@ mod tests {
                 true
             })
             .build(&design);
-        assert!(handler_called.load(Ordering::SeqCst) == false); // Handler should not be called during build
+        assert!(!handler_called.load(Ordering::SeqCst)); // Handler should not be called during build
     }
 
     #[test]

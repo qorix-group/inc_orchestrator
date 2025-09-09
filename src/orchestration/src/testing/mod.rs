@@ -13,11 +13,9 @@
 
 #![allow(dead_code)]
 
-use std::{
-    future::Future,
-    task::{Poll, Waker},
-    time::Instant,
-};
+use core::future::Future;
+use core::task::{Poll, Waker};
+use std::time::Instant;
 
 use crate::actions::action::{ActionResult, ActionTrait, ReusableBoxFutureResult};
 
@@ -181,7 +179,6 @@ impl OrchTestingPoller {
 
 #[cfg(test)]
 #[cfg(not(loom))]
-
 mod tests {
 
     use super::*;

@@ -401,11 +401,8 @@ mod tests {
                 clear_count: cc.clone(),
             });
 
-            // Get the object
-            let obj = pool.next_object().expect("Should get object");
-
-            // Return the object but drop the pool
-            obj
+            // Get the object, return the object but drop the pool
+            pool.next_object().expect("Should get object")
             // Pool is dropped here
         };
 

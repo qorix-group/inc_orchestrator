@@ -353,11 +353,8 @@ mod tests {
             {
                 let mut poller = TestingFuturePoller::new(async move {
                     loop {
-                        let res = r.recv().await;
-                        if res.is_none() {
-                            continue;
-                        } else {
-                            return res.unwrap();
+                        if let Some(v) = r.recv().await {
+                            return v;
                         }
                     }
                 });
@@ -383,11 +380,8 @@ mod tests {
             {
                 let mut poller = TestingFuturePoller::new(async move {
                     loop {
-                        let res = r.recv().await;
-                        if res.is_none() {
-                            continue;
-                        } else {
-                            return res.unwrap();
+                        if let Some(v) = r.recv().await {
+                            return v;
                         }
                     }
                 });

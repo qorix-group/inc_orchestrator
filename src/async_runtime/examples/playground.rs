@@ -22,9 +22,9 @@ use async_runtime::{
 };
 
 use ::core::future::Future;
+use core::time::Duration;
 use foundation::prelude::*;
 use iceoryx2::prelude::*;
-use std::time::Duration;
 
 pub struct X {}
 

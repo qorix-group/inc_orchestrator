@@ -728,12 +728,8 @@ mod tests {
 
         loop {
             if queue.steal_into(&steal_queue, None).is_some() {
-                loop {
-                    if let Some(val) = steal_pc.pop() {
-                        vec.push(val);
-                    } else {
-                        break;
-                    }
+                while let Some(val) = steal_pc.pop() {
+                    vec.push(val);
                 }
             } else {
                 break;
@@ -755,14 +751,9 @@ mod tests {
             thread::spawn(move || steal_for_pop_fn(qc))
         };
 
-        loop {
-            match pc.pop() {
-                Some(i) => {
-                    assert_eq!(tasks_done[i as usize], None);
-                    tasks_done[i as usize] = Some(i);
-                }
-                None => break,
-            }
+        while let Some(i) = pc.pop() {
+            assert_eq!(tasks_done[i as usize], None);
+            tasks_done[i as usize] = Some(i);
         }
 
         let worker1_vec = handle1.join().unwrap();
@@ -792,10 +783,10 @@ mod tests {
             thread::spawn(move || steal_fn(qc, sc))
         };
 
-        let mut i: u32 = vec_produced.last().unwrap().clone();
+        let mut i = *vec_produced.last().unwrap();
         let mpmc = MpmcQueue::new(256);
         while i < 100000 {
-            if let Ok(_) = pc.push(i, &mpmc) {
+            if pc.push(i, &mpmc).is_ok() {
                 vec_produced.push(i);
                 i += 1;
             }
@@ -868,10 +859,10 @@ mod tests {
             thread::spawn(move || steal_fn(qc, sc))
         };
 
-        let mut i: u32 = vec_produced.last().unwrap().clone();
+        let mut i = *vec_produced.last().unwrap();
         let mpmc: MpmcQueue<u32> = MpmcQueue::new(256);
         while i < 1000000 {
-            if let Ok(_) = pc.push(i, &mpmc) {
+            if pc.push(i, &mpmc).is_ok() {
                 vec_produced.push(i);
                 i += 1;
             }
@@ -981,14 +972,9 @@ mod tests {
             }
 
             // empty the mpmc
-            loop {
-                match dst.pop() {
-                    Some(i) => {
-                        assert_eq!(tasks_done[i as usize], None);
-                        tasks_done[i as usize] = Some(i);
-                    }
-                    None => break,
-                }
+            while let Some(i) = dst.pop() {
+                assert_eq!(tasks_done[i as usize], None);
+                tasks_done[i as usize] = Some(i);
             }
         }
 
@@ -1000,14 +986,9 @@ mod tests {
         }
 
         // Is there one last remaining task in spmc that can't be stolen?
-        loop {
-            match pc.pop() {
-                Some(i) => {
-                    assert_eq!(tasks_done[i as usize], None);
-                    tasks_done[i as usize] = Some(i);
-                }
-                None => break,
-            }
+        while let Some(i) = pc.pop() {
+            assert_eq!(tasks_done[i as usize], None);
+            tasks_done[i as usize] = Some(i);
         }
 
         // check if every task was exactly one time in a task queue
@@ -1026,7 +1007,7 @@ mod tests {
 
         let src: MpmcQueue<u32> = MpmcQueue::new(16);
         for i in 0..16 {
-            assert_eq!(src.push(i), true);
+            assert!(src.push(i));
         }
 
         assert_eq!(dst_pc.fetch_from(&src), 16);
@@ -1053,7 +1034,7 @@ mod tests {
         }
 
         for i in 0..16 {
-            assert_eq!(src.push(i), true);
+            assert!(src.push(i));
         }
 
         assert_eq!(dst_pc.fetch_from(&src), 5);
@@ -1093,7 +1074,7 @@ mod tests {
         }
 
         for i in 0..16 {
-            assert_eq!(src.push(i), true);
+            assert!(src.push(i));
         }
 
         assert_eq!(dst_pc.fetch_from(&src), 7);
@@ -1129,7 +1110,7 @@ mod tests {
         }
 
         for i in 0..4 {
-            assert_eq!(src.push(i), true);
+            assert!(src.push(i));
         }
 
         assert_eq!(dst_pc.fetch_from(&src), 4);
@@ -1161,7 +1142,7 @@ mod tests {
         }
 
         for i in 0..16 {
-            assert_eq!(src.push(i), true);
+            assert!(src.push(i));
         }
 
         for i in 0..8 {
@@ -1197,7 +1178,7 @@ mod tests {
         }
 
         for i in 0..16 {
-            assert_eq!(src.push(i), true);
+            assert!(src.push(i));
         }
 
         for i in 0..12 {
@@ -1205,7 +1186,7 @@ mod tests {
         }
 
         for i in 16..17 {
-            assert_eq!(src.push(i), true);
+            assert!(src.push(i));
         }
 
         assert_eq!(dst_pc.fetch_from(&src), 5);
@@ -1237,7 +1218,7 @@ mod tests {
         }
 
         for i in 0..14 {
-            assert_eq!(src.push(i), true);
+            assert!(src.push(i));
         }
 
         for i in 0..8 {
