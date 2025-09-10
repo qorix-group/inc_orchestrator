@@ -116,31 +116,7 @@ class TestSPMCBroadcastChannelBigMaxReceivers(CitScenario):
     def scenario_name(self) -> str:
         return "runtime.channel.spmc_broadcast.create_receivers_only"
 
-    @pytest.fixture(
-        scope="class",
-        params=[
-            pytest.param(
-                18446744073709551615,
-                marks=pytest.mark.xfail(
-                    reason="Bug https://github.com/qorix-group/inc_orchestrator_internal/issues/271"
-                ),
-            ),  # u64::MAX
-            pytest.param(
-                46744073709551615,
-                marks=pytest.mark.xfail(
-                    reason="Bug https://github.com/qorix-group/inc_orchestrator_internal/issues/271"
-                ),
-            ),
-            20000001,
-            pytest.param(
-                20000000,
-                marks=pytest.mark.xfail(
-                    reason="Bug https://github.com/qorix-group/inc_orchestrator_internal/issues/271"
-                ),
-            ),
-            19999999,
-        ],
-    )
+    @pytest.fixture(scope="class", params=[65535, 60000, 4095, 3000, 255])
     def max_receiver_count(self, request: pytest.FixtureRequest) -> int:
         return request.param
 

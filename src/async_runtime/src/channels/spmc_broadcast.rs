@@ -23,9 +23,9 @@ pub const DEFAULT_CHANNEL_SIZE: usize = 8;
 ///
 /// Creates Single Producer Multiple Consumer channel. Please keep in mind this is broadcast channel, so all `Receiver`s will receive the same value.
 ///
-pub fn create_channel<T: Copy, const SIZE: usize>(max_num_of_receivers: usize) -> (Sender<T, SIZE>, Receiver<T, SIZE>) {
+pub fn create_channel<T: Copy, const SIZE: usize>(max_num_of_receivers: u16) -> (Sender<T, SIZE>, Receiver<T, SIZE>) {
     assert!(max_num_of_receivers > 0, "Channel size must be greater than 0");
-    let chan = Arc::new(Channel::new(max_num_of_receivers));
+    let chan = Arc::new(Channel::new(max_num_of_receivers as usize));
 
     (
         Sender {
@@ -39,8 +39,8 @@ pub fn create_channel<T: Copy, const SIZE: usize>(max_num_of_receivers: usize) -
 ///
 /// Creates Single Producer Multiple Consumer channel with [`DEFAULT_CHANNEL_SIZE`] capacity. Please keep in mind this is broadcast channel, so all `Receiver`s will receive the same value.
 ///
-pub fn create_channel_default<T: Copy>(max_num_of_receivers: usize) -> (Sender<T, DEFAULT_CHANNEL_SIZE>, Receiver<T, DEFAULT_CHANNEL_SIZE>) {
-    let chan = Arc::new(Channel::new(max_num_of_receivers));
+pub fn create_channel_default<T: Copy>(max_num_of_receivers: u16) -> (Sender<T, DEFAULT_CHANNEL_SIZE>, Receiver<T, DEFAULT_CHANNEL_SIZE>) {
+    let chan = Arc::new(Channel::new(max_num_of_receivers as usize));
 
     (
         Sender {
