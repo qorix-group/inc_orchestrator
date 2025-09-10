@@ -19,7 +19,7 @@ use tracing::info;
 struct TestInput {
     data_to_send: Vec<u64>,
     receivers: Vec<String>,
-    max_receiver_count: usize,
+    max_receiver_count: u16,
 }
 
 impl TestInput {
@@ -116,7 +116,7 @@ impl Scenario for SPMCBroadcastSendReceive {
 struct OverflowTestInput {
     population_method: String,
     receiver_count: usize,
-    max_receiver_count: usize,
+    max_receiver_count: u16,
 }
 
 impl OverflowTestInput {
@@ -563,7 +563,7 @@ impl Scenario for SPMCBroadcastDropSender {
 struct HeavyTestInput {
     send_count: u64,
     receivers: Vec<String>,
-    max_receiver_count: usize,
+    max_receiver_count: u16,
 }
 
 impl HeavyTestInput {
