@@ -13,11 +13,16 @@
 
 #![allow(dead_code)]
 
-use core::future::Future;
-use core::task::{Poll, Waker};
+use core::{
+    future::Future,
+    task::{Poll, Waker},
+};
 use std::time::Instant;
 
-use crate::actions::action::{ActionResult, ActionTrait, ReusableBoxFutureResult};
+use crate::{
+    actions::action::{ActionResult, ActionTrait, ReusableBoxFutureResult},
+    prelude::ActionBaseMeta,
+};
 
 use kyron::futures::reusable_box_future::{ReusableBoxFuture, ReusableBoxFuturePool};
 use kyron_foundation::containers::{reusable_objects::ReusableObject, reusable_objects::ReusableObjects};
@@ -28,24 +33,12 @@ use kyron_testing::{
 use std::sync::{Arc, Mutex};
 
 const DEFAULT_POOL_SIZE: usize = 5;
-const DEFAULT_TAG: &str = "orch::testing::MockAction";
 
 ///
 /// A mock object that can be used to monitor the invocation count of actions, i.e. try_execute().
 /// Each invocation returns a (reusable) future containing values previously configured via will_once() or will_repeatedly().
 ///
 pub struct MockActionBuilder(MockFnBuilder<ActionResult>);
-
-pub struct MockAction {
-    reusable_future_pool: ReusableBoxFuturePool<ActionResult>,
-    reusable_mockfn_pool: ReusableObjects<MockFn<ActionResult>>,
-}
-
-impl Default for MockAction {
-    fn default() -> Self {
-        MockActionBuilder::default().build()
-    }
-}
 
 impl Default for MockActionBuilder {
     fn default() -> Self {
@@ -112,6 +105,11 @@ impl MockActionBuilder {
     }
 }
 
+pub struct MockAction {
+    reusable_future_pool: ReusableBoxFuturePool<ActionResult>,
+    reusable_mockfn_pool: ReusableObjects<MockFn<ActionResult>>,
+}
+
 impl MockAction {
     ///
     /// Call the underlying MockFn
@@ -140,6 +138,62 @@ impl ActionTrait for MockAction {
     fn dbg_fmt(&self, nest: usize, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         let indent = " ".repeat(nest);
         writeln!(f, "{}|-{}", indent, self.name())
+    }
+}
+
+impl Default for MockAction {
+    fn default() -> Self {
+        MockActionBuilder::default().build()
+    }
+}
+
+pub struct TestAsyncAction<A, F>
+where
+    A: Fn() -> F,
+    F: Future<Output = ActionResult>,
+{
+    base: ActionBaseMeta,
+    action: A,
+}
+
+impl<A, F> TestAsyncAction<A, F>
+where
+    A: Fn() -> F + 'static + Send,
+    F: Future<Output = ActionResult> + 'static + Send,
+{
+    pub fn new(action: A) -> Self {
+        let future = action();
+
+        Self {
+            base: ActionBaseMeta {
+                tag: "orch::testing::TestAsyncAction".into(),
+                reusable_future_pool: ReusableBoxFuturePool::<ActionResult>::for_value(DEFAULT_POOL_SIZE, Self::wrap_future(future)),
+            },
+            action,
+        }
+    }
+
+    // This is necessary to prevent undefined behavior with ReusableBoxFuturePool when F size is 0, f.e. when F is the result of future::pending.
+    async fn wrap_future(future: F) -> ActionResult {
+        future.await
+    }
+}
+
+impl<A, F> ActionTrait for TestAsyncAction<A, F>
+where
+    A: Fn() -> F + 'static + Send,
+    F: Future<Output = ActionResult> + 'static + Send,
+{
+    fn try_execute(&mut self) -> ReusableBoxFutureResult {
+        self.base.reusable_future_pool.next(Self::wrap_future((self.action)()))
+    }
+
+    fn name(&self) -> &'static str {
+        "MockPendingAction"
+    }
+
+    fn dbg_fmt(&self, _nest: usize, _formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        Ok(())
     }
 }
 
