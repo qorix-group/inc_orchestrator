@@ -20,13 +20,19 @@ use crate::futures::{FutureInternalReturn, FutureState};
 
 pub const DEFAULT_CHANNEL_SIZE: usize = 8;
 
+use iceoryx2_bb_elementary::bump_allocator::*;
+use iceoryx2_bb_elementary_traits::relocatable_container::*;
+use iceoryx2_bb_lock_free::mpmc::unique_index_set::*;
+
 ///
 /// Creates Single Producer Multiple Consumer channel. Please keep in mind this is broadcast channel, so all `Receiver`s will receive the same value.
 ///
 pub fn create_channel<T: Copy, const SIZE: usize>(max_num_of_receivers: u16) -> (Sender<T, SIZE>, Receiver<T, SIZE>) {
     assert!(max_num_of_receivers > 0, "Channel size must be greater than 0");
-    let chan = Arc::new(Channel::new(max_num_of_receivers as usize));
-
+    let mut chan = Arc::new(Channel::new(max_num_of_receivers as usize));
+    // Initialize the channel to set up the UniqueIndexSet after it is placed in an Arc.
+    // Since UniqueIndexSet uses self-referential pointers, it must be initialized after being placed in Arc.
+    Arc::get_mut(&mut chan).unwrap().init();
     (
         Sender {
             chan: chan.clone(),
@@ -40,8 +46,10 @@ pub fn create_channel<T: Copy, const SIZE: usize>(max_num_of_receivers: u16) -> 
 /// Creates Single Producer Multiple Consumer channel with [`DEFAULT_CHANNEL_SIZE`] capacity. Please keep in mind this is broadcast channel, so all `Receiver`s will receive the same value.
 ///
 pub fn create_channel_default<T: Copy>(max_num_of_receivers: u16) -> (Sender<T, DEFAULT_CHANNEL_SIZE>, Receiver<T, DEFAULT_CHANNEL_SIZE>) {
-    let chan = Arc::new(Channel::new(max_num_of_receivers as usize));
-
+    let mut chan = Arc::new(Channel::new(max_num_of_receivers as usize));
+    // Initialize the channel to set up the UniqueIndexSet after it is placed in an Arc.
+    // Since UniqueIndexSet uses self-referential pointers, it must be initialized after being placed in Arc.
+    Arc::get_mut(&mut chan).unwrap().init();
     (
         Sender {
             chan: chan.clone(),
@@ -86,10 +94,10 @@ impl<T: Copy, const SIZE: usize> Sender<T, SIZE> {
     }
 
     ///
-    /// Returns the number of receivers that was fetched.
+    /// Returns the number of active receivers.
     ///
     pub fn num_of_subscribers(&self) -> usize {
-        self.chan.len() as usize
+        self.chan.len()
     }
 }
 
@@ -159,7 +167,9 @@ impl<T: Copy, const SIZE: usize> Drop for Receiver<T, SIZE> {
 
 struct Channel<T: Copy, const SIZE: usize = DEFAULT_CHANNEL_SIZE> {
     channels: Vec<super::spsc::Channel<T, SIZE>>,
-    next_free_receiver: FoundationAtomicU8,
+    free_slots: UniqueIndexSet,
+    // Memory required for UniqueIndexSet to hold the indices
+    memory: Box<[u8]>,
 }
 
 unsafe impl<T: Copy, const SIZE: usize> Sync for Channel<T, SIZE> {}
@@ -173,16 +183,34 @@ impl<T: Copy, const SIZE: usize> Channel<T, SIZE> {
 
         Self {
             channels: v,
-            next_free_receiver: FoundationAtomicU8::new(0),
+            free_slots: unsafe { UniqueIndexSet::new_uninit(size) },
+            memory: {
+                let mut slice = Box::<[u8]>::new_uninit_slice(UniqueIndexSet::const_memory_size(size));
+                // SAFETY: We are initializing all bytes to zero before assuming init.
+                unsafe {
+                    ::core::ptr::write_bytes(slice.as_mut_ptr(), 0, slice.len());
+                }
+                unsafe { slice.assume_init() }
+            },
         }
     }
 
-    fn len(&self) -> u8 {
-        self.next_free_receiver.load(::core::sync::atomic::Ordering::Relaxed)
+    fn init(&mut self) {
+        let allocator = BumpAllocator::new(self.memory.as_mut_ptr());
+        unsafe {
+            self.free_slots
+                .init(&allocator)
+                .expect("Failed to allocate enough memory for UniqueIndexSet");
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.free_slots.borrowed_indices()
     }
 
     fn receiver_dropping(&self, index: usize) {
         self.channels[index].receiver_dropping();
+        unsafe { self.free_slots.release_raw_index(index as u32, ReleaseMode::Default) };
     }
 
     fn sender_dropping(&self) {
@@ -192,7 +220,7 @@ impl<T: Copy, const SIZE: usize> Channel<T, SIZE> {
     }
 
     fn send(&self, value: &T) -> Result<(), CommonErrors> {
-        let len = self.next_free_receiver.load(::core::sync::atomic::Ordering::Relaxed) as usize;
+        let len = self.channels.len();
         let mut ret = Ok(());
         let mut i = 0;
 
@@ -224,24 +252,14 @@ impl<T: Copy, const SIZE: usize> Channel<T, SIZE> {
     }
 
     fn subscribe(self: &Arc<Self>) -> Option<Receiver<T, SIZE>> {
-        let mut curr = self.next_free_receiver.load(::core::sync::atomic::Ordering::Relaxed);
-
-        loop {
-            if curr >= self.channels.len() as u8 {
-                return None; // No more receivers can be created
-            }
-
-            match self.next_free_receiver.compare_exchange(
-                curr,
-                curr + 1,
-                ::core::sync::atomic::Ordering::AcqRel,
-                ::core::sync::atomic::Ordering::Acquire,
-            ) {
-                Ok(_) => break,
-                Err(v) => curr = v,
-            }
+        let free_slot = unsafe { self.free_slots.acquire_raw_index() };
+        if free_slot.is_err() {
+            return None; // No more slots
         }
-
+        let curr = free_slot.unwrap() as u16;
+        // If receiver was dropped and reusing the channel, then we need to enable receiver again
+        // If new receiver, then it is already enabled, no harm in calling enable_receiver again
+        self.channels[curr as usize].enable_receiver();
         Some(Receiver {
             chan: self.clone(),
             index: curr as usize,
@@ -324,14 +342,16 @@ mod tests {
     #[test]
     fn test_channel_max_receivers() {
         let (s, _) = create_channel::<u32, 16>(3);
-
+        // The default receiver is already dropped above, so we can create max_num_of_receivers
         let r1 = s.subscribe();
         let r2 = s.subscribe();
-        let r3 = s.subscribe(); // Exceeds the maximum number of receivers
+        let r3 = s.subscribe();
+        let r4 = s.subscribe(); // Exceeds the maximum number of receivers
 
         assert!(r1.is_some());
         assert!(r2.is_some());
-        assert!(r3.is_none()); // No more receivers can be created
+        assert!(r3.is_some());
+        assert!(r4.is_none()); // No more receivers can be created
     }
 
     #[test]
@@ -494,6 +514,69 @@ mod tests {
         let mut poller = TestingFuturePoller::new(async move { vec![r2.recv().await.unwrap(), r2.recv().await.unwrap()] });
         let res = poller.poll_with_waker(&waker);
         assert_poll_ready(res, vec![1, 2]);
+    }
+
+    #[test]
+    fn test_reuse_of_unsubscribed_channel() {
+        let (s, r1) = create_channel::<u32, 16>(2);
+        let mut r2 = s.subscribe().unwrap();
+        assert!(s.num_of_subscribers() == 2);
+        drop(r1); // Drop one receiver
+        assert!(s.num_of_subscribers() == 1);
+
+        assert!(s.send(&1).is_ok()); // Should succeed for the remaining receiver
+
+        let mut r3 = s.subscribe().unwrap(); // Should reuse the slot of the dropped receiver
+        assert!(r3.try_clone().is_none()); // No more slots available
+
+        assert!(s.send(&2).is_ok()); // Should succeed for both receivers
+
+        let (waker, _) = get_dummy_task_waker();
+        let mut poller2 = TestingFuturePoller::new(async move { vec![r2.recv().await.unwrap(), r2.recv().await.unwrap()] });
+        let mut poller3 = TestingFuturePoller::new(async move { vec![r3.recv().await.unwrap()] });
+
+        let res2 = poller2.poll_with_waker(&waker);
+        let res3 = poller3.poll_with_waker(&waker);
+        assert_poll_ready(res2, vec![1, 2]);
+        assert_poll_ready(res3, vec![2]);
+    }
+
+    #[test]
+    fn test_reuse_of_unsubscribed_channel_discard_old_samples() {
+        let (s, r1) = create_channel::<u32, 16>(2);
+        let mut r2 = s.subscribe().unwrap();
+        assert!(s.num_of_subscribers() == 2);
+        // Send 5 samples
+        for i in 1..6 {
+            assert!(s.send(&i).is_ok());
+        }
+        drop(r1); // Drop one receiver
+        assert!(s.num_of_subscribers() == 1);
+        // Send another 5 samples
+        for i in 6..11 {
+            assert!(s.send(&i).is_ok());
+        }
+        // subscribe new receiver, should reuse the slot of the dropped receiver
+        let mut r3 = s.subscribe().unwrap();
+
+        // Send one sample
+        assert!(s.send(&100).is_ok());
+
+        let (waker, _) = get_dummy_task_waker();
+        let mut poller2 = TestingFuturePoller::new(async move {
+            let mut v = vec![];
+            // r2 should receive all 10 samples (1..10) + last one (100)
+            for _ in 0..11 {
+                v.push(r2.recv().await.unwrap());
+            }
+            v
+        });
+        let mut poller3 = TestingFuturePoller::new(async move { vec![r3.recv().await.unwrap()] });
+
+        let res2 = poller2.poll_with_waker(&waker);
+        let res3 = poller3.poll_with_waker(&waker);
+        assert_poll_ready(res2, vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 100]);
+        assert_poll_ready(res3, vec![100]); // r3 should only receive the last sample (100)
     }
 }
 
@@ -663,6 +746,56 @@ mod tests {
                 ::core::task::Poll::Pending => {}
                 _ => assert_poll_ready(res2, input.clone()),
             }
+        });
+    }
+
+    #[test]
+    fn test_broadcast_channel_multiple_receivers_drop_and_subscribe_again() {
+        let mut builder = Builder::new();
+        builder.preemption_bound = Some(3);
+
+        builder.check(|| {
+            let (s, r1) = create_channel::<u32, 16>(8);
+            let r2 = s.subscribe().unwrap();
+            let mut r3 = s.subscribe().unwrap();
+
+            // Drop 2 receivers from different threads
+            let h1 = loom::thread::spawn(move || drop(r1));
+            drop(r2);
+            h1.join().unwrap();
+            // only one receiver should be left
+            assert_eq!(s.num_of_subscribers(), 1);
+
+            let s = Arc::new(s);
+            let s1 = s.clone();
+            // Subscribe from 2 different threads
+            let handle1 = loom::thread::spawn(move || s1.subscribe().unwrap());
+            let mut r1 = s.subscribe().unwrap();
+            let mut r2 = handle1.join().unwrap();
+
+            // Now we should have 3 receivers
+            assert_eq!(s.num_of_subscribers(), 3);
+
+            // Send a value
+            assert!(s.send(&42).is_ok());
+
+            // All receivers should get the value
+            let (waker, _) = get_dummy_task_waker();
+            let w2 = waker.clone();
+            let w3 = waker.clone();
+            let mut poller1 = TestingFuturePoller::new(async move { r1.recv().await.unwrap() });
+            let mut poller2 = TestingFuturePoller::new(async move { r2.recv().await.unwrap() });
+            let mut poller3 = TestingFuturePoller::new(async move { r3.recv().await.unwrap() });
+
+            let res1 = poller1.poll_with_waker(&waker);
+            let h2 = loom::thread::spawn(move || poller2.poll_with_waker(&w2));
+            let h3 = loom::thread::spawn(move || poller3.poll_with_waker(&w3));
+            let res2 = h2.join().unwrap();
+            let res3 = h3.join().unwrap();
+
+            assert_poll_ready(res1, 42);
+            assert_poll_ready(res2, 42);
+            assert_poll_ready(res3, 42);
         });
     }
 }
