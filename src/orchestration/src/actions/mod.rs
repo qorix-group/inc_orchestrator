@@ -17,6 +17,7 @@ pub mod concurrency;
 pub mod graph;
 pub mod ifelse;
 pub mod invoke;
+pub mod select;
 pub mod sequence;
 pub mod sync;
 pub mod trigger;
