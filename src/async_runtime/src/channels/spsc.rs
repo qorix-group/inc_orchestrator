@@ -161,6 +161,24 @@ impl<T: Copy, const SIZE: usize> Channel<T, SIZE> {
     }
 
     ///
+    /// Enables receiver again in case it was dropped and we are reusing the channel
+    ///
+    pub(super) fn enable_receiver(&self) {
+        // Load current state
+        let state = self.connected_state.load(::core::sync::atomic::Ordering::Acquire);
+
+        // Check if receiver was gone
+        if state & RECV_GONE != 0 {
+            // Clear any stale data before enabling receiver again
+            let mut consumer = self.queue.acquire_consumer().unwrap();
+            while consumer.pop().is_some() {}
+
+            // Clear the bit to enable again
+            self.connected_state.fetch_and(!RECV_GONE, ::core::sync::atomic::Ordering::AcqRel);
+        }
+    }
+
+    ///
     /// Safety: Upper layer needs to assure that there is no other `send` caller at the same time, otherwise this will panic
     ///
     pub(crate) fn send(&self, value: &T) -> Result<(), CommonErrors> {
@@ -437,6 +455,43 @@ mod tests {
 
         // Now sending should succeed, as future is keep due to always pending, so 'r' is not dropped
         assert!(s.send(&3).is_ok());
+    }
+
+    #[test]
+    fn test_channel_reuse_after_receiver_dropped() {
+        let (s, mut r) = create_channel_default::<u32>();
+
+        assert!(s.send(&1).is_ok());
+        {
+            let (waker, _) = get_dummy_task_waker();
+
+            let mut poller = TestingFuturePoller::new(async move { r.recv().await.unwrap() });
+
+            let res = poller.poll_with_waker(&waker);
+            assert_poll_ready(res, 1);
+        }
+
+        // recv was dropped from above scope
+        assert!(s.send(&2).is_err());
+
+        // Create new receiver on same channel
+        let mut r2 = Receiver {
+            chan: s.chan.clone(),
+            _not_sync: PhantomData,
+        };
+        // Enable receiver again since it was dropped before
+        r2.chan.enable_receiver();
+
+        assert!(s.send(&2).is_ok());
+
+        {
+            let (waker, _) = get_dummy_task_waker();
+
+            let mut poller = TestingFuturePoller::new(async move { r2.recv().await.unwrap() });
+
+            let res = poller.poll_with_waker(&waker);
+            assert_poll_ready(res, 2);
+        }
     }
 }
 

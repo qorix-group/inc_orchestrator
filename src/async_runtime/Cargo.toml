@@ -13,6 +13,9 @@ iceoryx2-cal = {workspace = true, optional = true}
 iceoryx2-pal-concurrency-sync.workspace = true
 iceoryx2-bb-container.workspace = true
 iceoryx2-bb-posix.workspace = true
+iceoryx2-bb-lock-free.workspace = true
+iceoryx2-bb-elementary.workspace = true
+iceoryx2-bb-elementary-traits.workspace = true
 libc.workspace = true
 
 [target.'cfg(loom)'.dependencies]

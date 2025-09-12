@@ -186,9 +186,6 @@ class TestSPMCBroadcastChannelNumOfSubscribers(CitScenario):
         ]
         assert expected_values == received_values
 
-    @pytest.mark.xfail(
-        reason="https://github.com/qorix-group/inc_orchestrator_internal/issues/277"
-    )
     def test_remove_receivers(
         self, test_config: dict[str, Any], logs_info_level: LogContainer
     ):
