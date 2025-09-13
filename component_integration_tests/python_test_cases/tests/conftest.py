@@ -1,14 +1,10 @@
 import json
 import os
-import socket
 from pathlib import Path
 from subprocess import DEVNULL, Popen
-from typing import Any
 
 import pytest
 from testing_utils import CargoTools
-
-from component_integration_tests.python_test_cases.tests.cit_scenario import NetHelper
 
 FAILED_CONFIGS = []
 
@@ -52,18 +48,6 @@ def pytest_addoption(parser):
         default=5.0,
         help="Default execution timeout in seconds. Default: %(default)s",
     )
-
-
-# General fixtures
-@pytest.fixture(scope="class")
-def connection(test_config: dict[str, Any]):
-    """
-    Create a TCP connection to the server.
-    """
-    connection_details = test_config.get("connection", {})
-    s = NetHelper.connection_builder(**connection_details, timeout=3.0)
-    yield s
-    s.close()
 
 
 # Hooks

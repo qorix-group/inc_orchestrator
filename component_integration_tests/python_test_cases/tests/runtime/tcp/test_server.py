@@ -3,13 +3,13 @@ from typing import Any
 
 import pytest
 
-from component_integration_tests.python_test_cases.tests.cit_scenario import (
-    CitContinousScenario,
+from component_integration_tests.python_test_cases.tests.cit_runtime_scenario import (
+    CitRuntimeScenario,
     NetHelper,
 )
 
 
-class TestTcpServer(CitContinousScenario):
+class TestTcpServer(CitRuntimeScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
         return "runtime.tcp.basic_server"
@@ -21,14 +21,20 @@ class TestTcpServer(CitContinousScenario):
             "connection": {"ip": "127.0.0.1", "port": 7878},
         }
 
-    def test_tcp_echo(self, connection: socket.socket) -> None:
+    def test_tcp_echo(self, client_connection: socket.socket) -> None:
         message = b"Echo!"
-        connection.sendall(message)
-        data = connection.recv(1024)
+        client_connection.sendall(message)
+        data = client_connection.recv(1024)
         assert message == data
 
-    def test_multiple_connections(self, test_config: dict[str, Any]) -> None:
+    def test_multiple_connections(
+        self, test_config: dict[str, Any], executable
+    ) -> None:
         connection_details = test_config.get("connection", {})
+        executable.wait_for_log(
+            f"TCP server listening on {connection_details['ip']}:{connection_details['port']}"
+        )
+
         conn1 = NetHelper.connection_builder(**connection_details)
         conn2 = NetHelper.connection_builder(**connection_details)
         conn3 = NetHelper.connection_builder(**connection_details)

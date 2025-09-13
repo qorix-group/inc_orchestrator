@@ -1,6 +1,8 @@
 use async_runtime::net::TcpListener;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct NetHelper {
     ip: String,
     port: u64,
@@ -11,11 +13,7 @@ impl NetHelper {
     pub fn new(input: &Option<String>) -> Self {
         let input_string = input.as_ref().expect("Test input is expected");
         let v: Value = serde_json::from_str(input_string).expect("Failed to parse input string");
-        let connection_field = &v["connection"];
-        let ip = connection_field["ip"].as_str().expect("Missing 'ip' in connection input").to_string();
-        let port = connection_field["port"].as_u64().expect("Missing 'port' in connection input");
-
-        Self { ip, port }
+        serde_json::from_value(v["connection"].clone()).expect("Failed to parse \"connection\" field")
     }
 
     pub async fn create_tcp_listener(&self) -> TcpListener {
