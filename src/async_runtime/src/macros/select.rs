@@ -115,9 +115,15 @@ macro_rules! select {
     // Main logic. This is matched at the end of the recursion.
     (@ ($($max_index_underscores:tt)*); $(($($index_underscores:tt)*) $v:pat = $f:expr => $b:block,)+) => {{
         use core::future::Future;
+        use core::pin::pin;
 
         // If a bit at case's index is set to 1, the case is disabled.
         let mut disabled_cases = 0_usize;
+
+        // The pin! macro is necessary to pin futures that don't implement that Unpin trait, for example async functions and closures.
+        // The use of the pin! macro is safe because select! awaits on the poll_fn immediately instad of returning the future.
+        // If select was to return the future, the wrapping block would need to be async to capture the local variable crated by pin!.
+        let mut pins = ($(pin!($f),)+);
 
         core::future::poll_fn(|context| {
             // Create a block for each case and poll its future.
@@ -127,7 +133,7 @@ macro_rules! select {
                 let case_mask = 1 << case_index;
 
                 if (disabled_cases & case_mask) == 0 {
-                    let mut pin = core::pin::Pin::new(&mut $f);
+                    let ($($index_underscores,)* pin, ..) = &mut pins;
 
                     match pin.as_mut().poll(context) {
                         core::task::Poll::Ready(result) => {
@@ -360,7 +366,7 @@ mod tests {
     #[test]
     fn one_case() {
         async fn test() -> i32 {
-            let mut fut1 = future::ready(111);
+            let fut1 = future::ready(111);
             let mut result = 0;
 
             select! {
@@ -381,9 +387,9 @@ mod tests {
     #[test]
     fn case_1_first() {
         async fn test() -> i32 {
-            let mut fut1 = future::ready(111);
-            let mut fut2 = future::pending::<i32>();
-            let mut fut3 = future::pending::<i32>();
+            let fut1 = future::ready(111);
+            let fut2 = future::pending::<i32>();
+            let fut3 = future::pending::<i32>();
             let mut result = 0;
 
             select! {
@@ -410,9 +416,9 @@ mod tests {
     #[test]
     fn case_2_first() {
         async fn test() -> i32 {
-            let mut fut1 = future::pending::<i32>();
-            let mut fut2 = future::ready(222);
-            let mut fut3 = future::pending::<i32>();
+            let fut1 = future::pending::<i32>();
+            let fut2 = future::ready(222);
+            let fut3 = future::pending::<i32>();
             let mut result = 0;
 
             select! {
@@ -439,9 +445,9 @@ mod tests {
     #[test]
     fn case_3_first() {
         async fn test() -> i32 {
-            let mut fut1 = future::pending::<i32>();
-            let mut fut2 = future::pending::<i32>();
-            let mut fut3 = future::ready(333);
+            let fut1 = future::pending::<i32>();
+            let fut2 = future::pending::<i32>();
+            let fut3 = future::ready(333);
             let mut result = 0;
 
             select! {
@@ -468,10 +474,10 @@ mod tests {
     #[test]
     fn case_2_and_3_ready() {
         async fn test() -> i32 {
-            let mut fut1 = future::pending::<i32>();
+            let fut1 = future::pending::<i32>();
             // Both futures are ready, but since there's no randomization, the 2nd will return first.
-            let mut fut2 = future::ready(222);
-            let mut fut3 = future::ready(333);
+            let fut2 = future::ready(222);
+            let fut3 = future::ready(333);
             let mut result = 0;
 
             select! {
@@ -498,10 +504,10 @@ mod tests {
     #[test]
     fn optional_case_matches() {
         async fn test() -> i32 {
-            let mut fut1 = future::pending::<i32>();
-            let mut fut2: future::Ready<Option<i32>> = future::ready(Some(222));
-            let mut fut3 = future::ready(333);
-            let mut fut4 = future::pending::<i32>();
+            let fut1 = future::pending::<i32>();
+            let fut2: future::Ready<Option<i32>> = future::ready(Some(222));
+            let fut3 = future::ready(333);
+            let fut4 = future::pending::<i32>();
             let mut result = 0;
 
             select! {
@@ -531,10 +537,10 @@ mod tests {
     #[test]
     fn optional_case_fails_to_match() {
         async fn test() -> i32 {
-            let mut fut1 = future::pending::<i32>();
-            let mut fut2: future::Ready<Option<i32>> = future::ready(None);
-            let mut fut3 = future::ready(333);
-            let mut fut4 = future::pending::<i32>();
+            let fut1 = future::pending::<i32>();
+            let fut2: future::Ready<Option<i32>> = future::ready(None);
+            let fut3 = future::ready(333);
+            let fut4 = future::pending::<i32>();
             let mut result = 0;
 
             select! {
@@ -564,9 +570,9 @@ mod tests {
     #[test]
     fn all_cases_pending() {
         async fn test() -> i32 {
-            let mut fut1 = future::pending::<i32>();
-            let mut fut2 = future::pending::<i32>();
-            let mut fut3 = future::pending::<i32>();
+            let fut1 = future::pending::<i32>();
+            let fut2 = future::pending::<i32>();
+            let fut3 = future::pending::<i32>();
             let mut result = 0;
 
             select! {
@@ -596,9 +602,67 @@ mod tests {
     #[test]
     fn select_returns_result() {
         async fn test() -> i32 {
-            let mut fut1 = future::ready(111);
-            let mut fut2 = future::pending::<i32>();
-            let mut fut3 = future::pending::<i32>();
+            let fut1 = future::ready(111);
+            let fut2 = future::pending::<i32>();
+            let fut3 = future::pending::<i32>();
+
+            select! {
+                var1 = fut1 => {
+                    var1
+                }
+                _ = fut2 => {
+                    222
+                }
+                _ = fut3 => {
+                    333
+                }
+            }
+        }
+
+        let mut context = task::Context::from_waker(task::Waker::noop());
+        let mut future = Box::pin(test());
+        let result = future.as_mut().poll(&mut context);
+        assert_eq!(result, task::Poll::Ready(111));
+    }
+
+    #[test]
+    fn select_called_with_async_function() {
+        async fn test() -> i32 {
+            async fn first() -> i32 {
+                111
+            }
+
+            let fut1 = first();
+            let fut2 = future::pending::<i32>();
+            let fut3 = future::pending::<i32>();
+
+            select! {
+                var1 = fut1 => {
+                    var1
+                }
+                _ = fut2 => {
+                    222
+                }
+                _ = fut3 => {
+                    333
+                }
+            }
+        }
+
+        let mut context = task::Context::from_waker(task::Waker::noop());
+        let mut future = Box::pin(test());
+        let result = future.as_mut().poll(&mut context);
+        assert_eq!(result, task::Poll::Ready(111));
+    }
+
+    #[test]
+    fn select_called_with_async_closure() {
+        async fn test() -> i32 {
+            let first = async || 111;
+
+            let fut1 = first();
+            let fut2 = future::pending::<i32>();
+            let fut3 = future::pending::<i32>();
 
             select! {
                 var1 = fut1 => {
