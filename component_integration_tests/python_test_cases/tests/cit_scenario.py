@@ -2,10 +2,36 @@
 Test scenario runner for component integration tests.
 """
 
+import socket
+import time
 from pathlib import Path
+from subprocess import PIPE, Popen
 
 import pytest
-from testing_utils import Scenario, LogContainer, BuildTools, CargoTools, ScenarioResult
+from testing_utils import BuildTools, CargoTools, LogContainer, Scenario, ScenarioResult
+
+
+class NetHelper:
+    @staticmethod
+    def connection_builder(
+        ip: str = "127.0.0.1", port: int = 7878, timeout: float | None = 3.0
+    ) -> socket.socket:
+        """
+        Create and return a socket connected to the server.
+
+        Parameters
+        ----------
+        ip : str
+            IP address of the server.
+        port : int
+            Port number of the server.
+        timeout : float | None
+            Connection timeout in seconds. 0 for non-blocking mode, None for blocking mode.
+        """
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(timeout)
+        s.connect((ip, port))
+        return s
 
 
 class ResultCode:
@@ -117,3 +143,41 @@ class CitScenario(Scenario):
 
         for trace in traces:
             print(trace)
+
+
+class CitContinousScenario(Scenario):
+    """
+    CIT test scenario definition for net testing.
+    It requires binary with the server to be running for the duration of the tests.
+    """
+
+    @pytest.fixture(scope="class")
+    def build_tools(self, *args, **kwargs) -> BuildTools:
+        """
+        Build tools used to handle test scenario.
+        """
+        return CargoTools()
+
+    @pytest.fixture(scope="class")
+    def results(
+        self,
+        process,
+        execution_timeout: float,
+        *args,
+        **kwargs,
+    ):
+        pass
+
+    @pytest.fixture(scope="class")
+    def logs(self, results, *args, **kwargs):
+        pass
+
+    @pytest.fixture(scope="class", autouse=True)
+    def server(self, command: list[str], *args, **kwargs):
+        """
+        Start the server process and terminate it after tests.
+        """
+        proc = Popen(command, stdout=PIPE, stderr=PIPE, text=True)
+        time.sleep(0.5)  # give the server half a second to start
+        yield proc
+        proc.terminate()
