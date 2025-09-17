@@ -28,6 +28,7 @@ macro_rules! generic_test_func {
 #[macro_use]
 mod orchestration_concurrency;
 mod orchestration_double_handler_catch;
+mod orchestration_if_else;
 mod orchestration_sequence;
 mod orchestration_shutdown;
 mod orchestration_sleep;
@@ -69,6 +70,9 @@ pub fn orchestration_scenario_group() -> Box<dyn ScenarioGroup> {
             Box::new(CatchDoubleDiffHandlerError),
             Box::new(CatchNestedConcurrencyUserError),
             Box::new(DoubleCatchSequence),
+            // IfElse scenarios
+            Box::new(orchestration_if_else::BasicIfElse),
+            Box::new(orchestration_if_else::NestedIfElse),
         ],
         vec![],
     ))
