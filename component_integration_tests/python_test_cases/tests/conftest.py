@@ -53,6 +53,7 @@ def pytest_addoption(parser):
 # Hooks
 @pytest.hookimpl(tryfirst=True)
 def pytest_sessionstart(session: pytest.Session):
+    # Executes always as first - tests collection and running.
     try:
         # Build scenarios.
         if session.config.getoption("--build-scenarios"):
@@ -66,6 +67,40 @@ def pytest_sessionstart(session: pytest.Session):
 
     except Exception as e:
         pytest.exit(str(e), returncode=1)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def global_startup(request: pytest.FixtureRequest):
+    """
+    Executes once per testing session, before any tests. Does not execute on collection.
+
+    Some tests require root permissions, check and authenticate if needed.
+    Two modes of operation are supported:
+     - `bazel` run - check sudo can be used, skip tests if can't.
+     - `pytest` run - prompt for password once collected, run tests as usual.
+    """
+    root_required_tests = request.config._root_required_tests
+    if not root_required_tests:
+        return
+
+    # Check for current environment.
+    if _inside_bazel_env():
+        # Prompt for password is not possible, but user might have root rights.
+        # On failure - skip root requiring tests.
+        authenticated = _authenticate(interactive=False)
+        if not authenticated:
+            skipper = pytest.mark.skip(
+                reason="Failed to grant root permissions in Bazel environment."
+            )
+            for item in root_required_tests:
+                item.add_marker(skipper)
+
+    else:
+        # Prompt for password and cache credentials.
+        # On failure - exit.
+        authenticated = _authenticate(interactive=True)
+        if not authenticated:
+            pytest.exit("Failed to authenticate", returncode=1)
 
 
 def _inside_bazel_env() -> bool:
@@ -91,40 +126,14 @@ def _authenticate(*, interactive: bool) -> bool:
         return p.returncode == 0
 
 
-def pytest_collection_modifyitems(items: list[pytest.Item]):
-    # Certain tests require root permissions.
-    # Two modes of operation are supported:
-    # - `bazel` run - check sudo can be used, skip tests if can't.
-    # - `pytest` run - prompt for password once collected, run tests as usual.
-
-    # Collect tests requiring root permissions.
+def pytest_collection_finish(session: pytest.Session):
+    # Certain tests require root permissions. Collect them and store in config.
     root_required_tests = []
-    for item in items:
+    for item in session.items:
         if "root_required" in item.keywords:
             root_required_tests.append(item)
 
-    # Nothing must be done if no root requiring tests are detected.
-    if not root_required_tests:
-        return
-
-    # Check for current environment.
-    if _inside_bazel_env():
-        # Prompt for password is not possible, but user might have root rights.
-        # On failure - skip root requiring tests.
-        authenticated = _authenticate(interactive=False)
-        if not authenticated:
-            skipper = pytest.mark.skip(
-                reason="Failed to grant root permissions in Bazel environment."
-            )
-            for item in root_required_tests:
-                item.add_marker(skipper)
-
-    else:
-        # Prompt for password and cache credentials.
-        # On failure - exit.
-        authenticated = _authenticate(interactive=True)
-        if not authenticated:
-            pytest.exit("Failed to authenticate", returncode=1)
+    session.config._root_required_tests = root_required_tests
 
 
 def pytest_html_report_title(report):
