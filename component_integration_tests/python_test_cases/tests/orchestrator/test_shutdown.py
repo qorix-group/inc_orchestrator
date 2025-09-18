@@ -11,7 +11,7 @@ from component_integration_tests.python_test_cases.tests.cit_scenario import (
 class TestSingleProgramSingleShutdown(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self):
-        return "orchestration.single_program_single_shutdown"
+        return "orchestration.shutdown.single_program_single_shutdown"
 
     @pytest.fixture(scope="class")
     def execution_timeout(self, request, *args, **kwargs):
@@ -39,7 +39,7 @@ class TestSingleProgramSingleShutdown(CitScenario):
 class TestTwoProgramsSingleShutdown(TestSingleProgramSingleShutdown):
     @pytest.fixture(scope="class")
     def scenario_name(self):
-        return "orchestration.two_programs_single_shutdown"
+        return "orchestration.shutdown.two_programs_single_shutdown"
 
     def test_shutdown_executed(self, logs_info_level: LogContainer):
         assert logs_info_level.contains_log(
@@ -53,7 +53,7 @@ class TestTwoProgramsSingleShutdown(TestSingleProgramSingleShutdown):
 class TestTwoProgramsTwoShutdowns(TestTwoProgramsSingleShutdown):
     @pytest.fixture(scope="class")
     def scenario_name(self):
-        return "orchestration.two_programs_two_shutdowns"
+        return "orchestration.shutdown.two_programs_two_shutdowns"
 
     def test_shutdown_order(self, logs_info_level: LogContainer):
         shutdown1 = logs_info_level.find_log(
@@ -71,13 +71,13 @@ class TestTwoProgramsTwoShutdowns(TestTwoProgramsSingleShutdown):
 class TestTwoProgramsAllShutdowns(TestTwoProgramsSingleShutdown):
     @pytest.fixture(scope="class")
     def scenario_name(self):
-        return "orchestration.two_programs_all_shutdowns"
+        return "orchestration.shutdown.two_programs_all_shutdowns"
 
 
 class TestOneProgramNotShut(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self):
-        return "orchestration.one_program_not_shut"
+        return "orchestration.shutdown.one_program_not_shut"
 
     @pytest.fixture(scope="class", params=[1, 2, 42])
     def workers(self, request: pytest.FixtureRequest) -> int:
@@ -129,7 +129,7 @@ class TestOneProgramNotShut(CitScenario):
 class TestShutdownBeforeStart(TestSingleProgramSingleShutdown):
     @pytest.fixture(scope="class")
     def scenario_name(self):
-        return "orchestration.shutdown_before_start"
+        return "orchestration.shutdown.before_start"
 
     @pytest.mark.skip(
         "Behavior to be clarified - https://github.com/qorix-group/inc_orchestrator_internal/issues/148"

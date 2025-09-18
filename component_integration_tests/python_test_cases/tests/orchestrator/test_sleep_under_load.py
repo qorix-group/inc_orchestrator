@@ -25,7 +25,7 @@ def get_threshold_ms(expected_sleep_ms: int) -> int:
 class TestShortSleepUnderLoad2W256Q(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.sleep_under_load"
+        return "orchestration.sleep.under_load"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:

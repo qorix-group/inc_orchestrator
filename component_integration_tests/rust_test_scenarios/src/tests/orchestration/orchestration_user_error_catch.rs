@@ -183,7 +183,7 @@ impl CatchSequenceUserError {
 
 impl Scenario for CatchSequenceUserError {
     fn name(&self) -> &str {
-        "catch_sequence_user_error"
+        "sequence_user_error"
     }
 
     fn run(&self, input: Option<String>) -> Result<(), String> {
@@ -276,7 +276,7 @@ impl CatchNestedSequenceUserError {
 
 impl Scenario for CatchNestedSequenceUserError {
     fn name(&self) -> &str {
-        "catch_nested_sequence_user_error"
+        "nested_sequence_user_error"
     }
 
     fn run(&self, input: Option<String>) -> Result<(), String> {
@@ -361,7 +361,7 @@ impl CatchConcurrencyUserError {
 
 impl Scenario for CatchConcurrencyUserError {
     fn name(&self) -> &str {
-        "catch_concurrency_user_error"
+        "concurrency_user_error"
     }
 
     fn run(&self, input: Option<String>) -> Result<(), String> {
@@ -437,7 +437,7 @@ impl CatchNestedConcurrencyUserError {
 
 impl Scenario for CatchNestedConcurrencyUserError {
     fn name(&self) -> &str {
-        "catch_nested_concurrency_user_error"
+        "nested_concurrency_user_error"
     }
 
     fn run(&self, input: Option<String>) -> Result<(), String> {
@@ -701,7 +701,7 @@ impl DoubleCatchSequence {
 
 impl Scenario for DoubleCatchSequence {
     fn name(&self) -> &str {
-        "catch_per_nested_sequence"
+        "per_nested_sequence"
     }
 
     fn run(&self, input: Option<String>) -> Result<(), String> {

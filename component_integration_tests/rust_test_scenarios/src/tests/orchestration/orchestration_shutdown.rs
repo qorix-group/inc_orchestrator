@@ -405,7 +405,7 @@ impl Scenario for OneProgramNotShut {
 
 impl Scenario for ShutdownBeforeStart {
     fn name(&self) -> &str {
-        "shutdown_before_start"
+        "before_start"
     }
 
     fn run(&self, input: Option<String>) -> Result<(), String> {

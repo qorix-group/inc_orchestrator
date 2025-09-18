@@ -107,7 +107,7 @@ fn sleep_under_load(sleep_duration_ms: u64) -> Result<Design, CommonErrors> {
 
 impl Scenario for SleepUnderLoad {
     fn name(&self) -> &str {
-        "sleep_under_load"
+        "under_load"
     }
 
     fn run(&self, input: Option<String>) -> Result<(), String> {

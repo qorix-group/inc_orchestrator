@@ -235,7 +235,7 @@ fn nested_trigger_sync_design() -> Result<Design, CommonErrors> {
 /// Checks trigger and sync in the separate concurrency branches in a single program
 impl Scenario for TriggerAndSyncInNestedBranches {
     fn name(&self) -> &str {
-        "trigger_and_sync_in_nested_branches"
+        "nested_branches"
     }
 
     fn run(&self, input: Option<String>) -> Result<(), String> {
@@ -293,7 +293,7 @@ fn trigger_sync_oaa_design() -> Result<Design, CommonErrors> {
 /// Checks trigger and sync as sequential steps in a single program
 impl Scenario for TriggerSyncOneAfterAnother {
     fn name(&self) -> &str {
-        "trigger_sync_one_after_another"
+        "one_after_another"
     }
 
     fn run(&self, input: Option<String>) -> Result<(), String> {

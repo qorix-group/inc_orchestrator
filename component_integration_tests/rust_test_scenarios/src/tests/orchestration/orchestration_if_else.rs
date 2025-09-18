@@ -73,7 +73,7 @@ impl BasicIfElse {
 /// Checks IfElse action with true and false conditions
 impl Scenario for BasicIfElse {
     fn name(&self) -> &str {
-        "basic_if_else"
+        "basic"
     }
 
     fn run(&self, input: Option<String>) -> Result<(), String> {
@@ -152,7 +152,7 @@ impl NestedIfElse {
 /// Checks nested IfElse action with true and false conditions
 impl Scenario for NestedIfElse {
     fn name(&self) -> &str {
-        "nested_if_else"
+        "nested"
     }
 
     fn run(&self, input: Option<String>) -> Result<(), String> {

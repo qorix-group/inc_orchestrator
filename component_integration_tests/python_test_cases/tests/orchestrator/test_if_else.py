@@ -10,7 +10,7 @@ from component_integration_tests.python_test_cases.tests.cit_scenario import Cit
 class TestBasicIfElseCondition(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.basic_if_else"
+        return "orchestration.if_else.basic"
 
     @pytest.fixture(scope="class", params=[True, False])
     def condition(self, request: pytest.FixtureRequest) -> bool:
@@ -35,7 +35,7 @@ class TestBasicIfElseCondition(CitScenario):
 class TestNestedIfElseCondition(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.nested_if_else"
+        return "orchestration.if_else.nested"
 
     @pytest.fixture(scope="class", params=[True, False])
     def outer_condition(self, request: pytest.FixtureRequest) -> bool:

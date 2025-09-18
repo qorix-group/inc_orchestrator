@@ -9,7 +9,7 @@ from component_integration_tests.python_test_cases.tests.cit_scenario import Cit
 class TestSingleConcurrency1W256Q(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.single_concurrency"
+        return "orchestration.concurrency.single"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -68,7 +68,7 @@ class TestSingleConcurrency2W256Q(TestSingleConcurrency1W256Q):
 class TestMultipleConcurrency1W256Q(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.multiple_concurrency"
+        return "orchestration.concurrency.multiple"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -232,7 +232,7 @@ class TestMultipleConcurrency5W256Q(TestMultipleConcurrency1W256Q):
 class TestNestedConcurrency1W256Q(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.nested_concurrency"
+        return "orchestration.concurrency.nested"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:

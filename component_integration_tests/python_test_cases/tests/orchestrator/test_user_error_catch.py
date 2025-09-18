@@ -9,7 +9,7 @@ from component_integration_tests.python_test_cases.tests.cit_scenario import Cit
 class TestUnrecoverableCatchSequence(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.catch_sequence_user_error"
+        return "orchestration.catch.sequence_user_error"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -38,7 +38,7 @@ class TestUnrecoverableCatchSequence(CitScenario):
 class TestRecoverableFailedCatchSequence(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.catch_sequence_user_error"
+        return "orchestration.catch.sequence_user_error"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -73,7 +73,7 @@ class TestRecoverableFailedCatchSequence(CitScenario):
 class TestRecoverableCatchSequence(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.catch_sequence_user_error"
+        return "orchestration.catch.sequence_user_error"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -135,7 +135,7 @@ class TestRecoverableFailedCatchInMultipleRuns(TestRecoverableFailedCatchSequenc
 class TestRecoverableCatchInMultipleRuns(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.catch_sequence_user_error"
+        return "orchestration.catch.sequence_user_error"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -176,7 +176,7 @@ class TestRecoverableCatchInMultipleRuns(CitScenario):
 class TestNestedSequenceCatch(TestUnrecoverableCatchSequence):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.catch_nested_sequence_user_error"
+        return "orchestration.catch.nested_sequence_user_error"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -189,7 +189,7 @@ class TestNestedSequenceCatch(TestUnrecoverableCatchSequence):
 class TestConcurrencyCatch(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.catch_concurrency_user_error"
+        return "orchestration.catch.concurrency_user_error"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -223,13 +223,13 @@ class TestConcurrencyCatch(CitScenario):
 class TestNestedConcurrencyCatch(TestConcurrencyCatch):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.catch_nested_concurrency_user_error"
+        return "orchestration.catch.nested_concurrency_user_error"
 
 
 class TestDoubleMixedErrorCatch(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.double_mixed_user_error"
+        return "orchestration.catch.double_mixed_user_error"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -272,7 +272,7 @@ class TestDoubleMixedErrorCatch(CitScenario):
 class TestDoubleRecoverableErrorCatch(TestDoubleMixedErrorCatch):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.double_recoverable_user_error"
+        return "orchestration.catch.double_recoverable_user_error"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -291,7 +291,7 @@ class TestDoubleRecoverableErrorCatch(TestDoubleMixedErrorCatch):
 class TestDoubleCatchSequence(TestUnrecoverableCatchSequence):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.catch_per_nested_sequence"
+        return "orchestration.catch.per_nested_sequence"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
