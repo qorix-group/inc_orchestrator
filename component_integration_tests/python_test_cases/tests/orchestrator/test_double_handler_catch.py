@@ -12,7 +12,7 @@ from component_integration_tests.python_test_cases.tests.cit_scenario import (
 class TestDoubleSameCatchHandler(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.double_same_handler_error"
+        return "orchestration.catch.double_same_handler_error"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -33,4 +33,4 @@ class TestDoubleSameCatchHandler(CitScenario):
 class TestDoubleDiffCatchHandler(TestDoubleSameCatchHandler):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.double_diff_handler_error"
+        return "orchestration.catch.double_diff_handler_error"

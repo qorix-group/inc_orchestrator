@@ -31,7 +31,7 @@ fn single_sequence_design() -> Result<Design, CommonErrors> {
 /// Checks three actions in a single sequence execution
 impl Scenario for SingleSequence {
     fn name(&self) -> &str {
-        "single_sequence"
+        "single"
     }
 
     fn run(&self, input: Option<String>) -> Result<(), String> {
@@ -87,7 +87,7 @@ fn nested_sequence_design() -> Result<Design, CommonErrors> {
 /// Checks actions in a inner and outer sequence execution
 impl Scenario for NestedSequence {
     fn name(&self) -> &str {
-        "nested_sequence"
+        "nested"
     }
 
     fn run(&self, input: Option<String>) -> Result<(), String> {
@@ -157,7 +157,7 @@ fn awaited_sequence_design() -> Result<Design, CommonErrors> {
 /// Checks three actions in a single sequence execution
 impl Scenario for AwaitSequence {
     fn name(&self) -> &str {
-        "await_sequence"
+        "await"
     }
 
     fn run(&self, input: Option<String>) -> Result<(), String> {

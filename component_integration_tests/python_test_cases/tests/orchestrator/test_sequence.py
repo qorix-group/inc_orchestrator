@@ -9,7 +9,7 @@ from component_integration_tests.python_test_cases.tests.cit_scenario import Cit
 class TestSingleSequence1W256Q(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.single_sequence"
+        return "orchestration.sequence.single"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -40,7 +40,7 @@ class TestSingleSequence2W256Q(TestSingleSequence1W256Q):
 class TestNestedSequence1W256Q(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.nested_sequence"
+        return "orchestration.sequence.nested"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:

@@ -34,33 +34,58 @@ mod orchestration_shutdown;
 mod orchestration_sleep;
 mod orchestration_trigger_sync;
 
-pub fn orchestration_scenario_group() -> Box<dyn ScenarioGroup> {
+fn sequence_scenario_group() -> Box<dyn ScenarioGroup> {
     Box::new(ScenarioGroupImpl::new(
-        "orchestration",
+        "sequence",
+        vec![Box::new(SingleSequence), Box::new(NestedSequence), Box::new(AwaitSequence)],
+        vec![],
+    ))
+}
+
+fn concurrency_scenario_group() -> Box<dyn ScenarioGroup> {
+    Box::new(ScenarioGroupImpl::new(
+        "concurrency",
+        vec![Box::new(SingleConcurrency), Box::new(MultipleConcurrency), Box::new(NestedConcurrency)],
+        vec![],
+    ))
+}
+
+fn trigger_sync_scenario_group() -> Box<dyn ScenarioGroup> {
+    Box::new(ScenarioGroupImpl::new(
+        "trigger_sync",
         vec![
-            // Sequence scenarios
-            Box::new(SingleSequence),
-            Box::new(NestedSequence),
-            Box::new(AwaitSequence),
-            // Concurrency scenarios
-            Box::new(SingleConcurrency),
-            Box::new(MultipleConcurrency),
-            Box::new(NestedConcurrency),
-            // Trigger and sync scenarios
             Box::new(OneTriggerOneSyncTwoPrograms),
             Box::new(OneTriggerTwoSyncsThreePrograms),
             Box::new(TriggerAndSyncInNestedBranches),
             Box::new(TriggerSyncOneAfterAnother),
-            // Sleep scenarios
-            Box::new(SleepUnderLoad),
-            // Shutdown scenarios
+        ],
+        vec![],
+    ))
+}
+
+fn sleep_scenario_group() -> Box<dyn ScenarioGroup> {
+    Box::new(ScenarioGroupImpl::new("sleep", vec![Box::new(SleepUnderLoad)], vec![]))
+}
+
+fn shutdown_scenario_group() -> Box<dyn ScenarioGroup> {
+    Box::new(ScenarioGroupImpl::new(
+        "shutdown",
+        vec![
             Box::new(SingleProgramSingleShutdown),
             Box::new(TwoProgramsSingleShutdown),
             Box::new(TwoProgramsTwoShutdowns),
             Box::new(GetAllShutdowns),
             Box::new(OneProgramNotShut),
             Box::new(ShutdownBeforeStart),
-            // Catch scenarios
+        ],
+        vec![],
+    ))
+}
+
+fn catch_scenario_group() -> Box<dyn ScenarioGroup> {
+    Box::new(ScenarioGroupImpl::new(
+        "catch",
+        vec![
             Box::new(CatchSequenceUserError),
             Box::new(CatchNestedSequenceUserError),
             Box::new(CatchConcurrencyUserError),
@@ -70,11 +95,35 @@ pub fn orchestration_scenario_group() -> Box<dyn ScenarioGroup> {
             Box::new(CatchDoubleDiffHandlerError),
             Box::new(CatchNestedConcurrencyUserError),
             Box::new(DoubleCatchSequence),
-            // IfElse scenarios
+        ],
+        vec![],
+    ))
+}
+
+fn ifelse_scenario_group() -> Box<dyn ScenarioGroup> {
+    Box::new(ScenarioGroupImpl::new(
+        "if_else",
+        vec![
             Box::new(orchestration_if_else::BasicIfElse),
             Box::new(orchestration_if_else::NestedIfElse),
         ],
         vec![],
+    ))
+}
+
+pub fn orchestration_scenario_group() -> Box<dyn ScenarioGroup> {
+    Box::new(ScenarioGroupImpl::new(
+        "orchestration",
+        vec![],
+        vec![
+            sequence_scenario_group(),
+            concurrency_scenario_group(),
+            trigger_sync_scenario_group(),
+            sleep_scenario_group(),
+            shutdown_scenario_group(),
+            catch_scenario_group(),
+            ifelse_scenario_group(),
+        ],
     ))
 }
 

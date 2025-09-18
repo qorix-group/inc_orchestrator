@@ -15,7 +15,7 @@ BASIC_TASK_B_ID = "basic_task_B"
 class TestOneTriggerOneSyncTwoPrograms(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.1_trigger_1_sync_2_programs"
+        return "orchestration.trigger_sync.1_trigger_1_sync_2_programs"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -61,7 +61,7 @@ class TestOneTriggerOneSyncTwoPrograms(CitScenario):
 class TestOneTriggerTwoSyncsThreePrograms(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.1_trigger_2_syncs_3_programs"
+        return "orchestration.trigger_sync.1_trigger_2_syncs_3_programs"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -118,13 +118,13 @@ class TestOneTriggerTwoSyncsThreePrograms(CitScenario):
 class TestTriggerAndSyncInNestedBranches(TestOneTriggerOneSyncTwoPrograms):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.trigger_and_sync_in_nested_branches"
+        return "orchestration.trigger_sync.nested_branches"
 
 
 class TestTriggerSyncOneAfterAnother(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.trigger_sync_one_after_another"
+        return "orchestration.trigger_sync.one_after_another"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:

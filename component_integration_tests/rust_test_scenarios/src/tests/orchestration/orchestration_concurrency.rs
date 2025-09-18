@@ -41,7 +41,7 @@ fn single_concurrency_design() -> Result<Design, CommonErrors> {
 /// Checks Concurrency Functions
 impl Scenario for SingleConcurrency {
     fn name(&self) -> &str {
-        "single_concurrency"
+        "single"
     }
 
     fn run(&self, input: Option<String>) -> Result<(), String> {
@@ -111,7 +111,7 @@ fn multiple_concurrency_design() -> Result<Design, CommonErrors> {
 /// Checks Concurrency Functions
 impl Scenario for MultipleConcurrency {
     fn name(&self) -> &str {
-        "multiple_concurrency"
+        "multiple"
     }
 
     fn run(&self, input: Option<String>) -> Result<(), String> {
@@ -177,7 +177,7 @@ fn nested_concurrency_design() -> Result<Design, CommonErrors> {
 /// Checks Concurrency Functions
 impl Scenario for NestedConcurrency {
     fn name(&self) -> &str {
-        "nested_concurrency"
+        "nested"
     }
 
     fn run(&self, input: Option<String>) -> Result<(), String> {
