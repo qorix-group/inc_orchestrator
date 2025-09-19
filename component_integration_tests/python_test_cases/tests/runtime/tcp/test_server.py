@@ -2,10 +2,11 @@ import socket
 from typing import Any
 
 import pytest
+from testing_utils.net import Address, create_connection
 
 from component_integration_tests.python_test_cases.tests.cit_runtime_scenario import (
     CitRuntimeScenario,
-    NetHelper,
+    Executable,
 )
 
 
@@ -15,10 +16,14 @@ class TestTcpServer(CitRuntimeScenario):
         return "runtime.tcp.basic_server"
 
     @pytest.fixture(scope="class")
-    def test_config(self) -> dict[str, Any]:
+    def connection_params(self) -> dict[str, Any]:
+        return {"ip": "127.0.0.1", "port": 7878}
+
+    @pytest.fixture(scope="class")
+    def test_config(self, connection_params: dict[str, Any]) -> dict[str, Any]:
         return {
             "runtime": {"task_queue_size": 256, "workers": 4},
-            "connection": {"ip": "127.0.0.1", "port": 7878},
+            "connection": connection_params,
         }
 
     def test_tcp_echo(self, client_connection: socket.socket) -> None:
@@ -28,16 +33,20 @@ class TestTcpServer(CitRuntimeScenario):
         assert message == data
 
     def test_multiple_connections(
-        self, test_config: dict[str, Any], executable
+        self, connection_params: dict[str, Any], executable: Executable
     ) -> None:
-        connection_details = test_config.get("connection", {})
         executable.wait_for_log(
-            f"TCP server listening on {connection_details['ip']}:{connection_details['port']}"
+            lambda log_container: log_container.find_log(
+                "message",
+                pattern=f"TCP server listening on {connection_params['ip']}:{connection_params['port']}",
+            )
+            is not None
         )
 
-        conn1 = NetHelper.connection_builder(**connection_details)
-        conn2 = NetHelper.connection_builder(**connection_details)
-        conn3 = NetHelper.connection_builder(**connection_details)
+        address = Address.from_dict(connection_params)
+        conn1 = create_connection(address)
+        conn2 = create_connection(address)
+        conn3 = create_connection(address)
 
         with conn1, conn2, conn3:
             msg1 = b"Uno"

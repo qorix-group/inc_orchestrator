@@ -6,6 +6,8 @@ from testing_utils.scenario import ScenarioResult
 
 from component_integration_tests.python_test_cases.tests.cit_scenario import (
     CitScenario,
+)
+from component_integration_tests.python_test_cases.tests.result_code import (
     ResultCode,
 )
 
