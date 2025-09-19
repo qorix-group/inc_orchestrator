@@ -1,76 +1,25 @@
-from dataclasses import dataclass
 import platform
 import sys
-from ipaddress import IPv4Address, IPv6Address, ip_address
-from string import ascii_lowercase
-from typing import Any, Generator
-import pytest
+from ipaddress import IPv4Address, IPv6Address
 from socket import (
-    AddressFamily,
-    socket,
-    AF_INET,
-    AF_INET6,
+    SHUT_RDWR,
+    SO_REUSEADDR,
     SOCK_STREAM,
     SOL_SOCKET,
-    SO_REUSEADDR,
-    SHUT_RDWR,
+    socket,
 )
+from string import ascii_lowercase
 from threading import Thread
+from typing import Any, Generator
+
+import pytest
+from testing_utils import LogContainer, ScenarioResult
+from testing_utils.net import Address, IPAddress
+
 from component_integration_tests.python_test_cases.tests.cit_scenario import (
     CitScenario,
-    ResultCode,
 )
-from testing_utils import LogContainer, ScenarioResult
-
-
-type IPAddress = IPv4Address | IPv6Address
-
-
-@dataclass
-class Address:
-    ip: IPAddress
-    port: int
-
-    @classmethod
-    def from_raw(cls, *address) -> "Address":
-        """
-        Convert address in tuple format to 'Address' object.
-
-        Parameters
-        ----------
-        *address
-            Address tuple.
-            Only IP and port (first two fields) are used.
-        """
-        # Only 'ip' and 'port' are used for address.
-        # Ignore 'flowinfo' and 'scope_id' provided with 'AF_INET6'.
-        ip, port = address[:2]
-        return cls(ip_address(ip), port)
-
-    def to_raw(self) -> tuple[str, int]:
-        """
-        Convert this object to tuple address format.
-        """
-        return (str(self.ip), self.port)
-
-    def family(self) -> AddressFamily:
-        """
-        Return current address family.
-        """
-        if isinstance(self.ip, IPv4Address):
-            return AF_INET
-        elif isinstance(self.ip, IPv6Address):
-            return AF_INET6
-        else:
-            raise RuntimeError("Unsupported address family")
-
-    def __str__(self) -> str:
-        if self.family() == AF_INET:
-            return f"{self.ip}:{self.port}"
-        elif self.family() == AF_INET6:
-            return f"[{self.ip}]:{self.port}"
-        else:
-            raise RuntimeError("Unsupported address family")
+from component_integration_tests.python_test_cases.tests.result_code import ResultCode
 
 
 class EchoServer:
