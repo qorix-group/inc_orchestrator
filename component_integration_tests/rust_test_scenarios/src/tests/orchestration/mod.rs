@@ -1,4 +1,7 @@
-use crate::tests::orchestration::orchestration_shutdown::ShutdownBeforeStart;
+use crate::tests::orchestration::{
+    orchestration_methods::{InvalidInvokes, TagMethods, TooManyTags},
+    orchestration_shutdown::ShutdownBeforeStart,
+};
 use orchestration_concurrency::{MultipleConcurrency, NestedConcurrency, SingleConcurrency};
 use orchestration_sequence::{AwaitSequence, NestedSequence, SingleSequence};
 use orchestration_sleep::SleepUnderLoad;
@@ -14,6 +17,7 @@ use test_scenarios_rust::scenario::{ScenarioGroup, ScenarioGroupImpl};
 use orchestration_double_handler_catch::{CatchDoubleDiffHandlerError, CatchDoubleSameHandlerError};
 
 use async_runtime::futures::reusable_box_future::ReusableBoxFuturePool;
+use async_runtime::futures::sleep;
 use orchestration::{common::tag::Tag, prelude::*};
 
 use orchestration_shutdown::{GetAllShutdowns, OneProgramNotShut, SingleProgramSingleShutdown, TwoProgramsSingleShutdown, TwoProgramsTwoShutdowns};
@@ -29,6 +33,7 @@ macro_rules! generic_test_func {
 mod orchestration_concurrency;
 mod orchestration_double_handler_catch;
 mod orchestration_if_else;
+mod orchestration_methods;
 mod orchestration_sequence;
 mod orchestration_shutdown;
 mod orchestration_sleep;
@@ -111,6 +116,14 @@ fn ifelse_scenario_group() -> Box<dyn ScenarioGroup> {
     ))
 }
 
+fn tag_methods_scenario_group() -> Box<dyn ScenarioGroup> {
+    Box::new(ScenarioGroupImpl::new(
+        "tag_methods",
+        vec![Box::new(TagMethods), Box::new(InvalidInvokes), Box::new(TooManyTags)],
+        vec![],
+    ))
+}
+
 pub fn orchestration_scenario_group() -> Box<dyn ScenarioGroup> {
     Box::new(ScenarioGroupImpl::new(
         "orchestration",
@@ -123,6 +136,7 @@ pub fn orchestration_scenario_group() -> Box<dyn ScenarioGroup> {
             shutdown_scenario_group(),
             catch_scenario_group(),
             ifelse_scenario_group(),
+            tag_methods_scenario_group(),
         ],
     ))
 }
