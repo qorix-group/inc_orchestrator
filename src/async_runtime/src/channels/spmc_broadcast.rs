@@ -170,6 +170,8 @@ struct Channel<T: Copy, const SIZE: usize = DEFAULT_CHANNEL_SIZE> {
     free_slots: UniqueIndexSet,
     // Memory required for UniqueIndexSet to hold the indices
     memory: Box<[u8]>,
+    // Since max receivers is limited to u16 in create channel function, we can use u16 here
+    subscriber_index_max: FoundationAtomicU16,
 }
 
 unsafe impl<T: Copy, const SIZE: usize> Sync for Channel<T, SIZE> {}
@@ -192,6 +194,7 @@ impl<T: Copy, const SIZE: usize> Channel<T, SIZE> {
                 }
                 unsafe { slice.assume_init() }
             },
+            subscriber_index_max: FoundationAtomicU16::new(0),
         }
     }
 
@@ -220,7 +223,7 @@ impl<T: Copy, const SIZE: usize> Channel<T, SIZE> {
     }
 
     fn send(&self, value: &T) -> Result<(), CommonErrors> {
-        let len = self.channels.len();
+        let len = self.subscriber_index_max.load(FoundationOrdering::Acquire) as usize + 1;
         let mut ret = Ok(());
         let mut i = 0;
 
@@ -257,6 +260,7 @@ impl<T: Copy, const SIZE: usize> Channel<T, SIZE> {
             return None; // No more slots
         }
         let curr = free_slot.unwrap() as u16;
+        self.subscriber_index_max.fetch_max(curr, FoundationOrdering::AcqRel);
         // If receiver was dropped and reusing the channel, then we need to enable receiver again
         // If new receiver, then it is already enabled, no harm in calling enable_receiver again
         self.channels[curr as usize].enable_receiver();
@@ -577,6 +581,26 @@ mod tests {
         let res3 = poller3.poll_with_waker(&waker);
         assert_poll_ready(res2, vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 100]);
         assert_poll_ready(res3, vec![100]); // r3 should only receive the last sample (100)
+    }
+
+    #[test]
+    fn test_data_not_sent_to_unsubscribed_receiver() {
+        let (s, r1) = create_channel::<u32, 8>(2);
+        assert!(s.num_of_subscribers() == 1);
+
+        // Fill the channel
+        for i in 0..8 {
+            assert!(s.send(&i).is_ok());
+        }
+
+        // Read one sample from r1
+        let (waker, _) = get_dummy_task_waker();
+        let res1 = r1.receive(&mut r1.chan.get_consumer(r1.index), waker);
+        assert!(res1.is_ok());
+        assert_eq!(res1.unwrap(), 0);
+
+        // Call send again, should succeed as r1 has read one sample and no data is sent to unsubscribed receiver
+        assert!(s.send(&8).is_ok());
     }
 }
 
