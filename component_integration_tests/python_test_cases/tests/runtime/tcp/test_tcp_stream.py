@@ -1,0 +1,213 @@
+from dataclasses import dataclass
+import sys
+from ipaddress import IPv4Address, IPv6Address, ip_address
+from string import ascii_lowercase
+from typing import Any, Generator
+import pytest
+from socket import (
+    AddressFamily,
+    socket,
+    AF_INET,
+    AF_INET6,
+    SOCK_STREAM,
+    SOL_SOCKET,
+    SO_REUSEADDR,
+    SHUT_RDWR,
+)
+from threading import Thread
+from component_integration_tests.python_test_cases.tests.cit_scenario import CitScenario
+from testing_utils import LogContainer
+
+
+type IPAddress = IPv4Address | IPv6Address
+
+
+@dataclass
+class Address:
+    ip: IPAddress
+    port: int
+
+    @classmethod
+    def from_raw(cls, *address) -> "Address":
+        """
+        Convert address in tuple format to 'Address' object.
+
+        Parameters
+        ----------
+        *address
+            Address tuple.
+            Only IP and port (first two fields) are used.
+        """
+        # Only 'ip' and 'port' are used for address.
+        # Ignore 'flowinfo' and 'scope_id' provided with 'AF_INET6'.
+        ip, port = address[:2]
+        return cls(ip_address(ip), port)
+
+    def to_raw(self) -> tuple[str, int]:
+        """
+        Convert this object to tuple address format.
+        """
+        return (str(self.ip), self.port)
+
+    def family(self) -> AddressFamily:
+        """
+        Return current address family.
+        """
+        if isinstance(self.ip, IPv4Address):
+            return AF_INET
+        elif isinstance(self.ip, IPv6Address):
+            return AF_INET6
+        else:
+            raise RuntimeError("Unsupported address family")
+
+    def __str__(self) -> str:
+        if self.family() == AF_INET:
+            return f"{self.ip}:{self.port}"
+        elif self.family() == AF_INET6:
+            return f"[{self.ip}]:{self.port}"
+        else:
+            raise RuntimeError("Unsupported address family")
+
+
+class EchoServer:
+    def __init__(self, address: Address) -> None:
+        # Last connected peer address.
+        self._peer_addr: Address | None = None
+
+        # Create and configure socket to be reusable.
+        self._socket = socket(address.family(), SOCK_STREAM)
+        self._socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+
+        # Bind to address.
+        self._socket.bind(address.to_raw())
+
+        # Setup thread.
+        self._thread = Thread(target=self._run_server, args=(address,))
+        self._active = False
+
+    def _handle_client(self, conn: socket, addr: Address) -> None:
+        print(f"Connected by: {addr}", file=sys.stderr)
+        while self._active:
+            message = conn.recv(1024)
+            if not message:
+                print(f"Disconnected by {addr}", file=sys.stderr)
+                break
+            print(f"Message received from: {addr}", file=sys.stderr)
+            conn.send(message)
+
+    def _run_server(self, address: Address) -> None:
+        # Listen for connections.
+        self._socket.listen(10)
+
+        # Run thread loop.
+        while self._active:
+            print(f"Waiting for connection: {address}", file=sys.stderr)
+            try:
+                conn, addr = self._socket.accept()
+                addr = Address.from_raw(*addr)
+                self._peer_addr = addr
+            except OSError:
+                # Allow 'accept' to be interrupted.
+                print(
+                    "Socket accept interrupted, socket being shutdown", file=sys.stderr
+                )
+                break
+
+            client_thread = Thread(
+                target=self._handle_client, args=(conn, addr), daemon=True
+            )
+            client_thread.start()
+
+    def start(self) -> None:
+        self._active = True
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._active = False
+        self._socket.shutdown(SHUT_RDWR)
+        self._socket.close()
+        self._thread.join()
+
+    def __enter__(self) -> "EchoServer":
+        self.start()
+        return self
+
+    def __exit__(self, _type, _value, _traceback) -> None:
+        self.stop()
+
+    @property
+    def peer_addr(self) -> Address | None:
+        """
+        Last connected peer address.
+        """
+        return self._peer_addr
+
+    @property
+    def local_addr(self) -> Address:
+        """
+        Local socket address.
+        """
+        return Address.from_raw(*self._socket.getsockname())
+
+
+class TestSmoke(CitScenario):
+    @pytest.fixture(scope="class")
+    def scenario_name(self) -> str:
+        return "runtime.tcp.tcp_stream.smoke"
+
+    @pytest.fixture(
+        scope="class",
+        params=[IPv4Address("127.0.0.1"), IPv6Address("::1")],
+        ids=["v4", "v6"],
+    )
+    def ip(self, request: pytest.FixtureRequest) -> IPAddress:
+        return request.param
+
+    @pytest.fixture(scope="class")
+    def port(self) -> int:
+        return 7878
+
+    @pytest.fixture(scope="class")
+    def address(self, ip: IPAddress, port: int) -> Address:
+        return Address(ip, port)
+
+    @pytest.fixture(scope="class", params=[0, 1, 20, 1024])
+    def message(self, request: pytest.FixtureRequest) -> str:
+        # Message consists of repeated alphabet.
+        message_len = request.param
+        alphabet_len = len(ascii_lowercase)
+        times = int(message_len / alphabet_len + 1)
+        result = ascii_lowercase * times
+        return result[:message_len]
+
+    @pytest.fixture(scope="class")
+    def test_config(self, ip: IPAddress, port: int, message: str) -> dict[str, Any]:
+        return {
+            "runtime": {"task_queue_size": 256, "workers": 4},
+            "connection": {"ip": str(ip), "port": port},
+            "message": message,
+        }
+
+    @pytest.fixture(scope="class")
+    def echo_server(self, address: Address) -> Generator[EchoServer, None, None]:
+        with EchoServer(address) as server:
+            yield server
+
+    def test_message_ok(
+        self,
+        echo_server: EchoServer,
+        logs_info_level: LogContainer,
+        message: str,
+    ) -> None:
+        log = logs_info_level.find_log("message_read")
+        assert log is not None
+        assert log.message_read == message
+
+    def test_addrs_ok(
+        self, echo_server: EchoServer, logs_info_level: LogContainer
+    ) -> None:
+        log = logs_info_level.find_log("peer_addr")
+        assert log is not None
+        # Compare local (from server PoV) to peer (from client PoV).
+        assert log.peer_addr == str(echo_server.local_addr)
+        assert log.local_addr == str(echo_server.peer_addr)
