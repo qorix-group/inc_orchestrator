@@ -67,6 +67,18 @@ rust_binary(
 )
 
 rust_binary(
+    name = "main_macro_basic",
+    srcs = [
+        "examples/main_macro_basic.rs",
+    ] + glob(["examples/common/**/*.rs"]),
+    proc_macro_deps = [
+        "//src/async_runtime_macros:runtime_macros",
+    ],
+    visibility = ["//visibility:public"],
+    deps = _EXAMPLE_DEPS,
+)
+
+rust_binary(
     name = "catch_error",
     srcs = [
         "examples/catch_error.rs",
