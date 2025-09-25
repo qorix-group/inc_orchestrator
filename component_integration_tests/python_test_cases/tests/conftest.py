@@ -126,6 +126,52 @@ def _authenticate(*, interactive: bool) -> bool:
         return p.returncode == 0
 
 
+def skip_only_nightly(test_items: list[pytest.Item]):
+    """
+    Implement only_nightly marker functionality.
+    Skip tests marked with 'only_nightly'
+
+    Parameters
+    ----------
+    test_items : list[pytest.Item]
+        List of test items to process.
+    """
+    for item in test_items:
+        if item.get_closest_marker("only_nightly"):
+            item.add_marker(pytest.mark.skip(reason="Only for nightly runs"))
+
+
+def skip_do_not_repeat(test_items: list[pytest.Item], repeat_count: int):
+    """
+    Implement do_not_repeat marker functionality.
+    Skip repetitions of tests marked with 'do_not_repeat'.
+
+    Parameters
+    ----------
+    test_items : list[pytest.Item]
+        List of test items to process.
+    repeat_count : int
+        Number of times tests are repeated.
+    """
+    # Start items iteration after first loop and skip tests marked with 'do_not_repeat',
+    # so they are executed only once
+    for item in test_items[len(test_items) // repeat_count :]:
+        if item.get_closest_marker("do_not_repeat"):
+            item.add_marker(pytest.mark.skip(reason="Marked as do_not_repeat"))
+
+
+def pytest_collection_modifyitems(
+    session: pytest.Session, config: pytest.Config, items: list[pytest.Item]
+):
+    # Skip tests marked with 'only_nightly' if NIGHTLY env var is not set to TRUE
+    if os.getenv("NIGHTLY", "").lower() not in ("true", "1"):
+        skip_only_nightly(items)
+
+    # Skip repetitions of tests marked with 'do_not_repeat'
+    count = getattr(config.option, "count", 1)
+    skip_do_not_repeat(items, count)
+
+
 def pytest_collection_finish(session: pytest.Session):
     # Certain tests require root permissions. Collect them and store in config.
     root_required_tests = []

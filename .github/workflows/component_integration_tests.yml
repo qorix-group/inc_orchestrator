@@ -55,6 +55,8 @@ jobs:
 
       - name: Run Python tests with pytest (Nightly)
         if: github.event_name == 'schedule'
+        env:
+          NIGHTLY: TRUE
         working-directory: component_integration_tests/python_test_cases
         run: |
           source .venv/bin/activate
