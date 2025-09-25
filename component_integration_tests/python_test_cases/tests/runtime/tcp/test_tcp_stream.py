@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import platform
 import sys
 from ipaddress import IPv4Address, IPv6Address, ip_address
 from string import ascii_lowercase
@@ -15,8 +16,11 @@ from socket import (
     SHUT_RDWR,
 )
 from threading import Thread
-from component_integration_tests.python_test_cases.tests.cit_scenario import CitScenario
-from testing_utils import LogContainer
+from component_integration_tests.python_test_cases.tests.cit_scenario import (
+    CitScenario,
+    ResultCode,
+)
+from testing_utils import LogContainer, ScenarioResult
 
 
 type IPAddress = IPv4Address | IPv6Address
@@ -211,3 +215,92 @@ class TestSmoke(CitScenario):
         # Compare local (from server PoV) to peer (from client PoV).
         assert log.peer_addr == str(echo_server.local_addr)
         assert log.local_addr == str(echo_server.peer_addr)
+
+
+class TestTTL(CitScenario):
+    @pytest.fixture(scope="class")
+    def scenario_name(self) -> str:
+        return "runtime.tcp.tcp_stream.set_get_ttl"
+
+    @pytest.fixture(
+        scope="class",
+        params=[IPv4Address("127.0.0.1"), IPv6Address("::1")],
+        ids=["v4", "v6"],
+    )
+    def ip(self, request: pytest.FixtureRequest) -> IPAddress:
+        return request.param
+
+    @pytest.fixture(scope="class")
+    def port(self) -> int:
+        return 7878
+
+    @pytest.fixture(scope="class")
+    def address(self, ip: IPAddress, port: int) -> Address:
+        return Address(ip, port)
+
+    @pytest.fixture(scope="class")
+    def test_config(self, ip: IPAddress, port: int, ttl: int | None) -> dict[str, Any]:
+        return {
+            "runtime": {"task_queue_size": 256, "workers": 4},
+            "connection": {"ip": str(ip), "port": port},
+            "ttl": ttl,
+        }
+
+    @pytest.fixture(scope="class")
+    def echo_server(self, address: Address) -> Generator[EchoServer, None, None]:
+        with EchoServer(address) as server:
+            yield server
+
+    def _default_ttl_value(self) -> int:
+        """
+        Return default TTL value for current platform.
+        """
+        current_system = platform.system()
+        match current_system:
+            case "Linux":
+                return 64
+            case _:
+                raise RuntimeError(f"System not supported: {current_system}")
+
+
+class TestTTL_Valid(TestTTL):
+    @pytest.fixture(scope="class", params=[None, 1, 64, 128, 255, 4294967295])
+    def ttl(self, request: pytest.FixtureRequest) -> int | None:
+        # 'None' represents 'not set'.
+        return request.param
+
+    def test_ttl_ok(
+        self,
+        echo_server: EchoServer,
+        logs_info_level: LogContainer,
+        ttl: int | None,
+    ) -> None:
+        log = logs_info_level.find_log("ttl")
+        assert log is not None
+        assert log.ttl == ttl or self._default_ttl_value()
+
+
+class TestTTL_Invalid(TestTTL):
+    @pytest.fixture(scope="class", params=[0])
+    def ttl(self, request: pytest.FixtureRequest) -> int | None:
+        return request.param
+
+    def capture_stderr(self) -> bool:
+        return True
+
+    def expect_command_failure(self) -> bool:
+        return True
+
+    def test_ttl_invalid(
+        self,
+        echo_server: EchoServer,
+        results: ScenarioResult,
+    ) -> None:
+        # Panic inside async causes 'SIGABRT'.
+        assert results.return_code == ResultCode.SIGABRT
+
+        assert results.stderr
+        assert (
+            'Failed to set TTL value: Os { code: 22, kind: InvalidInput, message: "Invalid argument" }'
+            in results.stderr
+        )

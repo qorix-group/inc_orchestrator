@@ -33,6 +33,20 @@ fn parse_message(input: &Option<String>) -> String {
     input_content["message"].as_str().expect("Failed to parse \"message\" field").to_string()
 }
 
+fn parse_ttl(input: &Option<String>) -> Option<u32> {
+    let input_string = input.as_ref().expect("Test input is expected");
+    let input_content: Value = serde_json::from_str(input_string).expect("Failed to parse input string");
+    let value = &input_content["ttl"];
+    if value.is_u64() {
+        let casted = value.as_u64().expect("Failed to parse \"ttl\" field");
+        Some(casted as u32)
+    } else if value.is_null() {
+        None
+    } else {
+        panic!("Invalid TTL value type provided");
+    }
+}
+
 async fn write_and_read_task(mut stream: TcpStream, message: String) {
     // Addresses.
     let peer_addr = stream.peer_addr().expect("Failed to get peer address");
@@ -114,6 +128,38 @@ impl Scenario for Smoke {
     }
 }
 
+async fn set_get_ttl(stream: TcpStream, ttl: Option<u32>) {
+    // Set TTL value.
+    if let Some(ttl) = ttl {
+        stream.set_ttl(ttl).expect("Failed to set TTL value");
+    }
+
+    // Print TTL value.
+    let current_ttl = stream.ttl().expect("Failed to get TTL value");
+    info!(ttl = current_ttl);
+}
+
+struct SetGetTtl;
+
+impl Scenario for SetGetTtl {
+    fn name(&self) -> &str {
+        "set_get_ttl"
+    }
+
+    fn run(&self, input: Option<String>) -> Result<(), String> {
+        let mut rt = Runtime::new(&input).build();
+        let socket_addr = parse_socket_addr(&input);
+        let ttl = parse_ttl(&input);
+        let _ = rt.block_on(async move {
+            let stream = TcpStream::connect(socket_addr).await.expect("Failed to connect");
+            let _ = spawn(set_get_ttl(stream, ttl)).await;
+            Ok(0)
+        });
+
+        Ok(())
+    }
+}
+
 pub fn tcp_stream_group() -> Box<dyn ScenarioGroup> {
-    Box::new(ScenarioGroupImpl::new("tcp_stream", vec![Box::new(Smoke)], vec![]))
+    Box::new(ScenarioGroupImpl::new("tcp_stream", vec![Box::new(Smoke), Box::new(SetGetTtl)], vec![]))
 }
