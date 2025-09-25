@@ -1,4 +1,5 @@
 import math
+import os
 from typing import Any
 
 import pytest
@@ -31,9 +32,7 @@ class TestShortSleepUnderLoad2W256Q(CitScenario):
     def test_config(self) -> dict[str, Any]:
         return {
             "runtime": {"workers": 2, "task_queue_size": 256},
-            "test": {
-                "sleep_duration_ms": 100,
-            },
+            "test": {"sleep_duration_ms": 100, "run_count": 1, "cpu_load": "high"},
         }
 
     @pytest.fixture(scope="class")
@@ -82,9 +81,7 @@ class TestMediumSleepUnderLoad2W256Q(TestShortSleepUnderLoad2W256Q):
     def test_config(self):
         return {
             "runtime": {"workers": 2, "task_queue_size": 256},
-            "test": {
-                "sleep_duration_ms": 500,
-            },
+            "test": {"sleep_duration_ms": 500, "run_count": 1, "cpu_load": "high"},
         }
 
     @pytest.fixture(scope="class")
@@ -97,11 +94,61 @@ class TestLongSleepUnderLoad2W256Q(TestMediumSleepUnderLoad2W256Q):
     def test_config(self):
         return {
             "runtime": {"workers": 2, "task_queue_size": 256},
-            "test": {
-                "sleep_duration_ms": 1000,
-            },
+            "test": {"sleep_duration_ms": 1000, "run_count": 1, "cpu_load": "high"},
         }
 
     @pytest.fixture(scope="class")
     def execution_timeout(self) -> float:
         return 10.0
+
+
+@pytest.mark.do_not_repeat
+@pytest.mark.only_nightly
+class TestHugeAmountOfShortSleeps(TestShortSleepUnderLoad2W256Q):
+    @pytest.fixture(scope="class")
+    def test_config(self):
+        return {
+            "runtime": {"workers": 2, "task_queue_size": 256},
+            "test": {"sleep_duration_ms": 5, "run_count": 2_000, "cpu_load": "low"},
+        }
+
+    @pytest.fixture(scope="class")
+    def execution_timeout(self) -> float:
+        return 120.0
+
+    @pytest.mark.parametrize(
+        "sleep_name",
+        ["Sleep1", "Sleep2", "Sleep3", "Sleep4", "Sleep5"],
+    )
+    def test_sleep_duration(
+        self,
+        logs_info_level: LogContainer,
+        test_config: dict,
+        sleep_name: str,
+    ):
+        # Collect all start and finish logs for the given sleep_name
+        [sleep_starts, sleep_finishes] = (
+            logs_info_level.get_logs(field="id", value=sleep_name)
+            .group_by("location")
+            .values()
+        )
+        # Calculate duration of each sleep
+        sleep_durations_ms = []
+        for sleep_start, sleep_finish in zip(sleep_starts, sleep_finishes):
+            sleep_durations_ms.append(
+                (sleep_finish.timestamp - sleep_start.timestamp).total_seconds() * 1000
+            )
+
+        expected_sleep_ms = test_config["test"]["sleep_duration_ms"]
+        threshold_ms = get_threshold_ms(expected_sleep_ms)
+
+        # Check all sleep durations are within the expected range
+        for sleep_duration_ms in sleep_durations_ms:
+            assert (
+                expected_sleep_ms
+                <= sleep_duration_ms
+                <= expected_sleep_ms + threshold_ms
+            ), (
+                f"Expected sleep duration {expected_sleep_ms} ms, "
+                f"but got {sleep_duration_ms} ms. Threshold: {threshold_ms} ms."
+            )

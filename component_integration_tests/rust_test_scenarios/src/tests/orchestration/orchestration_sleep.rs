@@ -52,6 +52,8 @@ macro_rules! cpu_load_action {
 #[derive(Serialize, Deserialize, Debug)]
 struct TestInput {
     sleep_duration_ms: u64,
+    run_count: usize,
+    cpu_load: String,
 }
 
 impl TestInput {
@@ -64,12 +66,15 @@ impl TestInput {
 
 pub struct SleepUnderLoad;
 
-fn sleep_under_load(sleep_duration_ms: u64) -> Result<Design, CommonErrors> {
+fn sleep_under_load(sleep_duration_ms: u64, cpu_load: String) -> Result<Design, CommonErrors> {
     let mut design = Design::new("SleepUnderLoad".into(), DesignConfig::default());
 
     // Register async actions as invoke functions and get tags
     let sleep1_tag = design.register_invoke_async("Sleep1".into(), non_blocking_sleep_task!("Sleep1".to_string(), sleep_duration_ms))?;
-    let cpu_tag = design.register_invoke_fn("CpuLoadInput".into(), cpu_load_action!(42))?;
+
+    let cpu_load_action = if cpu_load == "low" { cpu_load_action!(5) } else { cpu_load_action!(42) };
+    let cpu_tag = design.register_invoke_fn("CpuLoadInput".into(), cpu_load_action)?;
+
     let sleep2_tag = design.register_invoke_async("Sleep2".into(), non_blocking_sleep_task!("Sleep2".to_string(), sleep_duration_ms))?;
     let sleep3_tag = design.register_invoke_async("Sleep3".into(), non_blocking_sleep_task!("Sleep3".to_string(), sleep_duration_ms))?;
     let sleep4_tag = design.register_invoke_async("Sleep4".into(), non_blocking_sleep_task!("Sleep4".to_string(), sleep_duration_ms))?;
@@ -113,7 +118,7 @@ impl Scenario for SleepUnderLoad {
     fn run(&self, input: Option<String>) -> Result<(), String> {
         let logic = TestInput::new(&input);
 
-        let design = sleep_under_load(logic.sleep_duration_ms).expect("Failed to create design");
+        let design = sleep_under_load(logic.sleep_duration_ms, logic.cpu_load).expect("Failed to create design");
 
         let mut rt = Runtime::new(&input).build();
 
@@ -124,7 +129,7 @@ impl Scenario for SleepUnderLoad {
 
         let _ = rt.block_on(async move {
             let mut program = programs.pop().expect("Failed to pop program");
-            let _ = program.run_n(1).await;
+            let _ = program.run_n(logic.run_count).await;
             Ok(0)
         });
         Ok(())
