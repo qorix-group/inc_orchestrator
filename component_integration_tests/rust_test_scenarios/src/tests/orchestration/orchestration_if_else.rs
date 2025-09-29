@@ -29,9 +29,8 @@ struct BasicTestInput {
 }
 
 impl BasicTestInput {
-    pub fn new(inputs: &Option<String>) -> Self {
-        let input_string = inputs.as_ref().expect("Test input is expected");
-        let v: Value = serde_json::from_str(input_string).expect("Failed to parse input string");
+    pub fn new(input: &str) -> Self {
+        let v: Value = serde_json::from_str(input).expect("Failed to parse input string");
         serde_json::from_value(v["test"].clone()).expect("Failed to parse \"test\" field")
     }
 }
@@ -76,9 +75,9 @@ impl Scenario for BasicIfElse {
         "basic"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
-        let logic = BasicTestInput::new(&input);
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
+        let logic = BasicTestInput::new(input);
 
         let orch = Orchestration::new()
             .add_design(Self::if_else_design(logic.condition).expect("Failed to create design"))
@@ -104,9 +103,8 @@ struct NestedTestInput {
 }
 
 impl NestedTestInput {
-    pub fn new(inputs: &Option<String>) -> Self {
-        let input_string = inputs.as_ref().expect("Test input is expected");
-        let v: Value = serde_json::from_str(input_string).expect("Failed to parse input string");
+    pub fn new(input: &str) -> Self {
+        let v: Value = serde_json::from_str(input).expect("Failed to parse input string");
         serde_json::from_value(v["test"].clone()).expect("Failed to parse \"test\" field")
     }
 }
@@ -155,9 +153,9 @@ impl Scenario for NestedIfElse {
         "nested"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
-        let logic = NestedTestInput::new(&input);
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
+        let logic = NestedTestInput::new(input);
 
         let orch = Orchestration::new()
             .add_design(Self::if_else_design(logic.inner_condition, logic.outer_condition).expect("Failed to create design"))

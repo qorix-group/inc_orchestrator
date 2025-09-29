@@ -34,8 +34,8 @@ impl Scenario for SingleSequence {
         "single"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
 
         // Build Orchestration
         let orch = Orchestration::new()
@@ -90,8 +90,8 @@ impl Scenario for NestedSequence {
         "nested"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
 
         // Build Orchestration
         let orch = Orchestration::new()
@@ -160,8 +160,8 @@ impl Scenario for AwaitSequence {
         "await"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
 
         // Build Orchestration
         let orch = Orchestration::new()

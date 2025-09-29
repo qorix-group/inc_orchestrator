@@ -108,8 +108,8 @@ impl Scenario for TagMethods {
         "tag_methods"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
 
         let orch = Orchestration::new()
             .add_design(test_design().expect("Failed to create design"))
@@ -196,8 +196,8 @@ impl Scenario for InvalidInvokes {
         "error_scenarios"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let logic: Program = serde_json::from_str(input.as_ref().expect("Test input is expected")).expect("Failed to parse input");
+    fn run(&self, input: &str) -> Result<(), String> {
+        let logic: Program = serde_json::from_str(input).expect("Failed to parse input");
 
         // Add design based on logic.program_name
         let selected_design = match logic.program_name.as_str() {
@@ -247,8 +247,8 @@ impl Scenario for TooManyTags {
         "too_many_tags"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let logic: Capacity = serde_json::from_str(input.as_ref().expect("Test input is expected")).expect("Failed to parse input");
+    fn run(&self, input: &str) -> Result<(), String> {
+        let logic: Capacity = serde_json::from_str(input).expect("Failed to parse input");
 
         let _ = Orchestration::new()
             .add_design(too_many_tags(logic.registration_capacity).expect("Failed to create design"))

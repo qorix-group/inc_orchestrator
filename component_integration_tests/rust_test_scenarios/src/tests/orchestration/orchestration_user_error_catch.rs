@@ -109,9 +109,8 @@ struct DesignTypeTestInput {
 }
 
 impl DesignTypeTestInput {
-    pub fn new(inputs: &Option<String>) -> Self {
-        let input_string = inputs.as_ref().expect("Test input is expected");
-        let v: Value = serde_json::from_str(input_string).expect("Failed to parse input string");
+    pub fn new(input: &str) -> Self {
+        let v: Value = serde_json::from_str(input).expect("Failed to parse input string");
         serde_json::from_value(v["test"].clone()).expect("Failed to parse \"test\" field")
     }
 }
@@ -186,9 +185,9 @@ impl Scenario for CatchSequenceUserError {
         "sequence_user_error"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
-        let logic = DesignTypeTestInput::new(&input);
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
+        let logic = DesignTypeTestInput::new(input);
 
         let orch = match logic.design_type.as_str() {
             "unrecoverable" => Orchestration::new()
@@ -231,9 +230,8 @@ struct ErrorCodeTestInput {
 }
 
 impl ErrorCodeTestInput {
-    pub fn new(inputs: &Option<String>) -> Self {
-        let input_string = inputs.as_ref().expect("Test input is expected");
-        let v: Value = serde_json::from_str(input_string).expect("Failed to parse input string");
+    pub fn new(input: &str) -> Self {
+        let v: Value = serde_json::from_str(input).expect("Failed to parse input string");
         serde_json::from_value(v["test"].clone()).expect("Failed to parse \"test\" field")
     }
 }
@@ -279,9 +277,9 @@ impl Scenario for CatchNestedSequenceUserError {
         "nested_sequence_user_error"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
-        let logic = ErrorCodeTestInput::new(&input);
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
+        let logic = ErrorCodeTestInput::new(input);
 
         let orch = Orchestration::new()
             .add_design(self.create_design(logic.error_code).expect("Failed to create design"))
@@ -307,9 +305,8 @@ struct ConcurrencyTestInput {
 }
 
 impl ConcurrencyTestInput {
-    pub fn new(inputs: &Option<String>) -> Self {
-        let input_string = inputs.as_ref().expect("Test input is expected");
-        let v: Value = serde_json::from_str(input_string).expect("Failed to parse input string");
+    pub fn new(input: &str) -> Self {
+        let v: Value = serde_json::from_str(input).expect("Failed to parse input string");
         serde_json::from_value(v["test"].clone()).expect("Failed to parse \"test\" field")
     }
 }
@@ -364,9 +361,9 @@ impl Scenario for CatchConcurrencyUserError {
         "concurrency_user_error"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
-        let logic = ConcurrencyTestInput::new(&input);
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
+        let logic = ConcurrencyTestInput::new(input);
         let valid_tasks_len = logic.concurrent_valid_tasks.len();
         if valid_tasks_len != 3 {
             panic!("Test issue, expecting 3 valid tasks, got {valid_tasks_len}");
@@ -440,9 +437,9 @@ impl Scenario for CatchNestedConcurrencyUserError {
         "nested_concurrency_user_error"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
-        let logic = ConcurrencyTestInput::new(&input);
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
+        let logic = ConcurrencyTestInput::new(input);
         let valid_tasks_len = logic.concurrent_valid_tasks.len();
         if valid_tasks_len != 3 {
             panic!("Test issue, expecting 3 valid tasks, got {valid_tasks_len}");
@@ -474,9 +471,8 @@ struct ErrorCodesTestInput {
 }
 
 impl ErrorCodesTestInput {
-    pub fn new(inputs: &Option<String>) -> Self {
-        let input_string = inputs.as_ref().expect("Test input is expected");
-        let v: Value = serde_json::from_str(input_string).expect("Failed to parse input string");
+    pub fn new(input: &str) -> Self {
+        let v: Value = serde_json::from_str(input).expect("Failed to parse input string");
         serde_json::from_value(v["test"].clone()).expect("Failed to parse \"test\" field")
     }
 }
@@ -551,9 +547,9 @@ impl Scenario for CatchDoubleMixedUserError {
         "double_mixed_user_error"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
-        let logic = ErrorCodesTestInput::new(&input);
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
+        let logic = ErrorCodesTestInput::new(input);
         let error_codes_len = logic.error_codes.len();
         if error_codes_len != 2 {
             panic!("Test issue, expecting 2 error codes, got {error_codes_len}");
@@ -631,9 +627,9 @@ impl Scenario for CatchDoubleRecoverableUserError {
         "double_recoverable_user_error"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
-        let logic = ErrorCodesTestInput::new(&input);
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
+        let logic = ErrorCodesTestInput::new(input);
         let error_codes_len = logic.error_codes.len();
         if error_codes_len != 2 {
             panic!("Test issue, expecting 2 error codes, got {error_codes_len}");
@@ -704,9 +700,9 @@ impl Scenario for DoubleCatchSequence {
         "per_nested_sequence"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
-        let logic = ErrorCodeTestInput::new(&input);
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
+        let logic = ErrorCodeTestInput::new(input);
 
         let orch = Orchestration::new()
             .add_design(self.create_design(logic.error_code).expect("Failed to create design"))
