@@ -115,8 +115,8 @@ impl Scenario for SingleProgramSingleShutdown {
         "single_program_single_shutdown"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
         let shutdown_tag = Tag::from_str_static("ShutdownEvent");
 
         // Build Orchestration
@@ -161,8 +161,8 @@ impl Scenario for TwoProgramsSingleShutdown {
         "two_programs_single_shutdown"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
         let shutdown_tag = Tag::from_str_static("ShutdownEvent");
         let counter_1 = ActionCounter {
             run_cnt: Arc::new(AtomicUsize::new(0)),
@@ -226,8 +226,8 @@ impl Scenario for TwoProgramsTwoShutdowns {
         "two_programs_two_shutdowns"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
         let shutdown_tag_1 = Tag::from_str_static("ShutdownEvent1");
         let shutdown_tag_2 = Tag::from_str_static("ShutdownEvent2");
 
@@ -301,8 +301,8 @@ impl Scenario for GetAllShutdowns {
         "two_programs_all_shutdowns"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
         let shutdown_tag_1 = Tag::from_str_static("ShutdownEvent1");
         let shutdown_tag_2 = Tag::from_str_static("ShutdownEvent2");
 
@@ -354,8 +354,8 @@ impl Scenario for OneProgramNotShut {
         "one_program_not_shut"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
         let shutdown_tag_1 = Tag::from_str_static("ShutdownEvent1");
         let shutdown_tag_2 = Tag::from_str_static("ShutdownEvent2");
 
@@ -408,8 +408,8 @@ impl Scenario for ShutdownBeforeStart {
         "before_start"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
         let shutdown_tag = Tag::from_str_static("ShutdownEvent");
 
         // Build Orchestration

@@ -75,8 +75,8 @@ impl Scenario for OneTriggerOneSyncTwoPrograms {
         "1_trigger_1_sync_2_programs"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
 
         let mut orch = Orchestration::new()
             .add_design(trigger_sync_design().expect("Failed to create design"))
@@ -170,8 +170,8 @@ impl Scenario for OneTriggerTwoSyncsThreePrograms {
         "1_trigger_2_syncs_3_programs"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
 
         let mut orch = Orchestration::new()
             .add_design(sync_design_a().expect("Failed to create design"))
@@ -238,8 +238,8 @@ impl Scenario for TriggerAndSyncInNestedBranches {
         "nested_branches"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
 
         let mut orch = Orchestration::new()
             .add_design(nested_trigger_sync_design().expect("Failed to create design"))
@@ -296,8 +296,8 @@ impl Scenario for TriggerSyncOneAfterAnother {
         "one_after_another"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
 
         let mut orch = Orchestration::new()
             .add_design(trigger_sync_oaa_design().expect("Failed to create design"))

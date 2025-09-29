@@ -44,8 +44,8 @@ impl Scenario for SingleConcurrency {
         "single"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
 
         // Build Orchestration
         let orch = Orchestration::new()
@@ -114,8 +114,8 @@ impl Scenario for MultipleConcurrency {
         "multiple"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
 
         // Build Orchestration
         let orch = Orchestration::new()
@@ -180,8 +180,8 @@ impl Scenario for NestedConcurrency {
         "nested"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
 
         // Build Orchestration
         let orch = Orchestration::new()

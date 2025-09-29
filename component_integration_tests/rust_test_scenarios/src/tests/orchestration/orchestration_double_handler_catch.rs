@@ -50,8 +50,8 @@ impl Scenario for CatchDoubleSameHandlerError {
         "double_same_handler_error"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
 
         let orch = Orchestration::new()
             .add_design(self.create_design().expect("Failed to create design"))
@@ -108,8 +108,8 @@ impl Scenario for CatchDoubleDiffHandlerError {
         "double_diff_handler_error"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
 
         let orch = Orchestration::new()
             .add_design(self.create_design().expect("Failed to create design"))
