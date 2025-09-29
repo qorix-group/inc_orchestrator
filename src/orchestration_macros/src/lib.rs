@@ -143,7 +143,7 @@ pub fn import_from_cpp(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let rust_method_definitions = method_lits.iter().map(|lit| {
         let method_name = lit.value();
-        let method_ident = syn::Ident::new(&format!("{}", method_name), lit.span());
+        let method_ident = syn::Ident::new(method_name.as_str(), lit.span());
         let fn_ident = syn::Ident::new(&format!("{}_{}", method_name, class_ident), lit.span());
         quote! {
             pub fn #method_ident(&mut self) -> InvokeResult {

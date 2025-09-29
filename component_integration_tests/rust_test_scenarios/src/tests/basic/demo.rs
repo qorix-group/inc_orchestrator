@@ -75,9 +75,9 @@ fn acc_design() -> Result<Design, CommonErrors> {
             .with_start_action(JustLogAction::new("StartACC"))
             .with_run_action(
                 SequenceBuilder::new()
-                    .with_step(SyncBuilder::from_design("trigger_acc", &design))
+                    .with_step(SyncBuilder::from_design("trigger_acc", design))
                     .with_step(JustLogAction::new("RunACC"))
-                    .with_step(TriggerBuilder::from_design("trigger_s2m", &design))
+                    .with_step(TriggerBuilder::from_design("trigger_s2m", design))
                     .build(),
             )
             .with_stop_action(JustLogAction::new("StopACC"), std::time::Duration::from_secs(10));
@@ -100,9 +100,9 @@ fn m2s_design() -> Result<Design, CommonErrors> {
             .with_start_action(JustLogAction::new("StartM2S"))
             .with_run_action(
                 SequenceBuilder::new()
-                    .with_step(SyncBuilder::from_design("cyclic_evt", &design))
+                    .with_step(SyncBuilder::from_design("cyclic_evt", design))
                     .with_step(JustLogAction::new("RunM2S"))
-                    .with_step(TriggerBuilder::from_design("trigger_acc", &design))
+                    .with_step(TriggerBuilder::from_design("trigger_acc", design))
                     .build(),
             )
             .with_stop_action(JustLogAction::new("StopM2S"), Duration::from_secs(10));
@@ -123,7 +123,7 @@ fn s2m_design() -> Result<Design, CommonErrors> {
             .with_start_action(JustLogAction::new("StartS2M"))
             .with_run_action(
                 SequenceBuilder::new()
-                    .with_step(SyncBuilder::from_design("trigger_s2m", &design))
+                    .with_step(SyncBuilder::from_design("trigger_s2m", design))
                     .with_step(JustLogAction::new("RunS2M"))
                     .build(),
             )
