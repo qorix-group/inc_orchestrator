@@ -15,6 +15,12 @@ use logging_tracing::prelude::*;
 use orchestration::actions::invoke::InvokeResult;
 pub struct CameraDriver {}
 
+impl Default for CameraDriver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CameraDriver {
     pub fn new() -> Self {
         Self {}

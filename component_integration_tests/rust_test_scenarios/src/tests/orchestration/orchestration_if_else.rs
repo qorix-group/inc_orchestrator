@@ -131,15 +131,15 @@ impl NestedIfElse {
                     "inner_condition",
                     Invoke::from_design("branch_true_true", design),
                     Invoke::from_design("branch_true_false", design),
-                    &design,
+                    design,
                 ),
                 IfElse::from_design(
                     "inner_condition",
                     Invoke::from_design("branch_false_true", design),
                     Invoke::from_design("branch_false_false", design),
-                    &design,
+                    design,
                 ),
-                &design,
+                design,
             ));
 
             Ok(())

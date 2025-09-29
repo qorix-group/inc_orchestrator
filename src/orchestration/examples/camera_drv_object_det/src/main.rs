@@ -52,11 +52,11 @@ fn camera_driver_design() -> Result<Design, CommonErrors> {
     design.add_program("camera_driver_design", move |design, builder| {
         builder.with_run_action(
             SequenceBuilder::new()
-                .with_step(SyncBuilder::from_design("timer_event", &design))
+                .with_step(SyncBuilder::from_design("timer_event", design))
                 .with_step(Invoke::from_tag(&t1_tag, design.config()))
                 .with_step(Invoke::from_tag(&t2_tag, design.config()))
                 .with_step(Invoke::from_tag(&t3_tag, design.config()))
-                .with_step(TriggerBuilder::from_design("trigger_obj_det", &design))
+                .with_step(TriggerBuilder::from_design("trigger_obj_det", design))
                 .build(),
         );
 
@@ -78,7 +78,7 @@ fn timer_design() -> Result<Design, CommonErrors> {
         builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(Invoke::from_tag(&t1_tag, design.config()))
-                .with_step(TriggerBuilder::from_design("timer_event", &design))
+                .with_step(TriggerBuilder::from_design("timer_event", design))
                 .build(),
         );
 
@@ -104,14 +104,14 @@ fn obj_det_design() -> Result<Design, CommonErrors> {
     design.add_program("obj_det_design", move |design, builder| {
         builder.with_run_action(
             SequenceBuilder::new()
-                .with_step(SyncBuilder::from_design("trigger_obj_det", &design))
+                .with_step(SyncBuilder::from_design("trigger_obj_det", design))
                 .with_step(Invoke::from_tag(&t1_tag, design.config()))
                 .with_step(
                     ConcurrencyBuilder::new()
                         .with_branch(Invoke::from_tag(&t2_tag, design.config()))
                         .with_branch(Invoke::from_tag(&t3_tag, design.config()))
                         .with_branch(Invoke::from_tag(&t4_tag, design.config()))
-                        .build(&design),
+                        .build(design),
                 )
                 .with_step(Invoke::from_tag(&t5_tag, design.config()))
                 .build(),

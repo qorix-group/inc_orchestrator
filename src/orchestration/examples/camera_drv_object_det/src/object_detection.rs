@@ -21,8 +21,9 @@ use logging_tracing::prelude::*;
 use std::ffi::CStr;
 use std::os::raw::c_char;
 
+#[allow(clippy::missing_safety_doc)]
 #[no_mangle]
-pub extern "C" fn rust_log_info(msg: *const c_char) {
+pub unsafe extern "C" fn rust_log_info(msg: *const c_char) {
     if msg.is_null() {
         return;
     }

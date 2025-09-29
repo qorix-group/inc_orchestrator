@@ -63,7 +63,7 @@ fn test_design() -> Result<Design, CommonErrors> {
     info!(message = "Tag created", id = method_tag.id(), tracing_str = method_tag.tracing_str());
     let method_tag_async = Tag::from_str_static("sample_async_method");
     let extra_tag = Tag::from_str_static("extra_tag");
-    let tags_collection = vec![CustomTag(method_tag), CustomTag(method_tag_async)];
+    let tags_collection = [CustomTag(method_tag), CustomTag(method_tag_async)];
 
     // Check if tags are in tags_collection
     let result = method_tag.is_in_collection(tags_collection.iter().cloned());
@@ -82,7 +82,7 @@ fn test_design() -> Result<Design, CommonErrors> {
     let _ = design.register_invoke_method(method_tag, sample.clone(), SampleStruct::sample_method)?;
     let _ = design.register_invoke_method_async(method_tag_async, sample.clone(), |arc_mutex_sample| {
         // Lock the mutex and extract the data before entering the async block
-        let guard = arc_mutex_sample.lock().unwrap();
+        let guard = arc_mutex_sample.lock().expect("Failed to lock mutex");
         // If SampleStruct implements Clone, you can clone it here. Otherwise, extract the needed data.
         let mut sample_struct = (*guard).clone();
         Box::pin(async move { sample_struct.sample_async_method().await })
@@ -161,13 +161,13 @@ fn register_same_async_method_twice() -> Result<Design, CommonErrors> {
 
     let _ = design.register_invoke_method_async(method_tag1, sample.clone(), |arc_mutex_sample| {
         // Lock the mutex and extract the data before entering the async block
-        let guard = arc_mutex_sample.lock().unwrap();
+        let guard = arc_mutex_sample.lock().expect("Failed to lock mutex");
         // If SampleStruct implements Clone, you can clone it here. Otherwise, extract the needed data.
         let mut sample_struct = (*guard).clone();
         Box::pin(async move { sample_struct.sample_async_method().await })
     })?;
     let _ = design.register_invoke_method_async(method_tag2, sample.clone(), |arc_mutex_sample| {
-        let guard = arc_mutex_sample.lock().unwrap();
+        let guard = arc_mutex_sample.lock().expect("Failed to lock mutex");
         let mut sample_struct = (*guard).clone();
         Box::pin(async move { sample_struct.sample_async_method().await })
     })?;
