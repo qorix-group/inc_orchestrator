@@ -1,4 +1,4 @@
-use crate::internals::net_helper::NetHelper;
+use crate::internals::net_helper::{create_tcp_listener, ConnectionParameters};
 use crate::internals::runtime_helper::Runtime;
 use async_runtime::io::AsyncReadExt;
 use async_runtime::io::AsyncWrite;
@@ -80,15 +80,17 @@ impl Scenario for TcpServer {
     }
 
     fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
+        let input_string = input.clone().expect("Test input is expected");
+        let mut rt = Runtime::new(&Some(input_string.clone())).build();
+        let connection_parameters = ConnectionParameters::from_json(&input_string).expect("Failed to parse connection parameters");
 
         let _ = rt.block_on(async move {
             info!("Program entered engine");
 
-            let net = NetHelper::new(&input);
-            let listener = net.create_tcp_listener().await;
+            let listener = create_tcp_listener(connection_parameters).await;
             info!("TCP server listening on {}", listener.local_addr().expect("Failed to get local address"));
 
+            // Loop is expected to be terminated by SIGTERM from Python test.
             loop {
                 let (stream, _addr) = listener
                     .accept()

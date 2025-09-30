@@ -1,4 +1,3 @@
-import platform
 import sys
 from ipaddress import IPv4Address, IPv6Address
 from socket import (
@@ -20,6 +19,9 @@ from component_integration_tests.python_test_cases.tests.cit_scenario import (
     CitScenario,
 )
 from component_integration_tests.python_test_cases.tests.result_code import ResultCode
+from component_integration_tests.python_test_cases.tests.runtime.tcp.ttl_helper import (
+    get_default_ttl,
+)
 
 
 class EchoServer:
@@ -191,8 +193,7 @@ class TestTTL(CitScenario):
     def test_config(self, ip: IPAddress, port: int, ttl: int | None) -> dict[str, Any]:
         return {
             "runtime": {"task_queue_size": 256, "workers": 4},
-            "connection": {"ip": str(ip), "port": port},
-            "ttl": ttl,
+            "connection": {"ip": str(ip), "port": port, "ttl": ttl},
         }
 
     @pytest.fixture(scope="class")
@@ -200,39 +201,36 @@ class TestTTL(CitScenario):
         with EchoServer(address) as server:
             yield server
 
-    def _default_ttl_value(self) -> int:
-        """
-        Return default TTL value for current platform.
-        """
-        current_system = platform.system()
-        match current_system:
-            case "Linux":
-                return 64
-            case _:
-                raise RuntimeError(f"System not supported: {current_system}")
-
 
 class TestTTL_Valid(TestTTL):
-    @pytest.fixture(scope="class", params=[None, 1, 64, 128, 255, 4294967295])
+    @pytest.fixture(scope="class", params=[None, 1, 64, 128, 255])
     def ttl(self, request: pytest.FixtureRequest) -> int | None:
         # 'None' represents 'not set'.
         return request.param
 
     def test_ttl_ok(
         self,
+        address: Address,
         echo_server: EchoServer,
         logs_info_level: LogContainer,
         ttl: int | None,
     ) -> None:
+        expected_ttl = ttl or get_default_ttl(address.family())
         log = logs_info_level.find_log("ttl")
         assert log is not None
-        assert log.ttl == ttl or self._default_ttl_value()
+        assert log.ttl == expected_ttl
 
 
 class TestTTL_Invalid(TestTTL):
-    @pytest.fixture(scope="class", params=[0])
+    @pytest.fixture(scope="class", params=[0, 256, 257, 2**16, 2**32 - 1])
     def ttl(self, request: pytest.FixtureRequest) -> int | None:
-        return request.param
+        value = request.param
+        if value == 2**32 - 1:
+            pytest.xfail(
+                reason="Max u32 value sets TTL to default - https://github.com/qorix-group/inc_orchestrator_internal/issues/327"
+            )
+
+        return value
 
     def capture_stderr(self) -> bool:
         return True
