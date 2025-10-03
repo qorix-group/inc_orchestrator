@@ -1,19 +1,56 @@
+use async_runtime::core::types::UniqueWorkerId;
+use async_runtime::prelude::ThreadParameters as AsyncRtThreadParameters;
 use async_runtime::runtime::async_runtime::{AsyncRuntime, AsyncRuntimeBuilder};
 use async_runtime::scheduler::execution_engine::ExecutionEngineBuilder;
 use async_runtime::scheduler::SchedulerType;
-use serde::{Deserialize, Deserializer};
+use serde::{de, Deserialize, Deserializer};
 use serde_json::Value;
 use tracing::debug;
 
-/// Execution engine configuration.
-#[derive(Deserialize, Debug)]
-pub struct ExecEngineConfig {
-    pub task_queue_size: u32,
-    pub workers: usize,
+fn deserialize_scheduler_type<'de, D>(deserializer: D) -> Result<Option<SchedulerType>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value_opt: Option<String> = Option::deserialize(deserializer)?;
+    if let Some(value_str) = value_opt {
+        let value = match value_str.as_str() {
+            "fifo" => SchedulerType::Fifo,
+            "round_robin" => SchedulerType::RoundRobin,
+            "other" => SchedulerType::Other,
+            _ => return Err(de::Error::custom("Unknown scheduler type")),
+        };
+        return Ok(Some(value));
+    }
+
+    Ok(None)
+}
+
+/// Thread parameters.
+#[derive(Deserialize, Debug, Clone)]
+pub struct ThreadParameters {
     pub thread_priority: Option<u8>,
     pub thread_affinity: Option<Vec<usize>>,
     pub thread_stack_size: Option<u64>,
-    pub thread_scheduler: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_scheduler_type")]
+    pub thread_scheduler: Option<SchedulerType>,
+}
+
+/// Dedicated worker configuration.
+#[derive(Deserialize, Debug, Clone)]
+pub struct DedicatedWorkerConfig {
+    pub id: String,
+    #[serde(flatten)]
+    pub thread_parameters: ThreadParameters,
+}
+
+/// Execution engine configuration.
+#[derive(Deserialize, Debug, Clone)]
+pub struct ExecEngineConfig {
+    pub task_queue_size: u32,
+    pub workers: usize,
+    #[serde(flatten)]
+    pub thread_parameters: ThreadParameters,
+    pub dedicated_workers: Option<Vec<DedicatedWorkerConfig>>,
 }
 
 fn deserialize_exec_engines<'de, D>(deserializer: D) -> Result<Vec<ExecEngineConfig>, D::Error>
@@ -63,23 +100,47 @@ impl Runtime {
             let mut exec_engine_builder = ExecutionEngineBuilder::new()
                 .task_queue_size(exec_engine.task_queue_size)
                 .workers(exec_engine.workers);
-            if let Some(thread_priority) = exec_engine.thread_priority {
-                exec_engine_builder = exec_engine_builder.thread_priority(thread_priority);
+
+            // Set thread parameters.
+            {
+                let thread_params = &exec_engine.thread_parameters;
+                if let Some(thread_priority) = thread_params.thread_priority {
+                    exec_engine_builder = exec_engine_builder.thread_priority(thread_priority);
+                }
+                if let Some(thread_affinity) = &thread_params.thread_affinity {
+                    exec_engine_builder = exec_engine_builder.thread_affinity(thread_affinity);
+                }
+                if let Some(thread_stack_size) = thread_params.thread_stack_size {
+                    exec_engine_builder = exec_engine_builder.thread_stack_size(thread_stack_size);
+                }
+                if let Some(thread_scheduler) = thread_params.thread_scheduler {
+                    exec_engine_builder = exec_engine_builder.thread_scheduler(thread_scheduler);
+                }
             }
-            if let Some(thread_affinity) = &exec_engine.thread_affinity {
-                exec_engine_builder = exec_engine_builder.thread_affinity(thread_affinity);
-            }
-            if let Some(thread_stack_size) = exec_engine.thread_stack_size {
-                exec_engine_builder = exec_engine_builder.thread_stack_size(thread_stack_size);
-            }
-            if let Some(thread_scheduler) = &exec_engine.thread_scheduler {
-                let thread_scheduler_type = match thread_scheduler.as_str() {
-                    "fifo" => SchedulerType::Fifo,
-                    "round_robin" => SchedulerType::RoundRobin,
-                    "other" => SchedulerType::Other,
-                    _ => panic!("Unknown scheduler type"),
-                };
-                exec_engine_builder = exec_engine_builder.thread_scheduler(thread_scheduler_type);
+
+            // Set dedicated workers.
+            if let Some(dedicated_workers) = &exec_engine.dedicated_workers {
+                for dedicated_worker in dedicated_workers {
+                    // Create thread parameters object.
+                    let mut async_rt_thread_params = AsyncRtThreadParameters::default();
+                    if let Some(thread_priority) = dedicated_worker.thread_parameters.thread_priority {
+                        async_rt_thread_params = async_rt_thread_params.priority(thread_priority);
+                    }
+                    if let Some(thread_affinity) = &dedicated_worker.thread_parameters.thread_affinity {
+                        async_rt_thread_params = async_rt_thread_params.affinity(thread_affinity);
+                    }
+                    if let Some(thread_stack_size) = dedicated_worker.thread_parameters.thread_stack_size {
+                        async_rt_thread_params = async_rt_thread_params.stack_size(thread_stack_size);
+                    }
+                    if let Some(thread_scheduler) = dedicated_worker.thread_parameters.thread_scheduler {
+                        async_rt_thread_params = async_rt_thread_params.scheduler_type(thread_scheduler);
+                    }
+
+                    // Create `UniqueWorkerId`.
+                    let unique_worker_id = UniqueWorkerId::from(&dedicated_worker.id);
+
+                    exec_engine_builder = exec_engine_builder.with_dedicated_worker(unique_worker_id, async_rt_thread_params);
+                }
             }
 
             let (builder, _) = async_rt_builder.with_engine(exec_engine_builder);

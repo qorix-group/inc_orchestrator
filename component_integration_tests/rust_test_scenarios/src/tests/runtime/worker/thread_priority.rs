@@ -98,8 +98,8 @@ impl Scenario for ThreadPriority {
             }
 
             // Wait until all tasks shown params.
-            let wait_s = 1;
-            let result = mid_barrier.wait_for_notification(Duration::from_secs(wait_s));
+            const WAIT_TIME: Duration = Duration::from_secs(1);
+            let result = mid_barrier.wait_for_notification(WAIT_TIME);
 
             // Allow tasks to finish.
             {

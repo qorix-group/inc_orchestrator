@@ -60,8 +60,8 @@ impl Scenario for NumWorkers {
             // Wait is expected to fail on timeout.
             // There's always one task more than available workers.
             // Wait time must be longer for more tasks.
-            let wait_s = if num_workers > 32 { 10 } else { 3 };
-            let result = mid_barrier.wait_for_notification(Duration::from_secs(wait_s));
+            let wait_time = Duration::from_secs(if num_workers > 32 { 10 } else { 3 });
+            let result = mid_barrier.wait_for_notification(wait_time);
 
             // Allow tasks to finish and disable tracing.
             {
@@ -76,7 +76,7 @@ impl Scenario for NumWorkers {
                 Ok(_) => info!(wait_result = "ok"),
                 // Only timeout is expected.
                 Err(e) => {
-                    let expected_message = format!("Failed to join tasks after {wait_s} seconds");
+                    let expected_message = format!("Failed to join tasks after {} seconds", wait_time.as_secs());
                     if e == expected_message {
                         info!(wait_result = "timeout");
                     } else {

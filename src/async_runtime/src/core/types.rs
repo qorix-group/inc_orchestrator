@@ -57,17 +57,21 @@ impl TaskId {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct UniqueWorkerId(u64);
 
-#[allow(clippy::from_over_into)]
-impl Into<UniqueWorkerId> for &str {
-    fn into(self) -> UniqueWorkerId {
-        UniqueWorkerId(compute_hash(self))
+impl From<&str> for UniqueWorkerId {
+    fn from(value: &str) -> Self {
+        Self(compute_hash(value))
     }
 }
 
-#[allow(clippy::from_over_into)]
-impl Into<UniqueWorkerId> for String {
-    fn into(self) -> UniqueWorkerId {
-        UniqueWorkerId(compute_hash(&self))
+impl From<String> for UniqueWorkerId {
+    fn from(value: String) -> Self {
+        Self(compute_hash(value.as_str()))
+    }
+}
+
+impl From<&String> for UniqueWorkerId {
+    fn from(value: &String) -> Self {
+        Self(compute_hash(value))
     }
 }
 
