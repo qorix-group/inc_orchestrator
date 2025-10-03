@@ -21,7 +21,7 @@ pub mod task;
 pub mod waker;
 pub(crate) mod workers;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum SchedulerType {
     Fifo,
     RoundRobin,

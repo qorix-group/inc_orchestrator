@@ -1,9 +1,11 @@
+mod dedicated_worker;
 mod num_workers;
 mod thread_affinity;
 mod thread_priority;
 mod worker_basic;
 mod worker_with_blocking_tasks;
 
+use dedicated_worker::dedicated_worker_group;
 use num_workers::NumWorkers;
 use test_scenarios_rust::scenario::{ScenarioGroup, ScenarioGroupImpl};
 use thread_affinity::ThreadAffinity;
@@ -21,6 +23,6 @@ pub fn worker_scenario_group() -> Box<dyn ScenarioGroup> {
             Box::new(ThreadAffinity),
             Box::new(ThreadPriority),
         ],
-        vec![],
+        vec![dedicated_worker_group()],
     ))
 }
