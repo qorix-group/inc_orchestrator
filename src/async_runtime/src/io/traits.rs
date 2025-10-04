@@ -14,19 +14,18 @@
 // TODO: To be removed once used in IO APIs
 #![allow(dead_code)]
 
+use crate::io::{
+    read_buf::ReadBuf,
+    utils::{read_future::ReadFuture, write_future::WriteFuture},
+};
 use core::{
+    marker::Unpin,
     pin::Pin,
     task::{Context, Poll},
 };
-
 use std::io::Error;
 
-use core::marker::Unpin;
-
-use crate::{io::read_buf::ReadBuf, io::utils::read_future::ReadFuture};
-
 pub trait AsyncRead {
-    ///
     /// Attempts to read into buf.
     /// On success, returns Poll::Ready(Ok(())) and places data in the unfilled portion of buf (**ATTENTION: Read specific Implementer additions to check how does this works**).
     /// If no data was read (buf.filled().len() is unchanged), it implies that EOF has been reached.
@@ -37,18 +36,16 @@ pub trait AsyncRead {
 /// Extension trait for AsyncRead to provide additional methods that are `async/await` compatible.
 /// This is auto implemented for all types that implement AsyncRead.
 pub trait AsyncReadExt: AsyncRead {
-    // Provided methods
     fn read<'a>(&'a mut self, buf: &'a mut [u8]) -> ReadFuture<'a, Self>
     where
         Self: Unpin;
-
-    //TODO: Add more useful calls in next PRs
 }
 
 // pub struct IoSlice<'a> {}
 
 pub trait AsyncWrite {
-    /// Attempt to write bytes from buf into the object.
+    /// Attempts to write a buffer into this writer.
+    ///
     /// On success, returns Poll::Ready(Ok(num_bytes_written)). If successful, then it must be guaranteed that n <= buf.len().
     /// A return value of 0 typically means that the underlying object is no longer able to accept bytes and will likely not be able to do it in the future as well, or that the buffer provided is empty.
     /// If the object is not ready for writing, the method returns Poll::Pending and arranges for the current task (via cx.waker()) to receive a notification when the object becomes writable or is closed.
@@ -67,15 +64,24 @@ pub trait AsyncWrite {
 
 /// Extension trait for AsyncWrite to provide additional methods that are `async/await` compatible.
 pub trait AsyncWriteExt: AsyncWrite {
-    //TODO: Add more useful calls in next PRs
+    /// Attempts to write a buffer into this writer.
+    ///
+    /// There's no guarantee that the whole buffer will be written, and such case is not considered an error.
+    /// The result of the returned future is the same as for [`AsyncWrite::poll_write`].
+    fn write<'a>(&'a mut self, src: &'a [u8]) -> WriteFuture<'a, Self>
+    where
+        Self: Unpin;
 }
 
 // Blanket impls
 
-impl<R> AsyncReadExt for R
-where
-    R: AsyncRead + ?Sized,
-{
+impl<T: AsyncRead + Unpin + ?Sized> AsyncRead for &mut T {
+    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf) -> Poll<Result<(), Error>> {
+        Pin::new(&mut **self).poll_read(cx, buf)
+    }
+}
+
+impl<T: AsyncRead + ?Sized> AsyncReadExt for T {
     fn read<'a>(&'a mut self, buf: &'a mut [u8]) -> ReadFuture<'a, Self>
     where
         Self: Unpin,
@@ -84,12 +90,25 @@ where
     }
 }
 
-// Blanket impls
-impl<T> AsyncRead for &mut T
-where
-    T: AsyncRead + Unpin + ?Sized,
-{
-    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf) -> Poll<Result<(), Error>> {
-        Pin::new(&mut **self).poll_read(cx, buf)
+impl<T: AsyncWrite + Unpin + ?Sized> AsyncWrite for &mut T {
+    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, Error>> {
+        Pin::new(&mut **self).poll_write(cx, buf)
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+        Pin::new(&mut **self).poll_flush(cx)
+    }
+
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+        Pin::new(&mut **self).poll_shutdown(cx)
+    }
+}
+
+impl<T: AsyncWrite + ?Sized> AsyncWriteExt for T {
+    fn write<'a>(&'a mut self, buf: &'a [u8]) -> WriteFuture<'a, Self>
+    where
+        Self: Unpin,
+    {
+        WriteFuture::new(self, buf)
     }
 }

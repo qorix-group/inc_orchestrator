@@ -12,3 +12,4 @@
 //
 
 pub mod read_future;
+pub mod write_future;
