@@ -11,17 +11,15 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+use crate::io::{AsyncRead, ReadBuf};
 use core::{
     future::Future,
     pin::Pin,
     task::{Context, Poll},
 };
-
 use std::io::Error;
 
-use crate::{io::AsyncRead, io::ReadBuf};
-
-pub struct ReadFuture<'a, R: Unpin + ?Sized> {
+pub struct ReadFuture<'a, R: AsyncRead + Unpin + ?Sized> {
     pub(crate) reader: &'a mut R,
     pub(crate) buf: ReadBuf<'a>,
 }
@@ -40,8 +38,8 @@ impl<R: AsyncRead + Unpin + ?Sized> Future for ReadFuture<'_, R> {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let Self { reader, buf } = &mut *self;
-
         let before = buf.filled().len();
+
         Pin::new(reader).poll_read(cx, buf).map(|_| Ok(buf.filled().len() - before))
     }
 }
