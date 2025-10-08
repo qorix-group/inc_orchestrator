@@ -4,7 +4,9 @@ from typing import Any
 import pytest
 from testing_utils import LogContainer
 
-from component_integration_tests.python_test_cases.tests.cit_scenario import CitScenario
+from component_integration_tests.python_test_cases.tests.cit_scenario import (
+    CitScenario,
+)
 
 
 # Due to OS related condition variable wait behavior including scheduling, thread priority,
@@ -31,7 +33,11 @@ class TestShortSleepUnderLoad2W256Q(CitScenario):
     def test_config(self) -> dict[str, Any]:
         return {
             "runtime": {"workers": 2, "task_queue_size": 256},
-            "test": {"sleep_duration_ms": 100, "run_count": 1, "cpu_load": "high"},
+            "test": {
+                "sleep_duration_ms": 100,
+                "run_count": 1,
+                "cpu_load": "high",
+            },
         }
 
     @pytest.fixture(scope="class")
@@ -60,16 +66,12 @@ class TestShortSleepUnderLoad2W256Q(CitScenario):
             field="id",
             value=sleep_name,
         )
-        sleep_duration_ms = (
-            sleep_finish.timestamp - sleep_start.timestamp
-        ).total_seconds() * 1000
+        sleep_duration_ms = (sleep_finish.timestamp - sleep_start.timestamp).total_seconds() * 1000
 
         expected_sleep_ms = test_config["test"]["sleep_duration_ms"]
 
         threshold_ms = get_threshold_ms(expected_sleep_ms)
-        assert (
-            expected_sleep_ms <= sleep_duration_ms <= expected_sleep_ms + threshold_ms
-        ), (
+        assert expected_sleep_ms <= sleep_duration_ms <= expected_sleep_ms + threshold_ms, (
             f"Expected sleep duration {expected_sleep_ms} ms, "
             f"but got {sleep_duration_ms} ms. Threshold: {threshold_ms} ms."
         )
@@ -80,7 +82,11 @@ class TestMediumSleepUnderLoad2W256Q(TestShortSleepUnderLoad2W256Q):
     def test_config(self):
         return {
             "runtime": {"workers": 2, "task_queue_size": 256},
-            "test": {"sleep_duration_ms": 500, "run_count": 1, "cpu_load": "high"},
+            "test": {
+                "sleep_duration_ms": 500,
+                "run_count": 1,
+                "cpu_load": "high",
+            },
         }
 
     @pytest.fixture(scope="class")
@@ -93,7 +99,11 @@ class TestLongSleepUnderLoad2W256Q(TestMediumSleepUnderLoad2W256Q):
     def test_config(self):
         return {
             "runtime": {"workers": 2, "task_queue_size": 256},
-            "test": {"sleep_duration_ms": 1000, "run_count": 1, "cpu_load": "high"},
+            "test": {
+                "sleep_duration_ms": 1000,
+                "run_count": 1,
+                "cpu_load": "high",
+            },
         }
 
     @pytest.fixture(scope="class")
@@ -108,7 +118,11 @@ class TestHugeAmountOfShortSleeps(TestShortSleepUnderLoad2W256Q):
     def test_config(self):
         return {
             "runtime": {"workers": 2, "task_queue_size": 256},
-            "test": {"sleep_duration_ms": 5, "run_count": 2_000, "cpu_load": "low"},
+            "test": {
+                "sleep_duration_ms": 5,
+                "run_count": 2_000,
+                "cpu_load": "low",
+            },
         }
 
     @pytest.fixture(scope="class")
@@ -127,27 +141,19 @@ class TestHugeAmountOfShortSleeps(TestShortSleepUnderLoad2W256Q):
     ):
         # Collect all start and finish logs for the given sleep_name
         [sleep_starts, sleep_finishes] = (
-            logs_info_level.get_logs(field="id", value=sleep_name)
-            .group_by("location")
-            .values()
+            logs_info_level.get_logs(field="id", value=sleep_name).group_by("location").values()
         )
         # Calculate duration of each sleep
         sleep_durations_ms = []
         for sleep_start, sleep_finish in zip(sleep_starts, sleep_finishes):
-            sleep_durations_ms.append(
-                (sleep_finish.timestamp - sleep_start.timestamp).total_seconds() * 1000
-            )
+            sleep_durations_ms.append((sleep_finish.timestamp - sleep_start.timestamp).total_seconds() * 1000)
 
         expected_sleep_ms = test_config["test"]["sleep_duration_ms"]
         threshold_ms = get_threshold_ms(expected_sleep_ms)
 
         # Check all sleep durations are within the expected range
         for sleep_duration_ms in sleep_durations_ms:
-            assert (
-                expected_sleep_ms
-                <= sleep_duration_ms
-                <= expected_sleep_ms + threshold_ms
-            ), (
+            assert expected_sleep_ms <= sleep_duration_ms <= expected_sleep_ms + threshold_ms, (
                 f"Expected sleep duration {expected_sleep_ms} ms, "
                 f"but got {sleep_duration_ms} ms. Threshold: {threshold_ms} ms."
             )
