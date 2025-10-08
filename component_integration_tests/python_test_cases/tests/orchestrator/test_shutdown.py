@@ -28,9 +28,7 @@ class TestSingleProgramSingleShutdown(CitScenario):
         return {"runtime": {"task_queue_size": 256, "workers": workers}}
 
     def test_program_executed(self, logs_info_level: LogContainer):
-        assert logs_info_level.contains_log(field="message", pattern="Action1"), (
-            "Action1 was not executed as expected"
-        )
+        assert logs_info_level.contains_log(field="message", pattern="Action1"), "Action1 was not executed as expected"
 
     def test_shutdown_executed(self, logs_info_level: LogContainer):
         assert logs_info_level.contains_log(field="message", pattern="StopAction"), (
@@ -44,12 +42,12 @@ class TestTwoProgramsSingleShutdown(TestSingleProgramSingleShutdown):
         return "orchestration.shutdown.two_programs_single_shutdown"
 
     def test_shutdown_executed(self, logs_info_level: LogContainer):
-        assert logs_info_level.contains_log(
-            field="message", pattern="ShutdownDesign1::StopAction was executed"
-        ), "Program1 Shutdown was not executed as expected"
-        assert logs_info_level.contains_log(
-            field="message", pattern="ShutdownDesign2::StopAction was executed"
-        ), "Program2 Shutdown was not executed as expected"
+        assert logs_info_level.contains_log(field="message", pattern="ShutdownDesign1::StopAction was executed"), (
+            "Program1 Shutdown was not executed as expected"
+        )
+        assert logs_info_level.contains_log(field="message", pattern="ShutdownDesign2::StopAction was executed"), (
+            "Program2 Shutdown was not executed as expected"
+        )
 
 
 class TestTwoProgramsTwoShutdowns(TestTwoProgramsSingleShutdown):
@@ -58,16 +56,10 @@ class TestTwoProgramsTwoShutdowns(TestTwoProgramsSingleShutdown):
         return "orchestration.shutdown.two_programs_two_shutdowns"
 
     def test_shutdown_order(self, logs_info_level: LogContainer):
-        shutdown1 = logs_info_level.find_log(
-            field="message", pattern="ShutdownDesign1::StopAction was executed"
-        )
-        shutdown2 = logs_info_level.find_log(
-            field="message", pattern="ShutdownDesign2::StopAction was executed"
-        )
+        shutdown1 = logs_info_level.find_log(field="message", pattern="ShutdownDesign1::StopAction was executed")
+        shutdown2 = logs_info_level.find_log(field="message", pattern="ShutdownDesign2::StopAction was executed")
 
-        assert shutdown2.timestamp < shutdown1.timestamp, (
-            "Program2 Shutdown did not happen before Program1 Shutdown"
-        )
+        assert shutdown2.timestamp < shutdown1.timestamp, "Program2 Shutdown did not happen before Program1 Shutdown"
 
 
 class TestTwoProgramsAllShutdowns(TestTwoProgramsSingleShutdown):
@@ -97,35 +89,31 @@ class TestOneProgramNotShut(CitScenario):
         return True
 
     def test_infinite_design_was_executed(self, logs_info_level: LogContainer):
-        assert logs_info_level.contains_log(
-            field="message", pattern="InfiniteDesign::Action1 was executed"
-        ), "InfiniteDesign::Action1 was not executed as expected"
+        assert logs_info_level.contains_log(field="message", pattern="InfiniteDesign::Action1 was executed"), (
+            "InfiniteDesign::Action1 was not executed as expected"
+        )
 
     def test_program_execution_is_running_infinitely(self, results: ScenarioResult):
         assert results.hang, "Program execution was not running infinitely as expected"
         # The program should run infinitely, so we kill it after a execution_timeout
-        assert results.return_code == ResultCode.SIGKILL, (
-            "Program execution was not killed as expected"
+        assert results.return_code == ResultCode.SIGKILL, "Program execution was not killed as expected"
+
+    def test_shutdown_designs_were_executed_and_shut(self, logs_info_level: LogContainer):
+        # Design1
+        assert logs_info_level.contains_log(field="message", pattern="ShutdownDesign1::Action1 was executed"), (
+            "ShutdownDesign1 was not executed as expected"
+        )
+        assert logs_info_level.contains_log(field="message", pattern="ShutdownDesign1::StopAction was executed"), (
+            "ShutdownDesign1 was not shut down as expected"
         )
 
-    def test_shutdown_designs_were_executed_and_shut(
-        self, logs_info_level: LogContainer
-    ):
-        # Design1
-        assert logs_info_level.contains_log(
-            field="message", pattern="ShutdownDesign1::Action1 was executed"
-        ), "ShutdownDesign1 was not executed as expected"
-        assert logs_info_level.contains_log(
-            field="message", pattern="ShutdownDesign1::StopAction was executed"
-        ), "ShutdownDesign1 was not shut down as expected"
-
         # Design2
-        assert logs_info_level.contains_log(
-            field="message", pattern="ShutdownDesign2::Action1 was executed"
-        ), "ShutdownDesign2 was not executed as expected"
-        assert logs_info_level.contains_log(
-            field="message", pattern="ShutdownDesign2::StopAction was executed"
-        ), "ShutdownDesign2 was not shut down as expected"
+        assert logs_info_level.contains_log(field="message", pattern="ShutdownDesign2::Action1 was executed"), (
+            "ShutdownDesign2 was not executed as expected"
+        )
+        assert logs_info_level.contains_log(field="message", pattern="ShutdownDesign2::StopAction was executed"), (
+            "ShutdownDesign2 was not shut down as expected"
+        )
 
 
 class TestShutdownBeforeStart(TestSingleProgramSingleShutdown):
@@ -133,16 +121,10 @@ class TestShutdownBeforeStart(TestSingleProgramSingleShutdown):
     def scenario_name(self):
         return "orchestration.shutdown.before_start"
 
-    @pytest.mark.skip(
-        "Behavior to be clarified - https://github.com/qorix-group/inc_orchestrator_internal/issues/148"
-    )
+    @pytest.mark.skip("Behavior to be clarified - https://github.com/qorix-group/inc_orchestrator_internal/issues/148")
     def test_execution_order(self, logs_info_level: LogContainer):
-        actions = logs_info_level.get_logs(
-            field="message", pattern="Action1 was executed"
-        )
-        shutdown = logs_info_level.find_log(
-            field="message", pattern="StopAction was executed"
-        )
+        actions = logs_info_level.get_logs(field="message", pattern="Action1 was executed")
+        shutdown = logs_info_level.find_log(field="message", pattern="StopAction was executed")
         # Current implementation - first action executes before shutdown
         # To be changed when shutdown behavior is modified
         assert actions[0].timestamp < shutdown.timestamp, (

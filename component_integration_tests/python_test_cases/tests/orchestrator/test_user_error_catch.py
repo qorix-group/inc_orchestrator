@@ -3,7 +3,9 @@ from typing import Any
 import pytest
 from testing_utils import LogContainer
 
-from component_integration_tests.python_test_cases.tests.cit_scenario import CitScenario
+from component_integration_tests.python_test_cases.tests.cit_scenario import (
+    CitScenario,
+)
 
 
 class TestUnrecoverableCatchSequence(CitScenario):
@@ -15,7 +17,11 @@ class TestUnrecoverableCatchSequence(CitScenario):
     def test_config(self) -> dict[str, Any]:
         return {
             "runtime": {"task_queue_size": 256, "workers": 4},
-            "test": {"design_type": "unrecoverable", "error_code": 42, "run_count": 1},
+            "test": {
+                "design_type": "unrecoverable",
+                "error_code": 42,
+                "run_count": 1,
+            },
         }
 
     def test_execution_order(self, test_config, logs_info_level: LogContainer):
@@ -25,9 +31,9 @@ class TestUnrecoverableCatchSequence(CitScenario):
         error_code = test_config["test"]["error_code"]
 
         error_msg = results.pop(0)
-        assert (
-            error_msg.id == "user_error_task" and error_msg.error_code == error_code
-        ), "Expected error triggering task"
+        assert error_msg.id == "user_error_task" and error_msg.error_code == error_code, (
+            "Expected error triggering task"
+        )
 
         catch_msg = results.pop(0)
         assert catch_msg.id == "catch" and catch_msg.error_code == error_code, (
@@ -58,9 +64,9 @@ class TestRecoverableFailedCatchSequence(CitScenario):
         error_code = test_config["test"]["error_code"]
 
         error_msg = results.pop(0)
-        assert (
-            error_msg.id == "user_error_task" and error_msg.error_code == error_code
-        ), "Expected error triggering task"
+        assert error_msg.id == "user_error_task" and error_msg.error_code == error_code, (
+            "Expected error triggering task"
+        )
 
         catch_msg = results.pop(0)
         assert (
@@ -93,9 +99,9 @@ class TestRecoverableCatchSequence(CitScenario):
         error_code = test_config["test"]["error_code"]
 
         error_msg = results.pop(0)
-        assert (
-            error_msg.id == "user_error_task" and error_msg.error_code == error_code
-        ), "Expected error triggering task"
+        assert error_msg.id == "user_error_task" and error_msg.error_code == error_code, (
+            "Expected error triggering task"
+        )
 
         catch_msg = results.pop(0)
         assert (
@@ -105,9 +111,7 @@ class TestRecoverableCatchSequence(CitScenario):
         ), "Expected catch block to handle the user error"
 
         after_catch_msg = results.pop(0)
-        assert after_catch_msg.id == "log_after_catch_task", (
-            "Expected task after catch block to be executed"
-        )
+        assert after_catch_msg.id == "log_after_catch_task", "Expected task after catch block to be executed"
 
 
 class TestUnrecoverableCatchInMultipleRuns(TestUnrecoverableCatchSequence):
@@ -115,7 +119,11 @@ class TestUnrecoverableCatchInMultipleRuns(TestUnrecoverableCatchSequence):
     def test_config(self) -> dict[str, Any]:
         return {
             "runtime": {"task_queue_size": 256, "workers": 4},
-            "test": {"design_type": "unrecoverable", "error_code": 42, "run_count": 3},
+            "test": {
+                "design_type": "unrecoverable",
+                "error_code": 42,
+                "run_count": 3,
+            },
         }
 
 
@@ -154,23 +162,15 @@ class TestRecoverableCatchInMultipleRuns(CitScenario):
         logs = list(logs_info_level)
         for _ in range(expected_iter_count):
             log = logs.pop(0)
-            assert log.id == "user_error_task", (
-                "Expected user error task to be executed"
-            )
+            assert log.id == "user_error_task", "Expected user error task to be executed"
 
             log = logs.pop(0)
-            assert log.id == "catch_recoverable", (
-                "Expected catch block to handle the user error"
-            )
+            assert log.id == "catch_recoverable", "Expected catch block to handle the user error"
 
             log = logs.pop(0)
-            assert log.id == "log_after_catch_task", (
-                "Expected task after catch block to be executed"
-            )
+            assert log.id == "log_after_catch_task", "Expected task after catch block to be executed"
 
-        assert len(logs) == 0, (
-            "Expected no additional logs after the expected iterations"
-        )
+        assert len(logs) == 0, "Expected no additional logs after the expected iterations"
 
 
 class TestNestedSequenceCatch(TestUnrecoverableCatchSequence):
@@ -205,9 +205,7 @@ class TestConcurrencyCatch(CitScenario):
         valid_tasks = test_config["test"]["concurrent_valid_tasks"]
 
         for task in valid_tasks:
-            assert logs_info_level.contains_log(field="id", value=task), (
-                f"Expected task {task} to be executed"
-            )
+            assert logs_info_level.contains_log(field="id", value=task), f"Expected task {task} to be executed"
 
         assert logs_info_level.contains_log(field="id", value="user_error_task"), (
             "Expected user error task to be executed"
@@ -215,9 +213,7 @@ class TestConcurrencyCatch(CitScenario):
 
         last_message = list(logs_info_level).pop(-1)
         catch_message = logs_info_level.find_log(field="id", value="catch")
-        assert last_message == catch_message, (
-            "Expected last message to be the catch block"
-        )
+        assert last_message == catch_message, "Expected last message to be the catch block"
 
 
 class TestNestedConcurrencyCatch(TestConcurrencyCatch):
@@ -236,25 +232,26 @@ class TestDoubleMixedErrorCatch(CitScenario):
         return {
             "runtime": {"task_queue_size": 256, "workers": 4},
             "test": {
-                "error_codes": [18446744073709551615, 43]  # The latter is unrecoverable
+                "error_codes": [
+                    18446744073709551615,
+                    43,
+                ]  # The latter is unrecoverable
             },
         }
 
-    def test_concurrent_branches_execution(
-        self, test_config, logs_info_level: LogContainer
-    ):
+    def test_concurrent_branches_execution(self, test_config, logs_info_level: LogContainer):
         error_codes = test_config["test"]["error_codes"]
 
         concurrent_branches = 3
         concurrency_tasks = LogContainer(logs_info_level[:concurrent_branches])
 
-        assert concurrency_tasks.contains_log(
-            field="error_code", value=error_codes[0]
-        ), f"Expected user error task for code {error_codes[0]} to be executed"
+        assert concurrency_tasks.contains_log(field="error_code", value=error_codes[0]), (
+            f"Expected user error task for code {error_codes[0]} to be executed"
+        )
 
-        assert concurrency_tasks.contains_log(
-            field="error_code", value=error_codes[1]
-        ), f"Expected user error task for code {error_codes[1]} to be executed"
+        assert concurrency_tasks.contains_log(field="error_code", value=error_codes[1]), (
+            f"Expected user error task for code {error_codes[1]} to be executed"
+        )
 
         assert concurrency_tasks.contains_log(field="id", value="just_log_task"), (
             "Expected 'just_log_task' to be executed in concurrency branches"

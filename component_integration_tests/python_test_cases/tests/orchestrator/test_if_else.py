@@ -4,7 +4,9 @@ from typing import Any
 import pytest
 from testing_utils import LogContainer
 
-from component_integration_tests.python_test_cases.tests.cit_scenario import CitScenario
+from component_integration_tests.python_test_cases.tests.cit_scenario import (
+    CitScenario,
+)
 
 
 class TestBasicIfElseCondition(CitScenario):
@@ -46,9 +48,7 @@ class TestNestedIfElseCondition(CitScenario):
         return request.param
 
     @pytest.fixture(scope="class")
-    def test_config(
-        self, outer_condition: bool, inner_condition: bool
-    ) -> dict[str, Any]:
+    def test_config(self, outer_condition: bool, inner_condition: bool) -> dict[str, Any]:
         return {
             "runtime": {"task_queue_size": 256, "workers": 4},
             "test": {
@@ -57,9 +57,7 @@ class TestNestedIfElseCondition(CitScenario):
             },
         }
 
-    def test_execution_branch(
-        self, outer_condition, inner_condition, logs_info_level: LogContainer
-    ):
+    def test_execution_branch(self, outer_condition, inner_condition, logs_info_level: LogContainer):
         assert len(logs_info_level) == 1, "Expected exactly one log message"
 
         outer_condition = json.dumps(outer_condition)

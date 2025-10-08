@@ -41,37 +41,23 @@ class TestTagMethods(CitScenario):
         log = logs_info_level.find_log(field="message", pattern="Tag created")
 
         assert log.tracing_str == "sample_method", "Tag ID is not as expected"
-        assert log.id == self.compute_djb2_tag_hash("sample_method"), (
-            "Tag ID is not as expected"
-        )
+        assert log.id == self.compute_djb2_tag_hash("sample_method"), "Tag ID is not as expected"
 
     def test_valid_tag_is_in_collection(self, logs_info_level: LogContainer):
-        log = logs_info_level.get_logs(field="is_in_collection").find_log(
-            field="tag", value="sample_method"
-        )
+        log = logs_info_level.get_logs(field="is_in_collection").find_log(field="tag", value="sample_method")
         assert log.is_in_collection, "Tag was not found in collection as expected"
 
     def test_invalid_tag_is_in_collection(self, logs_info_level: LogContainer):
-        log = logs_info_level.get_logs(field="is_in_collection").find_log(
-            field="tag", value="extra_tag"
-        )
-        assert not log.is_in_collection, (
-            "Tag was found in collection, but it should not be"
-        )
+        log = logs_info_level.get_logs(field="is_in_collection").find_log(field="tag", value="extra_tag")
+        assert not log.is_in_collection, "Tag was found in collection, but it should not be"
 
     def test_valid_tag_find_in_collection(self, logs_info_level: LogContainer):
-        log = logs_info_level.get_logs(field="find_in_collection").find_log(
-            field="tag", value="sample_method"
-        )
+        log = logs_info_level.get_logs(field="find_in_collection").find_log(field="tag", value="sample_method")
         assert log.find_in_collection, "Tag was not found in collection as expected"
 
     def test_invalid_tag_find_in_collection(self, logs_info_level: LogContainer):
-        log = logs_info_level.get_logs(field="find_in_collection").find_log(
-            field="tag", value="extra_tag"
-        )
-        assert not log.find_in_collection, (
-            "Tag was found in collection, but it should not be"
-        )
+        log = logs_info_level.get_logs(field="find_in_collection").find_log(field="tag", value="extra_tag")
+        assert not log.find_in_collection, "Tag was found in collection, but it should not be"
 
 
 class TestRegisterMethod(CitScenario):
@@ -91,9 +77,7 @@ class TestRegisterMethod(CitScenario):
     def test_async_method_executed(self, logs_info_level: LogContainer):
         logs = logs_info_level.get_logs(field="id", pattern="sample_async_method")
         assert len(logs) == 2, "Async SampleMethod should have 2 logs"
-        assert logs[0].location == "begin", (
-            "Async SampleMethod did not start as expected"
-        )
+        assert logs[0].location == "begin", "Async SampleMethod did not start as expected"
         assert logs[-1].location == "end", "Async SampleMethod did not end as expected"
 
 
@@ -122,9 +106,7 @@ class TestRegisterSameMethodTwice(CitScenarioWithCorruptedPrograms):
         return "register_same_method_twice"
 
     def test_invalid(self, results: ScenarioResult):
-        assert results.return_code == ResultCode.PANIC, (
-            "Test scenario was expected to fail with panic"
-        )
+        assert results.return_code == ResultCode.PANIC, "Test scenario was expected to fail with panic"
         assert "Failed to create design: AlreadyDone" in results.stderr, (
             "Test scenario did not with expected error message"
         )
@@ -136,9 +118,7 @@ class TestRegisterSameAsyncMethodTwice(CitScenarioWithCorruptedPrograms):
         return "register_same_async_method_twice"
 
     def test_invalid(self, results: ScenarioResult):
-        assert results.return_code == ResultCode.PANIC, (
-            "Test scenario was expected to fail with panic"
-        )
+        assert results.return_code == ResultCode.PANIC, "Test scenario was expected to fail with panic"
         assert "Failed to create design: AlreadyDone" in results.stderr, (
             "Test scenario did not with expected error message"
         )
@@ -150,9 +130,7 @@ class TestGetNonExistingTag(CitScenarioWithCorruptedPrograms):
         return "get_invalid_tag"
 
     def test_invalid(self, results: ScenarioResult):
-        assert results.return_code == ResultCode.PANIC, (
-            "Test scenario was expected to fail with panic"
-        )
+        assert results.return_code == ResultCode.PANIC, "Test scenario was expected to fail with panic"
         assert "Failed to create design: NotFound" in results.stderr, (
             "Test scenario did not with expected error message"
         )
@@ -175,9 +153,7 @@ class TestRegisterTooManyTags(CitScenarioWithCorruptedPrograms):
         }
 
     def test_invalid(self, results: ScenarioResult):
-        assert results.return_code == ResultCode.PANIC, (
-            "Test scenario was expected to fail with panic"
-        )
+        assert results.return_code == ResultCode.PANIC, "Test scenario was expected to fail with panic"
         assert "Failed to create design: NoSpaceLeft" in results.stderr, (
             "Test scenario did not with expected error message"
         )
