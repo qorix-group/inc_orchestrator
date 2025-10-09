@@ -78,10 +78,9 @@ fn main() {
     unsafe { SignalHandler::get_instance().register_signal_handlers() };
 
     // Put programs into runtime and run them
-    let _ = runtime.spawn(async move {
+    runtime.spawn(async move {
         let _ = program.run().await;
         info!("Program terminated.");
-        Ok(0)
     });
     info!("Runtime spawned. Running the program...");
     info!("Press Ctrl+C or send SIGTERM to terminate the program.");
@@ -92,9 +91,6 @@ fn main() {
 
     // Shutdown the program
     let _ = shutdown_notifier.shutdown();
-
-    // Wait for all engines to finish
-    runtime.wait_for_all_engines();
 
     info!("Exit.");
 }

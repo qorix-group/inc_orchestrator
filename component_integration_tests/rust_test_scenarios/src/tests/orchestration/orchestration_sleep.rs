@@ -126,10 +126,9 @@ impl Scenario for SleepUnderLoad {
         let mut program_manager: orchestration::api::OrchProgramManager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             let mut program = programs.pop().expect("Failed to pop program");
             let _ = program.run_n(logic.run_count).await;
-            Ok(0)
         });
         Ok(())
     }

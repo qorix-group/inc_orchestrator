@@ -40,7 +40,7 @@ impl Scenario for NumWorkers {
         let num_workers = exec_engine.workers;
         let mut rt = builder.build();
 
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             let mut joiner = RuntimeJoiner::new();
             let mid_barrier = MultiExecutionBarrier::new(num_workers);
             let mut mid_notifiers = mid_barrier.get_notifiers();
@@ -85,7 +85,7 @@ impl Scenario for NumWorkers {
                 }
             }
 
-            Ok(joiner.wait_for_all().await)
+            joiner.wait_for_all().await;
         });
 
         Ok(())

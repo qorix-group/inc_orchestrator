@@ -70,10 +70,10 @@ impl Scenario for SPSCSendReceive {
         let (sender, receiver) = spsc::create_channel_default::<u64>();
 
         let mut joiner = RuntimeJoiner::new();
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             joiner.add_handle(spawn(send_task(sender, logic.data_to_send.clone())));
             joiner.add_handle(spawn(receive_task(receiver, logic.data_to_send.len())));
-            Ok(joiner.wait_for_all().await)
+            joiner.wait_for_all().await;
         });
 
         Ok(())
@@ -97,9 +97,8 @@ impl Scenario for SPSCSendOnly {
 
         let (sender, _receiver) = spsc::create_channel::<u64, QUEUE_SIZE>();
 
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             spawn(send_task(sender, logic.data_to_send.clone())).await.expect("Failed to spawn task");
-            Ok(0)
         });
 
         Ok(())
@@ -123,9 +122,8 @@ impl Scenario for SPSCDropReceiver {
         let (sender, receiver) = spsc::create_channel_default::<u64>();
         drop(receiver);
 
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             spawn(send_task(sender, logic.data_to_send.clone())).await.expect("Failed to spawn task");
-            Ok(0)
         });
 
         Ok(())
@@ -149,11 +147,10 @@ impl Scenario for SPSCDropSender {
         let (sender, receiver) = spsc::create_channel_default::<u64>();
         drop(sender);
 
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             spawn(receive_task(receiver, logic.data_to_send.len()))
                 .await
                 .expect("Failed to spawn task");
-            Ok(0)
         });
 
         Ok(())
@@ -189,10 +186,10 @@ impl Scenario for SPSCDropSenderInTheMiddle {
         let (sender, receiver) = spsc::create_channel_default::<u64>();
 
         let mut joiner = RuntimeJoiner::new();
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             joiner.add_handle(spawn(send_task(sender, logic.data_to_send.clone())));
             joiner.add_handle(spawn(receive_task(receiver, logic.data_to_send.len() + logic.overread_count)));
-            Ok(joiner.wait_for_all().await)
+            joiner.wait_for_all().await;
         });
 
         Ok(())
@@ -260,7 +257,7 @@ impl Scenario for SPSCDropReceiverInTheMiddle {
         let (sender, receiver) = spsc::create_channel_default::<u64>();
 
         let sync = Arc::new(AtomicBool::new(false));
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             let handle = spawn(Self::double_send_task(
                 sender,
                 logic.first_step_data.clone(),
@@ -274,7 +271,6 @@ impl Scenario for SPSCDropReceiverInTheMiddle {
             sync.store(true, Ordering::Release);
 
             handle.await.expect("Failed to spawn send task");
-            Ok(0)
         });
 
         Ok(())
@@ -358,10 +354,10 @@ impl Scenario for SPSCHeavyLoad {
         let (sender, receiver) = spsc::create_channel::<u64, QUEUE_SIZE>();
 
         let mut joiner = RuntimeJoiner::new();
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             joiner.add_handle(spawn(SPSCHeavyLoad::heavy_send_task(sender, logic.send_count)));
             joiner.add_handle(spawn(SPSCHeavyLoad::heavy_receive_task(receiver, logic.send_count + 1)));
-            Ok(joiner.wait_for_all().await)
+            joiner.wait_for_all().await;
         });
 
         Ok(())

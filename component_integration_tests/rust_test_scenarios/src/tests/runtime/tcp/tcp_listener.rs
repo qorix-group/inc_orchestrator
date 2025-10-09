@@ -17,7 +17,7 @@ impl Scenario for Smoke {
         let mut rt = Runtime::from_json(input)?.build();
         let connection_parameters = ConnectionParameters::from_json(input).expect("Failed to parse connection parameters");
 
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             let listener = create_tcp_listener(connection_parameters).await;
             info!("TCP server listening on {}", listener.local_addr().expect("Failed to get local address"));
 
@@ -48,11 +48,9 @@ impl Scenario for SetGetTtl {
         let mut rt = Runtime::from_json(input)?.build();
         let connection_parameters = ConnectionParameters::from_json(input).expect("Failed to parse connection parameters");
 
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             let listener = create_tcp_listener(connection_parameters).await;
-
             let _ = spawn(print_listener_ttl(listener)).await;
-            Ok(0)
         });
 
         Ok(())

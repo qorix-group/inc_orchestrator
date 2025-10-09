@@ -88,14 +88,13 @@ impl Scenario for OneTriggerOneSyncTwoPrograms {
         let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             let mut joiner = Vec::new();
             for program in programs.as_mut_slice() {
                 joiner.push(program.run_n(1));
             }
 
             future::join_all(joiner).await;
-            Ok(0)
         });
 
         Ok(())
@@ -185,14 +184,13 @@ impl Scenario for OneTriggerTwoSyncsThreePrograms {
         let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             let mut joiner = Vec::new();
             for program in programs.as_mut_slice() {
                 joiner.push(program.run_n(1));
             }
 
             future::join_all(joiner).await;
-            Ok(0)
         });
 
         Ok(())
@@ -251,14 +249,13 @@ impl Scenario for TriggerAndSyncInNestedBranches {
         let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             let mut joiner = Vec::new();
             for program in programs.as_mut_slice() {
                 joiner.push(program.run_n(1));
             }
 
             future::join_all(joiner).await;
-            Ok(0)
         });
 
         Ok(())
@@ -309,14 +306,13 @@ impl Scenario for TriggerSyncOneAfterAnother {
         let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             let mut joiner = Vec::new();
             for program in programs.as_mut_slice() {
                 joiner.push(program.run_n(1));
             }
 
             future::join_all(joiner).await;
-            Ok(0)
         });
 
         Ok(())

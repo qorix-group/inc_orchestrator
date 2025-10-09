@@ -54,7 +54,7 @@ fn main() {
     tracing_subscriber::fmt()
         // .with_span_events(FmtSpan::FULL) // Ensures span open/close events are logged
         .with_target(false) // Optional: Remove module path
-        .with_max_level(Level::INFO)
+        .with_max_level(Level::DEBUG)
         .with_thread_ids(true)
         .with_thread_names(true)
         .init();
@@ -66,6 +66,7 @@ fn main() {
             .with_dedicated_worker("dedicated".into(), ThreadParameters::default())
             .enable_safety_worker(ThreadParameters::default()),
     );
+
     let mut runtime = builder.build().unwrap();
 
     let _ = runtime.block_on(async {
@@ -99,10 +100,10 @@ fn main() {
                     .await
                     .unwrap();
             }
-        })
-        .await
-        .unwrap();
+        });
 
-        Ok(0)
+        0
     });
+
+    println!("sdfdsf");
 }

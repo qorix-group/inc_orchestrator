@@ -140,16 +140,16 @@ impl Scenario for SingleProgramSingleShutdown {
             .expect("Failed to get shutdown notifier");
 
         // Put programs into runtime and run them
-        let _ = rt.spawn(async move {
+        let handle = rt.spawn(async move {
             let mut program = programs.pop().expect("Failed to pop program");
             let _ = program.run().await;
-            Ok(0)
         });
 
         // Execute shutdown and wait for all engines to finish
         debug!("Initiating shutdown...");
         let _ = shutdown.shutdown();
-        rt.wait_for_all_engines();
+
+        handle.join();
         debug!("EXIT.");
 
         Ok(())
@@ -195,14 +195,12 @@ impl Scenario for TwoProgramsSingleShutdown {
             .expect("Failed to get shutdown notifier");
 
         // Put programs into runtime and run them
-        let _ = rt.spawn(async move {
+        let handle = rt.spawn(async move {
             let mut joiner = Vec::new();
             for program in programs.as_mut_slice() {
                 joiner.push(program.run());
             }
             futures::future::join_all(joiner).await;
-
-            Ok(0)
         });
 
         // Ensure programs are running in a loop
@@ -214,7 +212,7 @@ impl Scenario for TwoProgramsSingleShutdown {
                 break;
             }
         }
-        rt.wait_for_all_engines();
+        handle.join();
         debug!("EXIT.");
 
         Ok(())
@@ -269,13 +267,12 @@ impl Scenario for TwoProgramsTwoShutdowns {
             .expect("Failed to get shutdown notifier 2");
 
         // Put programs into runtime and run them
-        let _ = rt.spawn(async move {
+        let handle = rt.spawn(async move {
             let mut joiner = Vec::new();
             for program in programs.as_mut_slice() {
                 joiner.push(program.run());
             }
             futures::future::join_all(joiner).await;
-            Ok(0)
         });
 
         // Ensure shutdown order execution
@@ -290,7 +287,7 @@ impl Scenario for TwoProgramsTwoShutdowns {
             }
         }
 
-        rt.wait_for_all_engines();
+        handle.join();
         debug!("EXIT.");
         Ok(())
     }
@@ -329,20 +326,18 @@ impl Scenario for GetAllShutdowns {
         let mut shutdowns = program_manager.get_shutdown_all_notifier().expect("Failed to get shutdown notifiers");
 
         // Put programs into runtime and run them
-        let _ = rt.spawn(async move {
+        let handle = rt.spawn(async move {
             let mut joiner = Vec::new();
             for program in programs.as_mut_slice() {
                 joiner.push(program.run());
             }
             futures::future::join_all(joiner).await;
-
-            Ok(0)
         });
 
         // Execute shutdown and wait for all engines to finish
         debug!("Initiating shutdown...");
         let _ = shutdowns.shutdown();
-        rt.wait_for_all_engines();
+        handle.join();
         debug!("EXIT.");
 
         Ok(())
@@ -383,20 +378,18 @@ impl Scenario for OneProgramNotShut {
         let mut shutdowns = program_manager.get_shutdown_all_notifier().expect("Failed to get shutdown notifiers");
 
         // Put programs into runtime and run them
-        let _ = rt.spawn(async move {
+        let handle = rt.spawn(async move {
             let mut joiner = Vec::new();
             for program in programs.as_mut_slice() {
                 joiner.push(program.run());
             }
             futures::future::join_all(joiner).await;
-
-            Ok(0)
         });
 
         // Execute shutdown and wait for all engines to finish
         debug!("Initiating shutdown...");
         let _ = shutdowns.shutdown();
-        rt.wait_for_all_engines();
+        handle.join();
         debug!("EXIT.");
 
         Ok(())
@@ -437,14 +430,13 @@ impl Scenario for ShutdownBeforeStart {
         let _ = shutdown.shutdown();
 
         // Put programs into runtime and run them
-        let _ = rt.spawn(async move {
+        let handle = rt.spawn(async move {
             let mut program = programs.pop().expect("Failed to pop program");
             let _ = program.run().await;
-            Ok(0)
         });
 
         // Wait for all engines to finish
-        rt.wait_for_all_engines();
+        handle.join();
         debug!("EXIT.");
 
         Ok(())

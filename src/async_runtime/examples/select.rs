@@ -38,7 +38,7 @@ fn main() {
     );
     let mut runtime = builder.build().unwrap();
 
-    let _ = runtime.block_on(async {
+    runtime.block_on(async {
         ensure_safety_enabled();
 
         async fn short_job(result: i32) -> SafetyResult<i32, ()> {
@@ -127,7 +127,5 @@ fn main() {
 
             assert_eq!(result, 333);
         }
-
-        Ok(0)
     });
 }

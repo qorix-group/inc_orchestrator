@@ -46,6 +46,7 @@ impl Scenario for SingleRtMultipleExecEngine {
         let logic = TestInput::new(input);
         let mut rt = Runtime::from_json(input)?.build();
 
+        let mut handles = vec![];
         for tasks_data in logic.tasks.iter() {
             let engine_id = tasks_data.engine_id;
             let task_ids = tasks_data.task_ids.clone();
@@ -54,19 +55,17 @@ impl Scenario for SingleRtMultipleExecEngine {
                 for task_id in task_ids {
                     joiner.add_handle(spawn(basic_task(engine_id, task_id)));
                 }
-                Ok(joiner.wait_for_all().await)
+                joiner.wait_for_all().await;
             });
 
-            if let Err(e) = spawn_result {
-                return Err(rt_errors_to_string(e));
+            match spawn_result {
+                Ok(hnd) => handles.push(hnd),
+                Err(e) => return Err(rt_errors_to_string(e)),
             }
         }
 
-        for tasks_data in logic.tasks.iter() {
-            let engine_id = tasks_data.engine_id;
-            if let Err(e) = rt.wait_for_engine(engine_id) {
-                return Err(rt_errors_to_string(e));
-            }
+        for handle in handles {
+            handle.join();
         }
 
         Ok(())

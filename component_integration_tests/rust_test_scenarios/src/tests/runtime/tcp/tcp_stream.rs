@@ -72,10 +72,9 @@ impl Scenario for Smoke {
         let connection_parameters = ConnectionParameters::from_json(input).expect("Failed to parse connection parameters");
 
         let message = parse_message(input);
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             let stream = create_tcp_stream(connection_parameters).await;
             let _ = spawn(write_and_read_task(stream, message)).await;
-            Ok(0)
         });
 
         Ok(())
@@ -98,10 +97,9 @@ impl Scenario for SetGetTtl {
         let mut rt = Runtime::from_json(input)?.build();
         let connection_parameters = ConnectionParameters::from_json(input).expect("Failed to parse connection parameters");
 
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             let stream = create_tcp_stream(connection_parameters).await;
             let _ = spawn(print_stream_ttl(stream)).await;
-            Ok(0)
         });
 
         Ok(())

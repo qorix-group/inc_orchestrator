@@ -84,16 +84,15 @@ fn main() {
         .expect("Failed to get shutdown notifier");
 
     // Put programs into runtime and run them
-    let _ = runtime.spawn(async move {
+    runtime.spawn(async move {
         let _ = program.run().await;
         info!("Program finished running.");
-        Ok(0)
     });
 
     info!("Runtime spawned");
     thread::sleep(Duration::from_secs(5));
     info!("Calling shutdown");
     let _ = shutdown.shutdown();
-    runtime.wait_for_all_engines();
+
     info!("Exit.");
 }

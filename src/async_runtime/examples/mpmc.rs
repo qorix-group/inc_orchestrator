@@ -41,7 +41,7 @@ fn main() {
     let (builder, _engine_id) = AsyncRuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(8).workers(1));
     let mut runtime = builder.build().unwrap();
 
-    let _ = runtime.block_on(async {
+    runtime.block_on(async {
         info!("We have just entered runtime.");
 
         for i in 0..14 {
@@ -50,7 +50,5 @@ fn main() {
                 i
             });
         }
-
-        Ok(0)
     });
 }

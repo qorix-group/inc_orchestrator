@@ -174,7 +174,7 @@ impl Scenario for ProgramDemo {
         let mut program_m2s = program_manager.get_program("m2s").expect("Failed to get m2s program");
 
         // Put programs into runtime and run them
-        let _ = runtime.block_on(async move {
+        runtime.block_on(async move {
             let h1 = async_runtime::spawn(async move {
                 let _ = program_acc.run().await;
             });
@@ -192,7 +192,6 @@ impl Scenario for ProgramDemo {
             let _ = h3.await;
 
             info!("Programs finished running");
-            Ok(0)
         });
 
         info!("Exit.");

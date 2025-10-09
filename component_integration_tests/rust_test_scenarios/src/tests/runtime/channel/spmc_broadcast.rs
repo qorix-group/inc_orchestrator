@@ -97,14 +97,14 @@ impl Scenario for SPMCBroadcastSendReceive {
         let receivers = prepare_receivers(logic.receivers.len(), receiver);
 
         let mut joiner = RuntimeJoiner::new();
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             joiner.add_handle(spawn(send_task(sender, logic.data_to_send.clone())));
 
             for (receiver, name) in receivers.into_iter().zip(logic.receivers) {
                 joiner.add_handle(spawn(receive_task(name, receiver, logic.data_to_send.len())));
             }
 
-            Ok(joiner.wait_for_all().await)
+            joiner.wait_for_all().await;
         });
 
         Ok(())
@@ -304,14 +304,14 @@ impl Scenario for SPMCBroadcastDropAddReceiver {
         receivers.push(receivers[0].try_clone().expect("Failed to clone receiver"));
 
         let mut joiner = RuntimeJoiner::new();
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             joiner.add_handle(spawn(send_task(sender, logic.data_to_send.clone())));
 
             for (receiver, name) in receivers.into_iter().zip(logic.receivers) {
                 joiner.add_handle(spawn(receive_task(name, receiver, logic.data_to_send.len())));
             }
 
-            Ok(joiner.wait_for_all().await)
+            joiner.wait_for_all().await;
         });
 
         Ok(())
@@ -384,7 +384,7 @@ impl Scenario for SPMCBroadcastSendReceiveOneLagging {
         let double_send_flag = Arc::new(AtomicBool::new(false));
 
         let mut joiner = RuntimeJoiner::new();
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             joiner.add_handle(spawn(Self::send_task_with_ctrl(
                 sender,
                 logic.data_to_send.clone(),
@@ -425,7 +425,7 @@ impl Scenario for SPMCBroadcastSendReceiveOneLagging {
             // Exit all tasks
             exit_task_flag.store(true, Ordering::Release);
 
-            Ok(joiner.wait_for_all().await)
+            joiner.wait_for_all().await;
         });
 
         Ok(())
@@ -497,7 +497,7 @@ impl Scenario for SPMCBroadcastVariableReceivers {
         let read_counter = Arc::new(AtomicUsize::new(0));
 
         let mut joiner = RuntimeJoiner::new();
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             let send_on_read_val = Self::prepare_send_trigger_values(receivers.len());
             joiner.add_handle(spawn(Self::send_task_looped(
                 sender,
@@ -517,7 +517,7 @@ impl Scenario for SPMCBroadcastVariableReceivers {
                 )));
             }
 
-            Ok(joiner.wait_for_all().await)
+            joiner.wait_for_all().await;
         });
 
         Ok(())
@@ -542,7 +542,7 @@ impl Scenario for SPMCBroadcastDropSender {
         let receivers = prepare_receivers(logic.receivers.len(), receiver);
 
         let mut joiner = RuntimeJoiner::new();
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             joiner.add_handle(spawn(send_task(sender, logic.data_to_send.clone())));
 
             for (receiver, name) in receivers.into_iter().zip(logic.receivers) {
@@ -550,7 +550,7 @@ impl Scenario for SPMCBroadcastDropSender {
                 joiner.add_handle(spawn(receive_task(name, receiver, receive_data_count)));
             }
 
-            Ok(joiner.wait_for_all().await)
+            joiner.wait_for_all().await;
         });
 
         Ok(())
@@ -634,7 +634,7 @@ impl Scenario for SPMCBroadcastHeavyLoad {
         let receivers = prepare_receivers(logic.receivers.len(), receiver);
 
         let mut joiner = RuntimeJoiner::new();
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             joiner.add_handle(spawn(Self::heavy_send_task(sender, logic.send_count)));
 
             for (receiver, name) in receivers.into_iter().zip(logic.receivers) {
@@ -642,7 +642,7 @@ impl Scenario for SPMCBroadcastHeavyLoad {
                 joiner.add_handle(spawn(Self::heavy_receive_task(name, receiver, receive_data_count)));
             }
 
-            Ok(joiner.wait_for_all().await)
+            joiner.wait_for_all().await;
         });
 
         Ok(())

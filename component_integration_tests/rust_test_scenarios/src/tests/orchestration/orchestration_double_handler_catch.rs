@@ -60,10 +60,9 @@ impl Scenario for CatchDoubleSameHandlerError {
         let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             let mut program = programs.pop().expect("Failed to pop program");
             let _ = program.run_n(1).await;
-            Ok(0)
         });
 
         Ok(())
@@ -118,10 +117,9 @@ impl Scenario for CatchDoubleDiffHandlerError {
         let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut programs = program_manager.get_programs();
 
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             let mut program = programs.pop().expect("Failed to pop program");
             let _ = program.run_n(1).await;
-            Ok(0)
         });
 
         Ok(())

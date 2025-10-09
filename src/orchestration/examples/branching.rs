@@ -82,7 +82,7 @@ fn main() {
 
     let (builder, _engine_id) = AsyncRuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(256).workers(2));
     let mut runtime = builder.build().unwrap();
-    let _ = runtime.block_on(async move {
+    runtime.block_on(async move {
         info!("Running program 1");
         let result = program1.run_n(1).await;
         assert_eq!(result, Ok(()));
@@ -92,6 +92,5 @@ fn main() {
         assert_eq!(result, Err(ActionExecError::UserError(123.into())));
 
         info!("Programs finished running");
-        Ok(0)
     });
 }

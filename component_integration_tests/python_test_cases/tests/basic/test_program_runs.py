@@ -81,6 +81,7 @@ class TestProgramRunCycle(TestProgramRun):
             (t2 - t1).total_seconds() * 1000  # convert to ms
             for t1, t2 in zip(execution_timestamps, execution_timestamps[1:])
         ]
+
         average_delay_ms = sum(execution_delays) / len(execution_delays)
         assert run_delay <= average_delay_ms, "Average delay is less than expected"
 
