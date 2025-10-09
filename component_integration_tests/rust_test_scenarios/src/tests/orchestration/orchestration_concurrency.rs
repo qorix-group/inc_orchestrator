@@ -57,11 +57,10 @@ impl Scenario for SingleConcurrency {
         let mut programs = program_manager.get_programs();
 
         // Put programs into runtime and run them
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             let mut program = programs.pop().expect("Failed to pop program");
             let _ = program.run_n(1).await;
             info!("Program finished running.");
-            Ok(0)
         });
 
         Ok(())
@@ -127,11 +126,10 @@ impl Scenario for MultipleConcurrency {
         let mut programs = program_manager.get_programs();
 
         // Put programs into runtime and run them
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             let mut program = programs.pop().expect("Failed to pop program");
             let _ = program.run_n(1).await;
             info!("Program finished running.");
-            Ok(0)
         });
 
         Ok(())
@@ -193,11 +191,10 @@ impl Scenario for NestedConcurrency {
         let mut programs = program_manager.get_programs();
 
         // Put programs into runtime and run them
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             let mut program = programs.pop().expect("Failed to pop program");
             let _ = program.run_n(1).await;
             info!("Program finished running.");
-            Ok(0)
         });
 
         Ok(())

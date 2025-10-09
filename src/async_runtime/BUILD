@@ -23,6 +23,9 @@ rust_library(
     name = "libasync_runtime",
     srcs = glob(["src/**/*.rs"]),
     crate_name = "async_runtime",
+    proc_macro_deps = [
+        "//src/async_runtime_macros:runtime_macros",
+    ],
     visibility = ["//visibility:public"],
     deps = _COMMON_DEPS,
 )
@@ -33,6 +36,9 @@ rust_library(
     srcs = glob(["src/**/*.rs"]),
     crate_features = ["runtime-api-mock"],
     crate_name = "async_runtime",
+    proc_macro_deps = [
+        "//src/async_runtime_macros:runtime_macros",
+    ],
     visibility = ["//visibility:public"],
     deps = _COMMON_DEPS,
 )
@@ -40,7 +46,10 @@ rust_library(
 rust_test(
     name = "tests",
     crate = ":libasync_runtime",
-    deps = _COMMON_DEPS + [
+    deps = all_crate_deps(
+        normal = True,
+    ) + [
+        "//src/async_runtime:libasync_runtime",
         "//src/testing:test_utils",
     ],
 )

@@ -13,7 +13,7 @@
 use ::core::future::Future;
 use iceoryx2_bb_container::vec::Vec;
 
-use crate::scheduler::execution_engine::{ExecutionEngine, ExecutionEngineBuilder};
+use crate::scheduler::execution_engine::{ExecutionEngine, ExecutionEngineBuilder, JoinHandle};
 use foundation::containers::growable_vec::GrowableVec;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -81,79 +81,48 @@ pub struct AsyncRuntime {
 }
 
 impl AsyncRuntime {
-    /// Runs the given future (denoted as main async task) to completion on the default engine, blocking the current thread.
+    /// Runs the given future to completion on the default engine, blocking the current thread.
     ///
-    /// Returns the result of the future or an error if the engine is not available.
-    pub fn block_on<T: Future<Output = Result<u32, RuntimeErrors>> + 'static + Send>(&mut self, future: T) -> Result<u32, RuntimeErrors> {
-        self.block_on_engine(0, future)
+    /// Returns the result of the future
+    pub fn block_on<T: Future + 'static + Send>(&mut self, future: T) -> T::Output
+    where
+        T::Output: Send,
+    {
+        self.engines.get_mut(0).unwrap().block_on(future)
     }
 
-    /// Runs the given future (denoted as main async task) to completion on the specified engine, blocking the current thread.
+    /// Runs the given future to completion on the specified engine, blocking the current thread.
     ///
     /// Returns the result of the future or an error if the engine is not available.
-    pub fn block_on_engine<T: Future<Output = Result<u32, RuntimeErrors>> + 'static + Send>(
-        &mut self,
-        engine_id: usize,
-        future: T,
-    ) -> Result<u32, RuntimeErrors> {
-        // The following line does:
-        // 1. Get the engine with the given `engine_id` as index into the `self.engines` vector.
-        // 2. If the engine is not found, return an `RuntimeErrors::EngineNotAvailable` error. This
-        // is the `ok_or()?` part.
-        // 3. Call `block_on` on the found engine with the provided future.
-        self.engines.get_mut(engine_id).ok_or(RuntimeErrors::EngineNotAvailable)?.block_on(future)
+    pub fn block_on_engine<T: Future + 'static + Send>(&mut self, engine_id: usize, future: T) -> Result<T::Output, RuntimeErrors>
+    where
+        T::Output: Send,
+    {
+        Ok(self.engines.get_mut(engine_id).ok_or(RuntimeErrors::EngineNotAvailable)?.block_on(future))
     }
 
     /// Starts the given future asynchronously on the default engine.
     ///
-    /// The result can be retrieved later using [`AsyncRuntime::wait_for_engine`] or just the completion of
-    /// all engines with [`AsyncRuntime::wait_for_all_engines`].
-    pub fn spawn<T: Future<Output = Result<u32, RuntimeErrors>> + 'static + Send>(&mut self, future: T) -> Result<(), RuntimeErrors> {
-        self.spawn_in_engine(0, future)
+    /// Returns [`JoinHandle`] that can be used to retrieve result
+    pub fn spawn<T: Future + 'static + Send>(&mut self, future: T) -> JoinHandle<T::Output>
+    where
+        T::Output: Send,
+    {
+        self.spawn_in_engine(0, future).unwrap() // Cannot fail as the engine 0 is always present
     }
 
     /// Starts the given future asynchronously on the specified engine.
     ///
-    /// The result can be retrieved later using [`AsyncRuntime::wait_for_engine`] or just the completion of
-    /// all engines with [`AsyncRuntime::wait_for_all_engines`].
-    pub fn spawn_in_engine<T: Future<Output = Result<u32, RuntimeErrors>> + 'static + Send>(
-        &mut self,
-        engine_id: usize,
-        future: T,
-    ) -> Result<(), RuntimeErrors> {
-        self.engines
+    /// Returns [`JoinHandle`] that can be used to retrieve result or an error
+    pub fn spawn_in_engine<T: Future + 'static + Send>(&mut self, engine_id: usize, future: T) -> Result<JoinHandle<T::Output>, RuntimeErrors>
+    where
+        T::Output: Send,
+    {
+        Ok(self
+            .engines
             .get_mut(engine_id)
             .ok_or(RuntimeErrors::EngineNotAvailable)?
-            .run_in_engine(future)
-    }
-
-    /// Waits for the result of the currently running main async task on the specified engine `engine_id`.
-    ///
-    /// This is a companion for [`AsyncRuntime::spawn_in_engine`]. This waits for the Future you spawn there to finish.
-    ///
-    /// # ATTENTION:
-    /// If there where any additional tasks spawned from within the starting Future,
-    /// they will not be waited for. You should take care of waiting for them yourself, if you have the need to do so, in main async task.
-    ///
-    /// # Returns
-    /// The result or an error if no task is running.
-    pub fn wait_for_engine(&mut self, engine_id: usize) -> Result<u32, RuntimeErrors> {
-        self.engines.get_mut(engine_id).ok_or(RuntimeErrors::EngineNotAvailable)?.wait_for()
-    }
-
-    /// Waits for all engines to finish their currently running main async task (spawned via [`AsyncRuntime::spawn_in_engine`]/[`AsyncRuntime::spawn`]).
-    ///
-    // # ATTENTION:
-    /// If there were any additional tasks spawned from within the starting Future,
-    /// they will not be waited for. You should take care of waiting for them yourself, if you have the need to do so, in main async task.
-    ///
-    /// # Returns
-    /// The results of the engines are consumed but not delivered anywhere. After calling this
-    /// function the engines do not have a result.
-    pub fn wait_for_all_engines(&mut self) {
-        for engine in self.engines.iter_mut() {
-            let _ = engine.wait_for();
-        }
+            .run_in_engine(future))
     }
 
     /// Stops all engines and their worker threads. This is forceful call that will abort after currently
@@ -200,12 +169,12 @@ mod tests {
         let threads_while: usize = {
             let (builder, engine_id) = AsyncRuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(8).workers(3));
             let mut runtime = builder.build().unwrap();
-            let t = runtime.block_on_engine(engine_id, async move {
+            let t: Result<Result<u32, ()>, RuntimeErrors> = runtime.block_on_engine(engine_id, async move {
                 drop_counter1_clone.fetch_add(1, Ordering::SeqCst);
                 Ok(count_threads() as u32)
             });
 
-            t.unwrap().try_into().unwrap()
+            t.unwrap().unwrap() as usize
         };
 
         thread::sleep(Duration::from_millis(100));
@@ -229,13 +198,13 @@ mod tests {
     fn test_async_runtime_return_value() {
         let (builder, engine_id) = AsyncRuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(8).workers(3));
         let mut runtime = builder.build().unwrap();
-        let ret = runtime.block_on_engine(engine_id, async move { Ok(23) });
+        let ret: Result<i32, ()> = runtime.block_on_engine(engine_id, async move { Ok(23) }).unwrap();
 
         assert_eq!(ret, Ok(23));
 
         let (builder, engine_id) = AsyncRuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(8).workers(3));
         let mut runtime = builder.build().unwrap();
-        let ret = runtime.block_on_engine(engine_id, async move { Ok(42) });
+        let ret: Result<i32, ()> = runtime.block_on_engine(engine_id, async move { Ok(42) }).unwrap();
 
         assert_eq!(ret, Ok(42));
     }
@@ -255,7 +224,7 @@ mod tests {
         let barrier = Arc::new(ThreadWaitBarrier::new(1));
         let ready_notifier = barrier.get_notifier().unwrap();
 
-        runtime
+        let handle = runtime
             .spawn_in_engine(engine_id, async move {
                 thread::sleep(Duration::from_millis(50));
                 ready_notifier.ready();
@@ -265,19 +234,8 @@ mod tests {
 
         assert_eq!(Ok(()), barrier.wait_for_all(Duration::from_secs(1)));
 
-        let result = runtime.wait_for_engine(engine_id);
+        let result: Result<u32, ()> = handle.join();
         assert_eq!(result, Ok(123));
-    }
-
-    #[test]
-    #[cfg(not(miri))] // Provenance issues
-    fn test_async_runtime_wait_for_without_task() {
-        let (builder, engine_id) = AsyncRuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(8).workers(1));
-        let mut runtime = builder.build().unwrap();
-
-        // no task running, try to get result immediately
-        let result = runtime.wait_for_engine(engine_id);
-        assert_eq!(result, Err(RuntimeErrors::NoTaskRunning));
     }
 
     #[test]
@@ -293,29 +251,28 @@ mod tests {
         let (builder, engine_id2) = builder.with_engine(ExecutionEngineBuilder::new().task_queue_size(8).workers(2));
         let mut runtime = builder.build().unwrap();
 
-        runtime
+        let handle1 = runtime
             .spawn_in_engine(engine_id1, async move {
                 thread::sleep(Duration::from_millis(50));
                 Ok(1u32)
             })
             .unwrap();
 
-        runtime
+        let handle2 = runtime
             .spawn_in_engine(engine_id2, async move {
                 thread::sleep(Duration::from_millis(100));
                 Ok(2u32)
             })
             .unwrap();
 
-        runtime.wait_for_all_engines();
-
         // After wait_for_all_engines the engines are stopped and do not deliver an result anymore.
         // There is no task running in them.
-        let res1 = runtime.wait_for_engine(engine_id1);
-        let res2 = runtime.wait_for_engine(engine_id2);
 
-        assert!(matches!(res1, Err(RuntimeErrors::NoTaskRunning)));
-        assert!(matches!(res2, Err(RuntimeErrors::NoTaskRunning)));
+        let res1: Result<u32, ()> = handle1.join();
+        let res2: Result<u32, ()> = handle2.join();
+
+        assert!(matches!(res1, Ok(1u32)));
+        assert!(matches!(res2, Ok(2u32)));
     }
 
     #[test]

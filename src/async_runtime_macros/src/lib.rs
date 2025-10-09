@@ -228,10 +228,12 @@ fn expr_to_usize(expr: &Expr) -> Result<usize> {
 }
 
 ///
-/// # Usage:
+/// The macro that allow user to declare `async` beautified main function what will
+/// configure and run function body in runtime waiting for it to finish
 ///
-/// #[main(
-///
+/// # Usage
+///```
+/// #[async_runtime::main(
 ///     task_queue_size = 128,                // Optional, must be power of two, default: 256
 ///     worker_threads = 4,                   // Optional, range: 1..=128, default: 2
 ///     worker_thread_parameters = {          // Optional, default: inherited from parent thread
@@ -259,12 +261,10 @@ fn expr_to_usize(expr: &Expr) -> Result<usize> {
 ///         }
 ///     ]
 /// )]
-///
-/// ### async fn main() {
-///
+/// async fn main() {
 ///     // User async code here
-///
-/// ### }
+/// }
+///```
 ///
 /// ## Notes:
 /// - All parameters are optional unless otherwise noted.
@@ -307,8 +307,8 @@ pub fn main(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     // original items preserved for the generated fn
     let fn_vis = &input_fn.vis;
-    let fn_ident = &input_fn.sig.ident;
     let fn_block = &input_fn.block;
+    let fn_ret = &input_fn.sig.output;
 
     // build tokens for worker_thread_parameters if present
     let worker_tp_tokens = match args.worker_thread_parameters {
@@ -402,12 +402,17 @@ pub fn main(attr: TokenStream, item: TokenStream) -> TokenStream {
         None => quote! { 2 }, // default
     };
 
+    let return_clause = match fn_ret {
+        syn::ReturnType::Default => quote!(), // no return type
+        syn::ReturnType::Type(_, ret_type) => quote!(-> #ret_type),
+    };
+
     // Now produce the expansion
     let expanded = quote! {
         use async_runtime::{runtime::async_runtime::AsyncRuntimeBuilder, scheduler::execution_engine::*, prelude::ThreadParameters};
 
-        #fn_vis fn #fn_ident() {
 
+        #fn_vis fn main() #return_clause{
             // Build runtime
             let (builder, _engine_id) = AsyncRuntimeBuilder::new().with_engine(
                 ExecutionEngineBuilder::new()
@@ -419,11 +424,10 @@ pub fn main(attr: TokenStream, item: TokenStream) -> TokenStream {
             );
             let mut runtime = builder.build().expect("Failed to build runtime.");
 
-            let _ = runtime.block_on(async {
+            runtime.block_on(async {
                 // Original function body
                 #fn_block
-                Ok(0)
-            });
+            })
         }
     };
 

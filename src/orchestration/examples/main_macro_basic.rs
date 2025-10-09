@@ -11,7 +11,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use async_runtime_macros::main;
 use core::time::Duration;
 
 use async_runtime::spawn;
@@ -90,7 +89,7 @@ fn create_orch_programs() -> Vec<Program> {
     program_manager.get_programs()
 }
 
-#[main(
+#[async_runtime::main(
     task_queue_size = 64,
     worker_threads = 2,
     dedicated_workers = [

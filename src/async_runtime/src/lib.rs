@@ -70,6 +70,9 @@ pub mod time;
 #[cfg(any(test, feature = "runtime-api-mock"))]
 pub mod testing;
 
+// Re-export from `async_runtime_macros` crate
+pub use async_runtime_macros::main;
+
 ///
 /// Spawns a given `future` into runtime and let it execute on any of configured workers
 /// This function allocates a `future` dynamically using [`Box`]

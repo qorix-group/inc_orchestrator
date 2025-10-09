@@ -43,12 +43,12 @@ impl Scenario for BasicWorker {
         let mut rt = Runtime::from_json(input)?.build();
 
         let mut joiner = RuntimeJoiner::new();
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             for name in logic.tasks.as_slice() {
                 joiner.add_handle(spawn(simple_task(name.to_string())));
             }
 
-            Ok(joiner.wait_for_all().await)
+            joiner.wait_for_all().await;
         });
 
         Ok(())

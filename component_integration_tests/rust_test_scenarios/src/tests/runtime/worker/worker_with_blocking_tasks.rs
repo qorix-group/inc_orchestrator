@@ -63,7 +63,7 @@ impl Scenario for WorkerWithBlockingTasks {
         let logic = TestInput::new(input);
         let mut rt = Runtime::from_json(input)?.build();
 
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             let mut joiner = RuntimeJoiner::new();
             let mid_barrier = MultiExecutionBarrier::new(logic.blocking_tasks.len());
             let mut mid_notifiers = mid_barrier.get_notifiers();
@@ -80,7 +80,7 @@ impl Scenario for WorkerWithBlockingTasks {
                 joiner.add_handle(spawn(non_blocking_task(name.to_string(), counter.clone())));
             }
 
-            Ok(joiner.wait_for_all().await)
+            joiner.wait_for_all().await;
         });
 
         Ok(())

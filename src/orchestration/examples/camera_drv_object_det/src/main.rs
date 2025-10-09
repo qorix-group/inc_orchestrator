@@ -160,7 +160,7 @@ fn main() {
     let mut programs = program_manager.get_programs();
 
     // Put programs into runtime and run them
-    let _ = runtime.block_on(async move {
+    runtime.block_on(async move {
         let mut program1 = programs.pop().unwrap();
         let mut program2 = programs.pop().unwrap();
         let mut program3 = programs.pop().unwrap();
@@ -182,7 +182,6 @@ fn main() {
         let _ = h3.await;
 
         info!("Programs finished running");
-        Ok(0)
     });
 
     info!("Exit.");

@@ -76,10 +76,9 @@ fn main() {
     let mut programs = program_manager.get_programs();
 
     // Put programs into runtime and run them
-    let _ = runtime.block_on(async move {
+    runtime.block_on(async move {
         let _ = programs.pop().unwrap().run_n(1).await;
         debug!("Program finished running.");
-        Ok(0)
     });
 
     info!("Successfully sent IPC event: {}", event);

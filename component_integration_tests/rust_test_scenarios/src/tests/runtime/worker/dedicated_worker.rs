@@ -30,7 +30,7 @@ async fn blocking_task(id: String, block_condition: Arc<(Condvar, Mutex<bool>)>,
 
 /// Common run implementation.
 fn common_run(mut rt: AsyncRuntime, dedicated_workers: Vec<DedicatedWorkerConfig>, info_fn: fn(&str)) {
-    let _ = rt.block_on(async move {
+    rt.block_on(async move {
         let mut joiner = RuntimeJoiner::new();
         let mid_barrier = MultiExecutionBarrier::new(dedicated_workers.len());
         let mut mid_notifiers = mid_barrier.get_notifiers();
@@ -72,7 +72,7 @@ fn common_run(mut rt: AsyncRuntime, dedicated_workers: Vec<DedicatedWorkerConfig
             }
         }
 
-        Ok(joiner.wait_for_all().await)
+        joiner.wait_for_all().await;
     });
 }
 
@@ -109,11 +109,10 @@ impl Scenario for SpawnToUnregisteredWorker {
     fn run(&self, input: &str) -> Result<(), String> {
         let mut rt = Runtime::from_json(input)?.build();
 
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             let unregistered_worker_id = "unregistered_worker".to_string();
             let unique_worker_id = UniqueWorkerId::from(unregistered_worker_id.clone());
             let _ = spawn_on_dedicated(non_blocking_task(unregistered_worker_id), unique_worker_id).await;
-            Ok(0)
         });
 
         Ok(())

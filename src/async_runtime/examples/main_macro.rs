@@ -12,11 +12,10 @@
 //
 
 use async_runtime::spawn;
-use async_runtime_macros::main;
 use foundation::prelude::*;
 
 // A simple example for main macro usage with all default engine parameters
-#[main]
+#[async_runtime::main]
 async fn main() {
     tracing_subscriber::fmt().with_target(false).with_max_level(Level::INFO).init();
 

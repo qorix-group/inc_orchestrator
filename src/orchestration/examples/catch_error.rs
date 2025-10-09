@@ -103,9 +103,8 @@ fn main() {
     let mut programs = program_manager.get_programs();
 
     // Put programs into runtime and run them
-    let _ = runtime.block_on(async move {
+    runtime.block_on(async move {
         let res = programs.pop().unwrap().run().await;
         info!("Program finished running with {:?}.", res);
-        Ok(0)
     });
 }

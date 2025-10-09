@@ -118,12 +118,11 @@ impl Scenario for TagMethods {
         let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
         let mut program = program_manager.get_program("test_program").expect("Failed to get program");
 
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             let h1 = async_runtime::spawn(async move {
                 let _ = program.run_n(1).await;
             });
             let _ = h1.await;
-            Ok(0)
         });
 
         Ok(())

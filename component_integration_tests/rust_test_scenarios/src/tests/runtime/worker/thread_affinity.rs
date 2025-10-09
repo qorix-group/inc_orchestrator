@@ -43,7 +43,7 @@ impl Scenario for ThreadAffinity {
         let num_workers = exec_engine.workers;
         let mut rt = builder.build();
 
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             let mut joiner = RuntimeJoiner::new();
             let mid_barrier = MultiExecutionBarrier::new(num_workers - 1);
             let mut mid_notifiers = mid_barrier.get_notifiers();
@@ -74,7 +74,7 @@ impl Scenario for ThreadAffinity {
 
             result.expect("Failed to join tasks in given time");
 
-            Ok(joiner.wait_for_all().await)
+            joiner.wait_for_all().await;
         });
 
         Ok(())

@@ -70,7 +70,7 @@ impl Scenario for SleepBasic {
         let mut rt = Runtime::from_json(input)?.build();
 
         let mut joiner = RuntimeJoiner::new();
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             for task in logic.non_blocking_sleep_tasks.as_slice() {
                 joiner.add_handle(spawn(non_blocking_sleep_task(task.id.to_string(), task.delay_ms)));
             }
@@ -83,7 +83,7 @@ impl Scenario for SleepBasic {
                 joiner.add_handle(spawn(non_sleep_task(name.to_string())));
             }
 
-            Ok(joiner.wait_for_all().await)
+            joiner.wait_for_all().await;
         });
 
         Ok(())

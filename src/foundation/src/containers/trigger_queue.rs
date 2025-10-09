@@ -57,6 +57,13 @@ impl<T> TriggerQueueConsumer<T> {
     }
 
     ///
+    /// Pops an item from a queue once it's available, otherwise it does block and wait until elem is present
+    ///
+    pub fn pop_blocking(&self) -> T {
+        self.queue.pop_blocking()
+    }
+
+    ///
     /// Returns max number of elements queue can hold
     ///
     pub fn capacity(&self) -> usize {
@@ -156,6 +163,16 @@ impl<T> TriggerQueue<T> {
         } else {
             Ok(res.0.pop().unwrap()) // As we did not timed out and we are single consumer, there must be value inside
         }
+    }
+
+    fn pop_blocking(&self) -> T {
+        let data = self.mtx.lock().unwrap();
+
+        self.state.store(true, ::core::sync::atomic::Ordering::Relaxed);
+        let mut res = self.cv.wait_while(data, |guard| guard.is_empty()).unwrap();
+        self.state.store(false, ::core::sync::atomic::Ordering::Relaxed);
+
+        res.pop().unwrap() // As queue is not empty and we are single consumer, there must be value inside
     }
 }
 

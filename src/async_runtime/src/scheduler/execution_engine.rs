@@ -23,7 +23,6 @@ use crate::scheduler::driver::Drivers;
 use crate::{
     box_future,
     core::types::UniqueWorkerId,
-    runtime::async_runtime::RuntimeErrors,
     scheduler::{
         workers::{worker::FIRST_WORKER_ID, ThreadParameters},
         SchedulerType,
@@ -33,19 +32,17 @@ use crate::{
 use foundation::containers::growable_vec::GrowableVec;
 use foundation::containers::mpmc_queue::MpmcQueue;
 use foundation::containers::trigger_queue::{TriggerQueue, TriggerQueueConsumer};
+use foundation::prelude::*;
 use foundation::threading::thread_wait_barrier::ThreadWaitBarrier;
-use foundation::{not_recoverable_error, prelude::*};
 
-pub struct JoinHandle {
-    recv: Option<TriggerQueueConsumer<Result<u32, RuntimeErrors>>>,
+pub struct JoinHandle<T> {
+    recv: TriggerQueueConsumer<T>,
 }
 
-impl JoinHandle {
-    pub fn join(self) -> Result<u32, RuntimeErrors> {
-        self.recv
-            .ok_or(RuntimeErrors::ResultNotThere)?
-            .pop_blocking_with_timeout(Duration::MAX)
-            .unwrap_or(Err(RuntimeErrors::NoResultAvailable))
+impl<T> JoinHandle<T> {
+    /// Blocking wait for the result of future that was scheduled for run into runtime
+    pub fn join(self) -> T {
+        self.recv.pop_blocking()
     }
 }
 
@@ -53,29 +50,18 @@ const MAX_NUM_OF_WORKERS: usize = 128;
 
 enum EngineState {
     Starting,
-    Running(JoinHandle),
-    Finished, // Main task is finished, but workers are still running
-    Stopped,  // Engine is stopped, no workers are running anymore
+    Running,
+    Stopped, // Engine is stopped, no workers are running anymore
 }
 
 impl EngineState {
+    #[allow(dead_code)]
     fn is_running(&self) -> bool {
-        matches!(self, EngineState::Running(_))
+        matches!(self, EngineState::Running)
     }
 
     fn is_stopped(&self) -> bool {
         matches!(self, EngineState::Stopped)
-    }
-
-    fn move_to_finished(&mut self) -> Result<JoinHandle, RuntimeErrors> {
-        if !self.is_running() {
-            return Err(RuntimeErrors::NoTaskRunning);
-        }
-
-        match ::core::mem::replace(self, Self::Finished) {
-            EngineState::Running(join_handle) => Ok(join_handle),
-            _ => not_recoverable_error!("Shall never be here since we checked that state is Running"),
-        }
     }
 }
 /// The central engine for managing and executing asynchronous and dedicated tasks.
@@ -85,6 +71,8 @@ impl EngineState {
 /// Instances are typically created using [`ExecutionEngineBuilder`].
 pub struct ExecutionEngine {
     async_workers: Vec<Worker>,
+
+    #[allow(dead_code)]
     async_queues: Vec<TaskStealQueue>,
     async_scheduler: Arc<AsyncScheduler>,
 
@@ -105,39 +93,69 @@ impl ExecutionEngine {
     /// Starts the engine, executes the future, and returns its result. The calling thread will
     /// block until the given future is complete.
     /// Returns an error if a task is already running or if no result is available.
-    pub(crate) fn block_on<T: Future<Output = Result<u32, RuntimeErrors>> + 'static + Send>(&mut self, future: T) -> Result<u32, RuntimeErrors> {
-        self.run_in_engine(future)?;
-        self.wait_for()
+    pub(crate) fn block_on<T: Future + 'static + Send>(&mut self, future: T) -> T::Output
+    where
+        T::Output: Send,
+    {
+        self.run_in_engine(future).join()
     }
 
     /// Starts the engine and executes the given future within the runtime context.
     ///
     /// Returns an error if a task is already running.
     /// Execution is asynchronous; the result can be retrieved later using [`wait_for`].
-    pub(crate) fn run_in_engine<T: Future<Output = Result<u32, RuntimeErrors>> + 'static + Send>(&mut self, future: T) -> Result<(), RuntimeErrors> {
-        if self.state.is_running() {
-            return Err(RuntimeErrors::TaskAlreadyRunning);
-        }
-
+    pub(crate) fn run_in_engine<T: Future + 'static + Send>(&mut self, future: T) -> JoinHandle<T::Output>
+    where
+        T::Output: Send,
+    {
         let tq = Arc::new(TriggerQueue::new(1));
-        let recv = tq.clone().get_consumer();
+        let recv = tq.clone().get_consumer().unwrap();
 
         let boxed = box_future(async move {
             let res = future.await;
-
             tq.push(res);
         });
+
         let scheduler = self.get_async_scheduler();
-        let task = Arc::new(AsyncTask::new(boxed, FIRST_WORKER_ID, scheduler)); // This is the first initial worker we start on this engine, so we can use a constant worker_id
+        let task = Arc::new(AsyncTask::new(boxed, FIRST_WORKER_ID, scheduler));
         let entry_task = TaskRef::new(task.clone());
 
-        {
-            //TODO: Total hack, injecting task before we run any async_workers so they will pick it
-            let pc = self.async_queues[0].get_local().unwrap();
-            pc.push(entry_task, &self.async_scheduler.global_queue)
-                .unwrap_or_else(|_| panic!("Failed to enter runtime while pushing init task"));
+        self.async_scheduler.respawn(entry_task);
+
+        JoinHandle { recv }
+    }
+
+    pub(crate) fn get_async_scheduler(&self) -> Arc<AsyncScheduler> {
+        self.async_scheduler.clone()
+    }
+
+    /// Stops all worker threads managed by the engine.
+    ///
+    /// The running tasks are not finished, they are only finishing their currently running
+    /// iteration and are then aborted. That means that running tasks are driven until their
+    /// current poll iteration finishes, regardless of the return value. Even when a task returns
+    /// Poll::Pending, it will be stopped after the current iteration.
+    pub(crate) fn stop(&mut self) {
+        if self.state.is_stopped() {
+            return; // Already stopped, nothing to do
         }
 
+        self.state = EngineState::Stopped;
+
+        for worker in self.async_workers.iter_mut() {
+            worker.stop();
+        }
+
+        for dworker in self.dedicated_workers.iter_mut() {
+            dworker.stop();
+        }
+
+        if let Some(ref sworker) = self.safety_worker {
+            sworker.stop();
+        }
+    }
+
+    fn start(&mut self) {
         let safety_worker_count = self.safety_worker.is_some() as u32;
 
         let start_barrier = Arc::new(ThreadWaitBarrier::new(
@@ -176,7 +194,7 @@ impl ExecutionEngine {
         });
 
         // Workers are spawned successfully
-        self.state = EngineState::Running(JoinHandle { recv });
+        self.state = EngineState::Running;
         debug!("Engine starts waiting for workers to be ready");
 
         let res = start_barrier.wait_for_all(Duration::new(5, 0));
@@ -188,64 +206,15 @@ impl ExecutionEngine {
                 panic!("Timeout on starting engine, not all workers reported ready, stopping...");
             }
         }
-
-        Ok(())
-    }
-
-    pub(crate) fn get_async_scheduler(&self) -> Arc<AsyncScheduler> {
-        self.async_scheduler.clone()
-    }
-
-    /// Waits for the result of the currently running entry-/main-task.
-    ///
-    /// It is required to asynchronously start a task with [`run_in_engine`] before using this.
-    /// Returns the result of a finished task or an error if no task is running.
-    pub(crate) fn wait_for(&mut self) -> Result<u32, RuntimeErrors> {
-        match self.state {
-            EngineState::Running(_) => self.state.move_to_finished()?.join(),
-            EngineState::Starting | EngineState::Finished => Err(RuntimeErrors::NoTaskRunning),
-            EngineState::Stopped => Err(RuntimeErrors::EngineNotAvailable),
-        }
-    }
-
-    /// Stops all worker threads managed by the engine.
-    ///
-    /// The running tasks are not finished, they are only finishing their currently running
-    /// iteration and are then aborted. That means that running tasks are driven until their
-    /// current poll iteration finishes, regardless of the return value. Even when a task returns
-    /// Poll::Pending, it will be stopped after the current iteration.
-    pub(crate) fn stop(&mut self) {
-        if self.state.is_stopped() {
-            return; // Already stopped, nothing to do
-        }
-
-        self.state = EngineState::Stopped;
-
-        for worker in self.async_workers.iter_mut() {
-            worker.stop();
-        }
-
-        for dworker in self.dedicated_workers.iter_mut() {
-            dworker.stop();
-        }
-
-        if let Some(ref sworker) = self.safety_worker {
-            sworker.stop();
-        }
     }
 }
 
 /// Dropping the `ExecutionEngine` will stop all workers and wait for them to finish.
 ///
-/// This means that the main task is completed before the engine is destroyed. Main task is the
-/// one,  which was started with [`run_in_engine`].
-/// We try to `wait_for` it here, but ignore the result, because an error returned from `wait_for`
-/// is kind of expected: The user of this `ExecutionEngine` might already have called `stop` or
-/// `wait_for` before and this will result in an error. If he did not, we to do it for him.
-/// After waiting for the main task to finish, we call `stop` to stop all workers.
+/// This means that the current task procseed by workers will be continued until it returns
+/// `Pending` or `Ready`.
 impl Drop for ExecutionEngine {
     fn drop(&mut self) {
-        let _ = self.wait_for();
         self.stop();
     }
 }
@@ -426,7 +395,7 @@ impl ExecutionEngineBuilder {
             dedicated_queues: unsafe { dedicated_queues.assume_init() },
         });
 
-        ExecutionEngine {
+        let mut engine = ExecutionEngine {
             async_workers,
             async_queues,
             async_scheduler,
@@ -436,7 +405,10 @@ impl ExecutionEngineBuilder {
             thread_params: self.thread_params,
             state: EngineState::Starting,
             drivers,
-        }
+        };
+
+        engine.start();
+        engine
     }
 }
 
@@ -535,7 +507,7 @@ mod tests {
     #[cfg(not(miri))]
     fn test_block_on_returns_result() {
         let mut engine = create_engine(2);
-        let result = engine.block_on(async { Ok(123u32) });
+        let result: Result<u32, ()> = engine.block_on(async { Ok(123u32) });
         assert_eq!(result, Ok(123));
     }
 
@@ -552,47 +524,15 @@ mod tests {
         let called = Arc::new(AtomicUsize::new(0));
         let called_clone = called.clone();
 
-        engine
+        let result: Result<u32, ()> = engine
             .run_in_engine(async move {
                 called_clone.fetch_add(1, Ordering::SeqCst);
                 Ok(42u32)
             })
-            .unwrap();
+            .join();
 
-        // Wait for the result
-        let result = engine.wait_for();
         assert_eq!(result, Ok(42));
         assert_eq!(called.load(Ordering::SeqCst), 1);
-    }
-
-    #[test]
-    // miri does not like this test for some reason. Disable it for now. The message is
-    // ```
-    // error: unsupported operation: can't call foreign function `pthread_attr_init` on OS `linux`
-    // ```
-    // See https://github.com/qorix-group/inc_orchestrator_internal/actions/runs/15675294733/job/44154074863?pr=47
-    // for an example CI run.
-    #[cfg(not(miri))]
-    fn test_run_in_engine_twice_should_fail() {
-        let mut engine = create_engine(1);
-
-        engine.run_in_engine(async { Ok(1u32) }).expect("First run_in_engine should succeed");
-
-        // Second call should fail because a task is already running
-        let err = engine.run_in_engine(async { Ok(2u32) }).unwrap_err();
-        assert_eq!(err, RuntimeErrors::TaskAlreadyRunning);
-
-        // Wait for the first task to finish
-        let res = engine.wait_for();
-        assert_eq!(res, Ok(1));
-    }
-
-    #[test]
-    #[cfg(not(miri))] // Provenance issues
-    fn test_wait_for_without_task_should_fail() {
-        let mut engine = create_engine(1);
-        let err = engine.wait_for().unwrap_err();
-        assert_eq!(err, RuntimeErrors::NoTaskRunning);
     }
 
     #[test]
@@ -612,7 +552,7 @@ mod tests {
     // for an example CI run.
     #[cfg(not(miri))]
     fn test_block_on_multiple_engines_parallel() {
-        let mut handles = GrowableVec::new(4);
+        let mut handles: GrowableVec<thread::JoinHandle<Result<u32, ()>>> = GrowableVec::new(4);
         for i in 0..3 {
             handles.push(thread::spawn(move || {
                 let mut engine = create_engine(1);
@@ -646,17 +586,15 @@ mod tests {
         let barrier = Arc::new(ThreadWaitBarrier::new(1));
         let ready_notifier = barrier.get_notifier().unwrap();
 
-        engine
-            .run_in_engine(async move {
-                thread::sleep(Duration::from_millis(50));
-                ready_notifier.ready();
-                Ok(777u32)
-            })
-            .unwrap();
+        let handle = engine.run_in_engine(async move {
+            thread::sleep(Duration::from_millis(50));
+            ready_notifier.ready();
+            Ok(777u32)
+        });
 
         assert_eq!(Ok(()), barrier.wait_for_all(Duration::from_secs(1)));
 
-        let result = engine.wait_for();
+        let result: Result<u32, ()> = handle.join();
         assert_eq!(result, Ok(777));
     }
 }

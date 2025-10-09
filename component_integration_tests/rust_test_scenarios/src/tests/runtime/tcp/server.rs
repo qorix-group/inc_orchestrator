@@ -16,7 +16,7 @@ impl Scenario for TcpServer {
         let mut rt = Runtime::from_json(input)?.build();
         let connection_parameters = ConnectionParameters::from_json(input).expect("Failed to parse connection parameters");
 
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             info!("Program entered engine");
 
             let listener = create_tcp_listener(connection_parameters).await;
