@@ -5,9 +5,8 @@ from typing import Any
 
 import psutil
 import pytest
-from testing_utils import LogContainer, ScenarioResult
+from testing_utils import LogContainer, ScenarioResult, cap_utils
 
-import component_integration_tests.python_test_cases.tests.cap_utils as cap_utils
 from component_integration_tests.python_test_cases.tests.cit_scenario import (
     CitScenario,
 )
@@ -203,7 +202,7 @@ class TestDedicatedWorkerPriority(CitScenario):
         # Check and set 'cap_sys_nice'.
         resolved_target_path = self._resolve_target_path(target_path)
         caps = cap_utils.get_caps(resolved_target_path)
-        if not caps.get("cap_sys_nice", "") == "ep":
+        if caps.get("cap_sys_nice", "") != "ep":
             cap_utils.set_caps(resolved_target_path, {"cap_sys_nice": "ep"})
 
         return self._run_command(command, execution_timeout, args, kwargs)
