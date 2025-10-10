@@ -21,6 +21,7 @@ use crate::actions::action::{ActionResult, ActionTrait, ReusableBoxFutureResult}
 
 use async_runtime::futures::reusable_box_future::{ReusableBoxFuture, ReusableBoxFuturePool};
 use foundation::containers::{reusable_objects::ReusableObject, reusable_objects::ReusableObjects};
+use std::sync::{Arc, Mutex};
 use testing::{
     mock_fn::{CallableTrait, MockFn, MockFnBuilder},
     poller::TestingFuturePoller,
@@ -79,6 +80,15 @@ impl MockActionBuilder {
     ///
     pub fn will_repeatedly(mut self, ret_val: ActionResult) -> Self {
         self.0 = self.0.will_repeatedly(ret_val);
+        self
+    }
+
+    ///
+    /// Attach an action log to the mock action.
+    /// Each time the action is executed, its ID will be appended to the log.
+    ///
+    pub fn with_log(mut self, id: usize, action_log: Arc<Mutex<Vec<usize>>>) -> Self {
+        self.0 = self.0.with_log(id, action_log);
         self
     }
 

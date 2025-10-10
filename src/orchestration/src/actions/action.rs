@@ -14,6 +14,7 @@
 use crate::{actions::invoke::InvokeResult, common::tag::Tag};
 
 use async_runtime::futures::reusable_box_future::{ReusableBoxFuture, ReusableBoxFuturePool};
+use async_runtime::JoinHandle;
 use foundation::prelude::CommonErrors;
 
 use ::core::{
@@ -109,5 +110,41 @@ pub struct ActionBaseMeta {
 impl Debug for ActionBaseMeta {
     fn fmt(&self, f: &mut Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "{:?}", self.tag)
+    }
+}
+
+/// Represents the state of an action's execution.
+/// Can be empty, a future, or a running handle.
+pub enum ActionMeta {
+    Empty,
+    Future(ReusableBoxFuture<ActionResult>),
+    Handle(JoinHandle<ActionResult>),
+}
+
+impl ActionMeta {
+    /// Wraps a future in an ActionMeta.
+    pub fn new(fut: ReusableBoxFuture<ActionResult>) -> Self {
+        ActionMeta::Future(fut)
+    }
+
+    /// Takes the future out of the ActionMeta, leaving it empty.
+    pub fn take_future(&mut self) -> Option<ReusableBoxFuture<ActionResult>> {
+        match ::core::mem::replace(self, ActionMeta::Empty) {
+            ActionMeta::Future(fut) => Some(fut),
+            other => {
+                *self = other;
+                None
+            }
+        }
+    }
+
+    /// Assigns a handle to the ActionMeta, replacing its current state.
+    pub fn assign_handle(&mut self, handle: JoinHandle<ActionResult>) {
+        *self = ActionMeta::Handle(handle);
+    }
+
+    /// Clears the ActionMeta, setting it to Empty.
+    pub fn clear(&mut self) {
+        *self = ActionMeta::Empty;
     }
 }
