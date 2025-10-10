@@ -14,6 +14,7 @@
 pub mod action;
 pub mod catch;
 pub mod concurrency;
+pub mod graph;
 pub mod ifelse;
 pub mod invoke;
 pub mod sequence;

@@ -11,20 +11,19 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use super::action::{ActionBaseMeta, ActionResult, ActionTrait, ReusableBoxFutureResult};
+use super::action::{ActionBaseMeta, ActionMeta, ActionResult, ActionTrait, ReusableBoxFutureResult};
 use crate::actions::action::ActionExecError;
 use crate::api::design::Design;
 use crate::common::tag::Tag;
 use ::core::future::Future;
 use ::core::pin::Pin;
 use ::core::task::{Context, Poll};
-use async_runtime::futures::reusable_box_future::{ReusableBoxFuture, ReusableBoxFuturePool};
+use async_runtime::futures::reusable_box_future::ReusableBoxFuturePool;
 use async_runtime::futures::{FutureInternalReturn, FutureState};
 #[cfg(any(test, feature = "runtime-api-mock"))]
 use async_runtime::testing::mock::*;
 #[cfg(not(any(test, feature = "runtime-api-mock")))]
 use async_runtime::*;
-use async_runtime::{self, JoinHandle};
 use foundation::containers::growable_vec::GrowableVec;
 use foundation::containers::reusable_objects::ReusableObject;
 use foundation::containers::reusable_vec_pool::ReusableVecPool;
@@ -98,7 +97,7 @@ impl Concurrency {
     async fn execute_impl(meta: Tag, mut futures_vec: ReusableObject<Vec<ActionMeta>>) -> ActionResult {
         for fut in futures_vec.iter_mut() {
             if let Some(future) = fut.take_future() {
-                *fut = ActionMeta::Handle(safety::spawn_from_reusable(future));
+                fut.assign_handle(safety::spawn_from_reusable(future));
             }
         }
 
@@ -146,32 +145,6 @@ impl ActionTrait for Concurrency {
     }
 }
 
-/// Represents the state of an action in the concurrency group.
-/// Can be empty, a future, or a running handle.
-enum ActionMeta {
-    Empty,
-    Future(ReusableBoxFuture<ActionResult>),
-    Handle(JoinHandle<ActionResult>),
-}
-
-impl ActionMeta {
-    /// Wraps a future in an ActionMeta.
-    fn new(fut: ReusableBoxFuture<ActionResult>) -> Self {
-        ActionMeta::Future(fut)
-    }
-
-    /// Takes the future out of the ActionMeta, leaving it empty.
-    fn take_future(&mut self) -> Option<ReusableBoxFuture<ActionResult>> {
-        match ::core::mem::replace(self, ActionMeta::Empty) {
-            ActionMeta::Future(fut) => Some(fut),
-            other => {
-                *self = other;
-                None
-            }
-        }
-    }
-}
-
 /// Future that waits for multiple [`JoinHandle`]s to complete.
 /// Returns `Ready` once all are done. Uses FutureState to track polling state.
 struct ConcurrencyJoin {
@@ -205,7 +178,7 @@ impl ConcurrencyJoin {
                             let res = Pin::new(handle).poll(cx);
                             match res {
                                 Poll::Ready(action_result) => {
-                                    *hnd.1 = ActionMeta::Empty; // Clear the handle after polling
+                                    hnd.1.clear(); // Clear the handle after polling
                                     let execution_result = match action_result {
                                         Ok(Ok(_)) => continue,
                                         Ok(Err(err)) => Err(err),

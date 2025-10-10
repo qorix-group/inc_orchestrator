@@ -15,6 +15,7 @@ use foundation::containers::reusable_objects::ReusableObjectTrait;
 
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
+use std::sync::{Arc, Mutex};
 
 #[macro_export]
 macro_rules! build_with_location {
@@ -44,6 +45,8 @@ pub struct MockFn<OutType> {
     min_count: usize,
     returns: VecDeque<OutType>,
     location: Option<String>,
+    id: usize,
+    action_log: Option<Arc<Mutex<Vec<usize>>>>,
 }
 
 impl<T> MockFn<T> {
@@ -65,6 +68,8 @@ impl<OutType: Default> Default for MockFn<OutType> {
             min_count: 0,
             returns: VecDeque::new(),
             location: None,
+            id: 0,
+            action_log: None,
         }
     }
 }
@@ -82,6 +87,8 @@ impl<OutType: Clone> Clone for MockFn<OutType> {
             min_count: self.min_count,
             returns: self.returns.clone(),
             location: self.location.clone(),
+            id: self.id,
+            action_log: self.action_log.clone(),
         }
     }
 }
@@ -109,6 +116,8 @@ impl<OutType> MockFnBuilder<OutType> {
             min_count: 0,
             returns: VecDeque::new(),
             location: None,
+            id: 0,
+            action_log: None,
         })
     }
 
@@ -148,6 +157,12 @@ impl<OutType> MockFnBuilder<OutType> {
         self
     }
 
+    pub fn with_log(mut self, id: usize, action_log: Arc<Mutex<Vec<usize>>>) -> Self {
+        self.0.id = id;
+        self.0.action_log = Some(action_log);
+        self
+    }
+
     pub fn build(mut self) -> MockFn<OutType> {
         // if only will_once is set, the min_count becomes the expected_count
         if self.0.is_will_once_set && !self.0.is_will_repeatedly_set {
@@ -171,6 +186,11 @@ impl<OutType> MockFnBuilder<OutType> {
 impl<OutType: Clone> CallableTrait<OutType> for MockFn<OutType> {
     fn call(&mut self) -> OutType {
         self.call_count.fetch_add(1, Relaxed);
+
+        if let Some(action_log) = &self.action_log {
+            let mut log = action_log.lock().unwrap();
+            log.push(self.id);
+        }
 
         if !self.returns.is_empty() {
             // return the ret_val in the order it was inserted (FIFO)
