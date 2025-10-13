@@ -31,7 +31,7 @@ class VEnv:
         self._python = venv_path / "bin" / "python3"
         self._pip = venv_path / "bin" / "pip3"
 
-        if not self._venv_path.is_dir():
+        if not self._python.is_file() or not self._pip.is_file():
             print(
                 "Virtual environment does not exist, creating...",
                 file=sys.stderr,
