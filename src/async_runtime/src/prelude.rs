@@ -11,4 +11,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+pub use crate::core::types::UniqueWorkerId;
+pub use crate::runtime::*;
 pub use crate::scheduler::workers::ThreadParameters;

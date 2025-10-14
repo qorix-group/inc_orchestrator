@@ -31,7 +31,7 @@ use ::core::{
     task::{Context, Poll},
     time::Duration,
 };
-use async_runtime::{scheduler::join_handle::JoinHandle, time::clock::Clock};
+use async_runtime::{time::clock::Clock, JoinHandle};
 use foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
 use tracing::trace;
 
