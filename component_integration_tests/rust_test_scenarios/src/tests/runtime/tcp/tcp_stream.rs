@@ -1,12 +1,9 @@
 use crate::internals::net_helper::{create_tcp_stream, ConnectionParameters};
 use crate::internals::runtime_helper::Runtime;
-use async_runtime::io::{AsyncReadExt, AsyncWrite};
+use async_runtime::io::{AsyncReadExt, AsyncWriteExt};
 use async_runtime::net::TcpStream;
 use async_runtime::spawn;
-use futures::task::noop_waker_ref;
 use serde_json::Value;
-use std::pin::Pin;
-use std::task::{Context, Poll};
 use test_scenarios_rust::scenario::{Scenario, ScenarioGroup, ScenarioGroupImpl};
 use tracing::info;
 
@@ -27,29 +24,17 @@ async fn write_and_read_task(mut stream: TcpStream, message: String) {
         let data = message.as_bytes();
         write_buf[0..data.len()].copy_from_slice(data);
 
-        let mut pinned = Pin::new(&mut stream);
-        let waker = noop_waker_ref();
-        let mut ctx = Context::from_waker(waker);
-
-        let mut written = 0;
-        while written < write_buf.len() {
-            match AsyncWrite::poll_write(pinned.as_mut(), &mut ctx, &write_buf[written..write_buf.len()]) {
-                Poll::Ready(Ok(0)) => {
-                    info!("Client closed connection during write");
-                    break;
-                }
-                Poll::Ready(Ok(m)) => {
-                    written += m;
-                    info!("Written {m} bytes");
-                }
-                Poll::Ready(Err(e)) => {
-                    info!("Write error: {e:?}");
-                    break;
-                }
-                Poll::Pending => {
-                    info!("Write would block, try again later");
-                    continue;
-                }
+        match stream.write(&write_buf).await {
+            Ok(0) => {
+                info!("Client closed connection during write");
+                return;
+            }
+            Ok(n) => {
+                info!("Written {n} bytes");
+            }
+            Err(e) => {
+                info!("Write error: {e:?}");
+                return;
             }
         }
     }
