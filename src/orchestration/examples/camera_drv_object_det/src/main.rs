@@ -17,7 +17,7 @@ pub mod object_detection;
 use camera_driver::CameraDriver;
 use object_detection::ObjectDetection;
 
-use async_runtime::{futures::sleep, runtime::async_runtime::AsyncRuntimeBuilder, scheduler::execution_engine::*};
+use async_runtime::{futures::sleep, *};
 use foundation::prelude::*;
 use logging_tracing::{TraceScope, TracingLibraryBuilder};
 use orchestration::{
@@ -134,7 +134,8 @@ fn main() {
     logger.init_log_trace();
 
     // Create runtime
-    let (builder, _engine_id) = AsyncRuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(256).workers(3));
+    let (builder, _engine_id) =
+        runtime::AsyncRuntimeBuilder::new().with_engine(runtime::ExecutionEngineBuilder::new().task_queue_size(256).workers(3));
     let mut runtime = builder.build().unwrap();
 
     // Build Orchestration

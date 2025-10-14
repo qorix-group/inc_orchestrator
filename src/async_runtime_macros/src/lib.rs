@@ -409,7 +409,7 @@ pub fn main(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     // Now produce the expansion
     let expanded = quote! {
-        use async_runtime::{runtime::async_runtime::AsyncRuntimeBuilder, scheduler::execution_engine::*, prelude::ThreadParameters};
+        use async_runtime::prelude::*;
 
 
         #fn_vis fn main() #return_clause{

@@ -49,7 +49,6 @@ use foundation::{not_recoverable_error, prelude::*};
 use futures::reusable_box_future::ReusableBoxFuture;
 use scheduler::{
     context::ctx_get_handler,
-    join_handle::JoinHandle,
     task::async_task::{AsyncTask, TaskRef},
 };
 
@@ -72,6 +71,10 @@ pub mod testing;
 
 // Re-export from `async_runtime_macros` crate
 pub use async_runtime_macros::main;
+
+// Re-export scheduler components for runtime API
+pub use crate::scheduler::join_handle::JoinHandle;
+pub use crate::scheduler::join_handle::JoinResult;
 
 ///
 /// Spawns a given `future` into runtime and let it execute on any of configured workers

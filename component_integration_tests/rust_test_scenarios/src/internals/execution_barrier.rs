@@ -1,4 +1,4 @@
-use async_runtime::scheduler::join_handle::JoinHandle;
+use async_runtime::JoinHandle;
 use foundation::threading::thread_wait_barrier::{ThreadReadyNotifier, ThreadWaitBarrier};
 
 use futures::future;
