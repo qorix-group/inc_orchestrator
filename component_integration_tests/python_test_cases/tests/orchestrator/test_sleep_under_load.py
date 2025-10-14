@@ -8,6 +8,11 @@ from component_integration_tests.python_test_cases.tests.cit_scenario import (
     CitScenario,
 )
 
+pytest.skip(
+    "Observed CICD timing issues: https://github.com/qorix-group/inc_orchestrator_internal/issues/352",
+    allow_module_level=True,
+)
+
 
 # Due to OS related condition variable wait behavior including scheduling, thread priority,
 # hardware, load and other factors, sleep can spike and wait longer than expected.
