@@ -201,6 +201,50 @@ class TestBlockDedicatedWorkOnRegular(BlockOneUseOther):
         return "runtime.worker.dedicated_worker.block_dedicated_work_on_regular"
 
 
+class TestMultipleTasks(CitScenario):
+    @pytest.fixture(scope="class")
+    def scenario_name(self) -> str:
+        return "runtime.worker.dedicated_worker.multiple_tasks"
+
+    @pytest.fixture(scope="class")
+    def num_tasks(self) -> int:
+        return 5
+
+    @pytest.fixture(scope="class")
+    def test_config(self, num_tasks: int) -> dict[str, Any]:
+        return {
+            "runtime": {
+                "task_queue_size": 256,
+                "workers": 4,
+                "dedicated_workers": [{"id": "dedicated_worker_0"}],
+            },
+            "test": {"num_tasks": num_tasks},
+        }
+
+    def test_valid(self, logs_info_level: LogContainer, num_tasks: int) -> None:
+        # Check each task have messages in correct order.
+        exp_messages = ["enter", "nested_task", "unblock", "exit"]
+        for i in range(num_tasks):
+            task_logs = logs_info_level.get_logs("task_id", value=f"task_{i}")
+            act_messages = [log.message for log in task_logs]
+            assert act_messages == exp_messages, (
+                f"Mismatch between messages expected ({exp_messages}) and actual ({act_messages})"
+            )
+
+            # Check thread IDs.
+            # Messages from tasks must be from the same thread.
+            thread_ids = {log.thread_id for log in task_logs if log.message != "unblock"}
+            assert len(thread_ids) == 1
+            task_thread_id = list(thread_ids)[0]
+
+            # 'unblock' must be from main thread.
+            # Main thread ID must be different than task thread ID.
+            unblock_log = task_logs.find_log("message", value="unblock")
+            assert unblock_log
+            main_thread_id = unblock_log.thread_id
+            assert task_thread_id != main_thread_id
+
+
 # region thread parameters tests
 
 

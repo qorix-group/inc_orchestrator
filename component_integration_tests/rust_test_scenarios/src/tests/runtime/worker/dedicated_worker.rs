@@ -5,6 +5,10 @@ use async_runtime::core::types::UniqueWorkerId;
 use async_runtime::runtime::async_runtime::AsyncRuntime;
 use async_runtime::{spawn, spawn_on_dedicated};
 use foundation::threading::thread_wait_barrier::ThreadReadyNotifier;
+use serde::Deserialize;
+use serde_json::Value;
+use std::collections::HashMap;
+use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 use test_scenarios_rust::scenario::{Scenario, ScenarioGroup, ScenarioGroupImpl};
@@ -193,7 +197,7 @@ impl Scenario for BlockAllRegularWorkOnDedicated {
         let num_workers = exec_engine.workers;
         let mut rt = builder.build();
 
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             const WAIT_TIME: Duration = Duration::from_secs(3);
             let mut joiner = RuntimeJoiner::new();
             // Regular and dedicated workers are handled and waited for separately.
@@ -260,7 +264,7 @@ impl Scenario for BlockDedicatedWorkOnRegular {
         let num_workers = exec_engine.workers;
         let mut rt = builder.build();
 
-        let _ = rt.block_on(async move {
+        rt.block_on(async move {
             const WAIT_TIME: Duration = Duration::from_secs(3);
             let mut joiner = RuntimeJoiner::new();
             // Regular and dedicated workers are handled and waited for separately.
@@ -312,6 +316,96 @@ impl Scenario for BlockDedicatedWorkOnRegular {
     }
 }
 
+async fn nested_logging_task(task_id: &str) {
+    info!(message = "nested_task", task_id = task_id);
+}
+
+async fn sequentially_blocking_task(task_id: String, block_condition: Arc<(Condvar, Mutex<bool>)>, tx: Sender<String>) {
+    info!(message = "enter", task_id = task_id);
+
+    nested_logging_task(&task_id).await;
+
+    // Let main worker know which task is currently being processed.
+    tx.send(task_id.clone()).expect("Failed to send task ID");
+
+    // Wait until allowed.
+    let (cv, mtx) = &*block_condition;
+    let mut block = mtx.lock().expect("Unable to lock mutex");
+    while *block {
+        block = cv.wait(block).expect("Unable to wait - poisoned mutex?");
+    }
+
+    info!(message = "exit", task_id = task_id);
+}
+
+#[derive(Deserialize, Debug)]
+struct MultipleTasksTestInput {
+    num_tasks: usize,
+}
+
+impl MultipleTasksTestInput {
+    pub fn from_json(input: &str) -> Self {
+        let v: Value = serde_json::from_str(input).expect("Failed to parse input string");
+        serde_json::from_value(v["test"].clone()).expect("Failed to parse \"test\" field")
+    }
+}
+
+struct MultipleTasks;
+
+impl Scenario for MultipleTasks {
+    fn name(&self) -> &str {
+        "multiple_tasks"
+    }
+
+    fn run(&self, input: &str) -> Result<(), String> {
+        let builder = Runtime::from_json(input)?;
+        let num_tasks = MultipleTasksTestInput::from_json(input).num_tasks;
+        let exec_engine = builder.exec_engines().first().expect("No execution engine configuration found").clone();
+        let dedicated_workers = exec_engine.dedicated_workers.expect("No dedicated workers configuration found");
+        let dedicated_worker = dedicated_workers.first().expect("No dedicated worker configuration found").clone();
+        let mut rt = builder.build();
+
+        rt.block_on(async move {
+            // Spawn tasks.
+            let mut tasks = HashMap::new();
+            let unique_worker_id = UniqueWorkerId::from(dedicated_worker.id.as_str());
+            let (tx, rx) = channel::<String>();
+            for i in 0..num_tasks {
+                // Prepare.
+                let task_id = format!("task_{i}");
+                let block_condition = Arc::new((Condvar::new(), Mutex::new(true)));
+
+                // Spawn.
+                let handle = spawn_on_dedicated(
+                    sequentially_blocking_task(task_id.clone(), block_condition.clone(), tx.clone()),
+                    unique_worker_id,
+                );
+
+                // Store.
+                tasks.insert(task_id, (handle, block_condition));
+            }
+
+            // Sequentially unblock tasks and await for join.
+            for _ in 0..num_tasks {
+                // Receive ID of a task being processed.
+                let task_id = rx.recv().expect("Failed to receive task ID");
+
+                // Print state message.
+                info!(message = "unblock", task_id = task_id);
+
+                // Unblock current task.
+                // Task data is no longer needed - can be moved from map to this scope.
+                let (handle, block_condition) = tasks.remove(&task_id).expect("Failed to get data for given task ID");
+                unblock_tasks(block_condition);
+
+                handle.await.expect("Unable to await for task to finish");
+            }
+        });
+
+        Ok(())
+    }
+}
+
 pub fn dedicated_worker_group() -> Box<dyn ScenarioGroup> {
     Box::new(ScenarioGroupImpl::new(
         "dedicated_worker",
@@ -322,6 +416,7 @@ pub fn dedicated_worker_group() -> Box<dyn ScenarioGroup> {
             Box::new(ThreadAffinity),
             Box::new(BlockAllRegularWorkOnDedicated),
             Box::new(BlockDedicatedWorkOnRegular),
+            Box::new(MultipleTasks),
         ],
         vec![],
     ))
