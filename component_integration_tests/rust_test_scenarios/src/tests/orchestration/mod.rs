@@ -3,6 +3,7 @@ use crate::tests::orchestration::{
     orchestration_shutdown::ShutdownBeforeStart,
 };
 use orchestration_concurrency::{MultipleConcurrency, NestedConcurrency, SingleConcurrency};
+use orchestration_dedicated_worker::dedicated_worker_scenario_group;
 use orchestration_sequence::{AwaitSequence, NestedSequence, SingleSequence};
 use orchestration_sleep::SleepUnderLoad;
 use orchestration_trigger_sync::{
@@ -17,7 +18,8 @@ use test_scenarios_rust::scenario::{ScenarioGroup, ScenarioGroupImpl};
 use orchestration_double_handler_catch::{CatchDoubleDiffHandlerError, CatchDoubleSameHandlerError};
 
 use async_runtime::futures::reusable_box_future::ReusableBoxFuturePool;
-use async_runtime::futures::sleep;
+use async_runtime::futures::{sleep, yield_now};
+
 use orchestration::{common::tag::Tag, prelude::*};
 
 use orchestration_shutdown::{GetAllShutdowns, OneProgramNotShut, SingleProgramSingleShutdown, TwoProgramsSingleShutdown, TwoProgramsTwoShutdowns};
@@ -29,8 +31,15 @@ macro_rules! generic_test_func {
         || generic_test_sync_func($name)
     };
 }
+
+macro_rules! generic_async_test_func {
+    ($name:expr) => {
+        || generic_test_async_func($name)
+    };
+}
 #[macro_use]
 mod orchestration_concurrency;
+mod orchestration_dedicated_worker;
 mod orchestration_double_handler_catch;
 mod orchestration_if_else;
 mod orchestration_methods;
@@ -137,6 +146,7 @@ pub fn orchestration_scenario_group() -> Box<dyn ScenarioGroup> {
             catch_scenario_group(),
             ifelse_scenario_group(),
             tag_methods_scenario_group(),
+            dedicated_worker_scenario_group(),
         ],
     ))
 }
@@ -190,6 +200,18 @@ fn busy_sleep() -> ActionResult {
 fn generic_test_sync_func(name: &'static str) -> InvokeResult {
     info!("Start of '{}' function", name);
     // Spend some time to simulate work
+    let _ = busy_sleep();
+    info!("End of '{}' function", name);
+    Ok(())
+}
+
+async fn generic_test_async_func(name: &'static str) -> InvokeResult {
+    info!("Start of '{}' function", name);
+
+    info!("'{}' function yielding", name);
+    yield_now::yield_now().await;
+    info!("'{}' function resuming", name);
+
     let _ = busy_sleep();
     info!("End of '{}' function", name);
     Ok(())
