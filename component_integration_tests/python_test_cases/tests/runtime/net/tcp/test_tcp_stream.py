@@ -21,7 +21,7 @@ from component_integration_tests.python_test_cases.tests.cit_scenario import (
 from component_integration_tests.python_test_cases.tests.result_code import (
     ResultCode,
 )
-from component_integration_tests.python_test_cases.tests.runtime.tcp.ttl_helper import (
+from component_integration_tests.python_test_cases.tests.runtime.net.ttl_helper import (
     get_default_ttl,
 )
 
@@ -109,7 +109,7 @@ class EchoServer:
 class TestSmoke(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.tcp.tcp_stream.smoke"
+        return "runtime.net.tcp.tcp_stream.smoke"
 
     @pytest.fixture(
         scope="class",
@@ -176,7 +176,7 @@ class TestSmoke(CitScenario):
 class TestTTL(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.tcp.tcp_stream.set_get_ttl"
+        return "runtime.net.tcp.tcp_stream.set_get_ttl"
 
     @pytest.fixture(
         scope="class",

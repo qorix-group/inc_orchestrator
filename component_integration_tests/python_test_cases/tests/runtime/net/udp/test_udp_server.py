@@ -12,7 +12,7 @@ from component_integration_tests.python_test_cases.tests.cit_runtime_scenario im
 )
 from component_integration_tests.python_test_cases.tests.cit_scenario import CitScenario
 from component_integration_tests.python_test_cases.tests.result_code import ResultCode
-from component_integration_tests.python_test_cases.tests.runtime.tcp.ttl_helper import (
+from component_integration_tests.python_test_cases.tests.runtime.net.ttl_helper import (
     get_default_ttl,
 )
 
@@ -20,7 +20,7 @@ from component_integration_tests.python_test_cases.tests.runtime.tcp.ttl_helper 
 class TestUdpServer(CitRuntimeScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.tcp.udp_server.send_receive_echo"
+        return "runtime.net.udp.server.send_receive_echo"
 
     @pytest.fixture(
         scope="class",
@@ -45,9 +45,7 @@ class TestUdpServer(CitRuntimeScenario):
             "connection": connection_params,
         }
 
-    def test_single_client_send_receive(
-        self, connection_params: dict[str, Any], udp_client: socket
-    ) -> None:
+    def test_single_client_send_receive(self, connection_params: dict[str, Any], udp_client: socket) -> None:
         message = b"Echo!"
         udp_client.sendto(message, tuple(connection_params.values()))
         received_data, addr = udp_client.recvfrom(1024)
@@ -55,9 +53,7 @@ class TestUdpServer(CitRuntimeScenario):
         assert received_data == message
         assert addr[:2] == tuple(connection_params.values())
 
-    def test_multiple_client_send_receive(
-        self, connection_params: dict[str, Any], executable: Executable
-    ) -> None:
+    def test_multiple_client_send_receive(self, connection_params: dict[str, Any], executable: Executable) -> None:
         executable.wait_for_log(
             lambda log_container: log_container.find_log(
                 "message",
@@ -84,7 +80,7 @@ class TestUdpServer(CitRuntimeScenario):
 class TestDefaultTTL(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.tcp.udp_server.log_ttl"
+        return "runtime.net.udp.server.log_ttl"
 
     @pytest.fixture(
         scope="class",
@@ -123,7 +119,7 @@ class TestDefaultTTL(CitScenario):
 class TestSetTTL(TestDefaultTTL):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.tcp.udp_server.log_ttl"
+        return "runtime.net.udp.server.log_ttl"
 
     @pytest.fixture(scope="class", params=[1, 100, 255])
     def ttl(self, request: pytest.FixtureRequest) -> int | None:
@@ -133,9 +129,7 @@ class TestSetTTL(TestDefaultTTL):
     def connection_params(self, ip: IPAddress, port: int, ttl: int) -> dict[str, Any]:
         return {"ip": str(ip), "port": port, "ttl": ttl}
 
-    def test_ttl(
-        self, address: Address, ttl: int, logs_info_level: LogContainer
-    ) -> None:
+    def test_ttl(self, address: Address, ttl: int, logs_info_level: LogContainer) -> None:
         expected_ttl = ttl
         log = logs_info_level.find_log("ttl")
         assert log is not None
@@ -145,7 +139,7 @@ class TestSetTTL(TestDefaultTTL):
 class TestSetInvalidTTL(TestDefaultTTL):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.tcp.udp_server.log_ttl"
+        return "runtime.net.udp.server.log_ttl"
 
     @pytest.fixture(
         scope="class",
