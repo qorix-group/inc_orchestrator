@@ -13,6 +13,11 @@
 load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 load("@score_orchestrator_crates//:defs.bzl", "all_crate_deps")
 
+config_setting(
+    name = "enable_vm_time_correction",
+    define_values = {"enable_vm_time_correction": "true"},
+)
+
 _COMMON_DEPS = [
     "//src/foundation:libfoundation",
 ] + all_crate_deps(
@@ -22,6 +27,10 @@ _COMMON_DEPS = [
 rust_library(
     name = "libasync_runtime",
     srcs = glob(["src/**/*.rs"]),
+    crate_features = select({
+        "//conditions:default": [],
+        ":enable_vm_time_correction": ["vm_time_correction"],
+    }),
     crate_name = "async_runtime",
     proc_macro_deps = [
         "//src/async_runtime_macros:runtime_macros",
