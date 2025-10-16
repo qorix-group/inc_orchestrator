@@ -71,6 +71,7 @@ impl Sub for Instant {
 /// A clock that provides the current time as an `Instant`.
 pub struct Clock;
 
+#[cfg(not(feature = "vm_time_correction"))]
 impl Clock {
     /// Returns the current time as an `Instant`.
     pub fn now() -> Instant {
@@ -78,6 +79,47 @@ impl Clock {
     }
 
     /// Returns the current time as a `Duration` since the clock started.
+    pub fn now_duration() -> Duration {
+        Self::now().elapsed()
+    }
+}
+
+#[cfg(feature = "vm_time_correction")]
+static LAST_INSTANT: std::sync::Mutex<Option<std::time::Instant>> = std::sync::Mutex::new(None);
+#[cfg(feature = "vm_time_correction")]
+static INIT: std::sync::Once = std::sync::Once::new();
+
+#[cfg(feature = "vm_time_correction")]
+impl Clock {
+    fn last_instant() -> &'static std::sync::Mutex<Option<std::time::Instant>> {
+        INIT.call_once(|| {
+            LAST_INSTANT.lock().unwrap().replace(std::time::Instant::now());
+        });
+
+        &LAST_INSTANT
+    }
+
+    /// Returns the current time as an `Instant`.
+    /// Ensures time never goes backward.
+    pub fn now() -> Instant {
+        let mutex = Self::last_instant();
+
+        let now = std::time::Instant::now();
+        let mut last = mutex.lock().unwrap();
+
+        let mut last_val = last.unwrap();
+
+        if now > last_val {
+            last.replace(now);
+            last_val = now;
+        }
+
+        drop(last);
+
+        Instant(last_val)
+    }
+
+    /// Returns the duration since the last stored instant.
     pub fn now_duration() -> Duration {
         Self::now().elapsed()
     }

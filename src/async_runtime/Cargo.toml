@@ -31,6 +31,7 @@ testing_macros.workspace = true
 default = ["iceoryx2_ipc"]
 runtime-api-mock = []
 iceoryx2_ipc = ["iceoryx2", "iceoryx2-cal"]
+vm_time_correction = [] # When running SOME VMs under Windows, the time can travel backward due to wrong assumptions between Linux and Windows
 
 [lints]
 workspace = true
