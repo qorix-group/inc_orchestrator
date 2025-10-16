@@ -13,9 +13,9 @@
 
 pub mod prelude;
 
-#[cfg(not(target_os = "nto"))]
+#[cfg(feature = "perfetto")]
 use ::core::fmt::Write;
-#[cfg(not(target_os = "nto"))]
+#[cfg(feature = "perfetto")]
 use std::{
     fs::File,
     path::PathBuf,
@@ -25,18 +25,18 @@ use std::{
 use tracing::level_filters::LevelFilter;
 use tracing::{span, Level, Span};
 use tracing_appender::non_blocking::WorkerGuard;
-#[cfg(not(target_os = "nto"))]
+#[cfg(feature = "perfetto")]
 use tracing_perfetto_sdk_layer::{self as layer, NativeLayer};
-#[cfg(not(target_os = "nto"))]
+#[cfg(feature = "perfetto")]
 use tracing_perfetto_sdk_schema as schema;
-#[cfg(not(target_os = "nto"))]
+#[cfg(feature = "perfetto")]
 use tracing_perfetto_sdk_schema::trace_config;
 use tracing_subscriber::fmt;
 use tracing_subscriber::fmt::format;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::Layer;
 
-#[cfg(not(target_os = "nto"))]
+#[cfg(feature = "perfetto")]
 const TRACE_OUTDIR_ENV_VAR: &str = "TRACE_OUTDIR";
 
 #[derive(Debug, Clone, Copy)]
@@ -119,7 +119,7 @@ impl TracingLibraryBuilder {
     }
 }
 
-#[cfg(not(target_os = "nto"))]
+#[cfg(feature = "perfetto")]
 fn system_trace_config() -> schema::TraceConfig {
     schema::TraceConfig {
         buffers: vec![trace_config::BufferConfig {
@@ -137,7 +137,7 @@ fn system_trace_config() -> schema::TraceConfig {
     }
 }
 
-#[cfg(not(target_os = "nto"))]
+#[cfg(feature = "perfetto")]
 fn local_trace_config() -> schema::TraceConfig {
     const FTRACE_EVENTS: [&str; 3] = ["sched_switch", "sched_wakeup", "sched_waking"];
     let ftrace = schema::FtraceConfig {
@@ -200,7 +200,7 @@ impl TracingLibrary {
         if self.enable_logging {
             layers = Some(fmt_layer.boxed());
         }
-        #[cfg(not(target_os = "nto"))]
+        #[cfg(feature = "perfetto")]
         if let Some(tracing_mode) = self.enable_tracing {
             match tracing_mode {
                 TraceScope::AppScope => {
@@ -241,7 +241,7 @@ impl TracingLibrary {
     /**
      * @brief This API is used to create a file name for the tracing file.
      */
-    #[cfg(not(target_os = "nto"))]
+    #[cfg(feature = "perfetto")]
     fn get_trace_filename(&self) -> PathBuf {
         // Get the current process name
         let process_name = env::current_exe()
@@ -275,7 +275,7 @@ impl TracingLibrary {
     /**
      * @brief Formats timestamp as YYYY-MM-DD_HH-MM-SS". This is used for naming the tracing file.
      */
-    #[cfg(not(target_os = "nto"))]
+    #[cfg(feature = "perfetto")]
     fn format_timestamp(&self, seconds: u64) -> String {
         let days = seconds / 86400;
         let hours = (seconds % 86400) / 3600;

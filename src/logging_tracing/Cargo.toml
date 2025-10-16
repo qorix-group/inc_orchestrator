@@ -7,7 +7,10 @@ edition.workspace = true
 tracing.workspace = true
 tracing-appender.workspace = true
 tracing-subscriber.workspace = true
+tracing-perfetto-sdk-schema = { workspace = true, optional = true }
+tracing-perfetto-sdk-layer = { workspace = true, optional = true }
 
-[target.'cfg(not(target_os = "nto"))'.dependencies]
-tracing-perfetto-sdk-schema.workspace = true
-tracing-perfetto-sdk-layer.workspace = true
+
+[features]
+default = []
+perfetto = ["tracing-perfetto-sdk-layer", "tracing-perfetto-sdk-schema"]
