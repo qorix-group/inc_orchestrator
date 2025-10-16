@@ -169,7 +169,7 @@ impl Scenario for UdpClientUnconnectedSendError {
 
 pub fn udp_client_group() -> Box<dyn ScenarioGroup> {
     Box::new(ScenarioGroupImpl::new(
-        "udp_client",
+        "client",
         vec![Box::new(UdpClientLogResponse), Box::new(UdpClientUnconnectedSendError)],
         vec![],
     ))

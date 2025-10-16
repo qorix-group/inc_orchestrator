@@ -13,7 +13,7 @@ from component_integration_tests.python_test_cases.tests.cit_runtime_scenario im
 class TestTcpServer(CitRuntimeScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.tcp.basic_server"
+        return "runtime.net.tcp.basic_server"
 
     @pytest.fixture(scope="class")
     def connection_params(self) -> dict[str, Any]:

@@ -112,7 +112,7 @@ class UdpClientBase(CitScenario):
 class TestUdpClient(UdpClientBase):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.tcp.udp_client.log_response"
+        return "runtime.net.udp.client.log_response"
 
     def test_send_receive(self, message: str, udp_server_echo: UdpServer, logs_info_level: LogContainer) -> None:
         # udp_server_echo must be before logs_info_level to ensure server is running before client sends message
@@ -124,7 +124,7 @@ class TestUdpClient(UdpClientBase):
 class TestUnconnectedSend(UdpClientBase):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.tcp.udp_client.unconnected_send_error"
+        return "runtime.net.udp.client.unconnected_send_error"
 
     @pytest.fixture(scope="class")
     def client_type(self) -> str:

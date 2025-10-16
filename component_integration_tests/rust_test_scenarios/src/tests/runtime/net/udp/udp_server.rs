@@ -78,7 +78,7 @@ impl Scenario for UdpServerLogTTL {
 
 pub fn udp_server_group() -> Box<dyn ScenarioGroup> {
     Box::new(ScenarioGroupImpl::new(
-        "udp_server",
+        "server",
         vec![Box::new(UdpServerEcho), Box::new(UdpServerLogTTL)],
         vec![],
     ))
