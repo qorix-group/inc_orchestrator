@@ -145,7 +145,9 @@ class TestSmoke(CitScenario):
         }
 
     @pytest.fixture(scope="class")
-    def echo_server(self, address: Address) -> Generator[EchoServer, None, None]:
+    def echo_server(self, address: Address, test_config: dict[str, Any]) -> Generator[EchoServer, None, None]:
+        # Due to parametrization we need to provide test_config as input here to make sure
+        # that it is setup and torn down for each variant thus each binary execution.
         with EchoServer(address) as server:
             yield server
 
@@ -155,11 +157,15 @@ class TestSmoke(CitScenario):
         logs_info_level: LogContainer,
         message: str,
     ) -> None:
+        # Left to right fixture order matters here - echo_server must be before logs_info_level
+
         log = logs_info_level.find_log("message_read")
         assert log is not None
         assert log.message_read == message
 
     def test_addrs_ok(self, echo_server: EchoServer, logs_info_level: LogContainer) -> None:
+        # Left to right fixture order matters here - echo_server must be before logs_info_level
+
         log = logs_info_level.find_log("peer_addr")
         assert log is not None
         # Compare local (from server PoV) to peer (from client PoV).
@@ -196,7 +202,9 @@ class TestTTL(CitScenario):
         }
 
     @pytest.fixture(scope="class")
-    def echo_server(self, address: Address) -> Generator[EchoServer, None, None]:
+    def echo_server(self, address: Address, test_config: dict[str, Any]) -> Generator[EchoServer, None, None]:
+        # Due to parametrization we need to provide test_config as input here to make sure
+        # that it is setup and torn down for each variant thus each binary execution.
         with EchoServer(address) as server:
             yield server
 
@@ -214,6 +222,8 @@ class TestTTL_Valid(TestTTL):
         logs_info_level: LogContainer,
         ttl: int | None,
     ) -> None:
+        # Left to right fixture order matters here - echo_server must be before logs_info_level
+
         expected_ttl = ttl or get_default_ttl(address.family())
         log = logs_info_level.find_log("ttl")
         assert log is not None
@@ -221,9 +231,15 @@ class TestTTL_Valid(TestTTL):
 
 
 class TestTTL_Invalid(TestTTL):
-    @pytest.fixture(scope="class", params=[0, 256, 257, 2**16])
+    @pytest.fixture(scope="class", params=[0, 256, 257, 2**16, 2**32 - 1])
     def ttl(self, request: pytest.FixtureRequest) -> int | None:
-        return request.param
+        value = request.param
+        if value == 2**32 - 1:
+            pytest.xfail(
+                reason="Max u32 value sets TTL to default - https://github.com/qorix-group/inc_orchestrator_internal/issues/327"
+            )
+
+        return value
 
     def capture_stderr(self) -> bool:
         return True
@@ -236,6 +252,8 @@ class TestTTL_Invalid(TestTTL):
         echo_server: EchoServer,
         results: ScenarioResult,
     ) -> None:
+        # Left to right fixture order matters here - echo_server must be before results
+
         # Panic inside async causes 'SIGABRT'.
         assert results.return_code == ResultCode.SIGABRT
 
@@ -244,12 +262,3 @@ class TestTTL_Invalid(TestTTL):
             'Failed to set TTL value: Os { code: 22, kind: InvalidInput, message: "Invalid argument" }'
             in results.stderr
         )
-
-
-@pytest.mark.skip(
-    reason="Max u32 value sets TTL to default - https://github.com/qorix-group/inc_orchestrator_internal/issues/327"
-)
-class TestTTL_MaxU32_Invalid(TestTTL_Invalid):
-    @pytest.fixture(scope="class")
-    def ttl(self) -> int:
-        return 2**32 - 1
