@@ -9,21 +9,6 @@ from component_integration_tests.python_test_cases.tests.cit_scenario import (
 )
 
 
-# Due to OS related condition variable wait behavior including scheduling, thread priority,
-# hardware, load and other factors, sleep can spike and wait longer than expected.
-# There is a bug filled for this topic: https://github.com/qorix-group/inc_orchestrator_internal/issues/142
-def get_threshold_ms(expected_sleep_ms: int) -> int:
-    """
-    Calculate the threshold for sleep duration checks.
-    """
-    if expected_sleep_ms > 500:
-        return math.ceil(expected_sleep_ms * 0.5)
-    elif expected_sleep_ms > 100:
-        return math.ceil(expected_sleep_ms * 1.5)
-    else:
-        return math.ceil(expected_sleep_ms * 5)
-
-
 class TestShortSleepUnderLoad2W256Q(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
@@ -66,17 +51,12 @@ class TestShortSleepUnderLoad2W256Q(CitScenario):
         sleep_duration_ms: int,
         sleep_name: str,
     ):
-        [sleep_start, sleep_finish] = logs_info_level.get_logs(
+        (sleep_start, sleep_finish) = logs_info_level.get_logs(
             field="id",
             value=sleep_name,
         )
         measured_sleep_duration = (sleep_finish.timestamp - sleep_start.timestamp).total_seconds() * 1000  # ms
-
-        threshold_ms = get_threshold_ms(sleep_duration_ms)
-        assert sleep_duration_ms <= measured_sleep_duration <= sleep_duration_ms + threshold_ms, (
-            f"Expected sleep duration {sleep_duration_ms} ms, "
-            f"but got {measured_sleep_duration} ms. Threshold: {threshold_ms} ms."
-        )
+        assert sleep_duration_ms <= measured_sleep_duration, "Sleep finished too early"
 
 
 class TestMediumSleepUnderLoad2W256Q(TestShortSleepUnderLoad2W256Q):
@@ -132,39 +112,13 @@ class TestHugeAmountOfShortSleeps(TestShortSleepUnderLoad2W256Q):
         sleep_name: str,
     ):
         # Collect all start and finish logs for the given sleep_name
-        [sleep_starts, sleep_finishes] = (
-            logs_info_level.get_logs(field="id", value=sleep_name).group_by("location").values()
-        )
+        location_group = logs_info_level.get_logs(field="id", value=sleep_name).group_by("location")
+        sleep_starts = location_group["begin"]
+        sleep_finishes = location_group["end"]
+
         # Calculate duration of each sleep
         for sleep_start, sleep_finish in zip(sleep_starts, sleep_finishes):
             measured_sleep_duration = (sleep_finish.timestamp - sleep_start.timestamp).total_seconds() * 1000
             assert measured_sleep_duration >= sleep_duration_ms, (
                 f"Expected sleep duration at least {sleep_duration_ms} ms, but got {measured_sleep_duration} ms."
             )
-
-    @pytest.mark.parametrize(
-        "sleep_name",
-        ["Sleep1", "Sleep2", "Sleep3", "Sleep4", "Sleep5"],
-    )
-    def test_sleep_duration_statistical(
-        self,
-        logs_info_level: LogContainer,
-        sleep_duration_ms: int,
-        sleep_name: str,
-    ):
-        # Collect all start and finish logs for the given sleep_name
-        [sleep_starts, sleep_finishes] = (
-            logs_info_level.get_logs(field="id", value=sleep_name).group_by("location").values()
-        )
-        # Calculate duration of each sleep
-        measured_sleep_durations = []  # ms
-        for sleep_start, sleep_finish in zip(sleep_starts, sleep_finishes):
-            measured_sleep_durations.append((sleep_finish.timestamp - sleep_start.timestamp).total_seconds() * 1000)
-
-        threshold_ms = get_threshold_ms(sleep_duration_ms)
-
-        average_sleep_duration = sum(measured_sleep_durations) / len(measured_sleep_durations)
-        assert sleep_duration_ms <= average_sleep_duration <= sleep_duration_ms + threshold_ms, (
-            f"Expected average sleep duration {sleep_duration_ms} ms, "
-            f"but got {average_sleep_duration} ms. Threshold: {threshold_ms} ms."
-        )

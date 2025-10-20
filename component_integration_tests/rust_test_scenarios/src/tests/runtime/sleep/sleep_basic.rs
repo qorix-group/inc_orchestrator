@@ -5,19 +5,19 @@ use test_scenarios_rust::scenario::Scenario;
 use async_runtime::futures::sleep;
 use async_runtime::spawn;
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::Value;
 use std::thread;
 use std::time::Duration;
 use tracing::info;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 struct NameWithDelayInput {
     id: String,
     delay_ms: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 struct TestInput {
     non_blocking_sleep_tasks: Vec<NameWithDelayInput>,
     blocking_sleep_tasks: Vec<NameWithDelayInput>,
