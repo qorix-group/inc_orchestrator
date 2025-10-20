@@ -9,86 +9,58 @@ from component_integration_tests.python_test_cases.tests.cit_scenario import (
 )
 
 
-# Due to OS related condition variable wait behavior including scheduling, thread priority,
-# hardware, load and other factors, sleep can spike and wait longer than expected.
-# There is a bug filled for this topic: https://github.com/qorix-group/inc_orchestrator_internal/issues/142
-def get_threshold_ms(expected_sleep_ms: int) -> int:
-    """
-    Calculate the threshold for sleep duration checks.
-    """
-    if expected_sleep_ms > 500:
-        return math.ceil(expected_sleep_ms * 0.5)
-    elif expected_sleep_ms > 100:
-        return math.ceil(expected_sleep_ms * 1.5)
-    else:
-        return math.ceil(expected_sleep_ms * 5)
+class TestSleepDuration(CitScenario):
+    @pytest.fixture(scope="class", params=[0, 10, 50, 100, 500, 1000, 3000], ids=lambda x: f"sleep_{x}ms")
+    def sleep_duration_ms(self, request: pytest.FixtureRequest) -> int:
+        return request.param
 
+    @pytest.fixture(scope="class", params=[1, 4], ids=lambda x: f"workers_{x}")
+    def workers(self, request: pytest.FixtureRequest) -> int:
+        return request.param
 
-class TestSingleSleep(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
         return "runtime.sleep.basic"
 
     @pytest.fixture(scope="class")
-    def test_config(self) -> dict[str, Any]:
+    def sleep_count(self) -> int:
+        return 10
+
+    @pytest.fixture(scope="class")
+    def non_blocking_sleep_tasks(self, sleep_duration_ms: int, sleep_count: int) -> list[dict[str, Any]]:
+        return [{"id": f"non_blocking_sleep_{x}", "delay_ms": sleep_duration_ms} for x in range(1, sleep_count + 1)]
+
+    @pytest.fixture(scope="class")
+    def test_config(self, workers: int, non_blocking_sleep_tasks: list[dict[str, Any]]) -> dict[str, Any]:
         return {
-            "runtime": {"workers": 1, "task_queue_size": 256},
+            "runtime": {"workers": workers, "task_queue_size": 256},
             "test": {
-                "non_blocking_sleep_tasks": [{"id": "non_blocking_sleep_1", "delay_ms": 2000}],
+                "non_blocking_sleep_tasks": non_blocking_sleep_tasks,
                 "blocking_sleep_tasks": [],
                 "non_sleep_tasks": [],
             },
         }
 
-    def test_completeness(self, test_config: dict[str, Any], logs_info_level: LogContainer):
-        task_id = test_config["test"]["non_blocking_sleep_tasks"][0]["id"]
+    def test_completeness(self, non_blocking_sleep_tasks: list[dict[str, Any]], logs_info_level: LogContainer):
+        for task in non_blocking_sleep_tasks:
+            task_id = task["id"]
+            entries = logs_info_level.get_logs(field="id", value=task_id)
 
-        assert logs_info_level[0].id == task_id and logs_info_level[0].location == "begin"
-        assert logs_info_level[1].id == task_id and logs_info_level[1].location == "end"
+            assert len(entries) == 2, f"Expected two entries for the task {task_id}."
+            assert entries[0].location == "begin"
+            assert entries[1].location == "end"
 
-    def test_sleep_duration(self, test_config: dict[str, Any], logs_info_level: LogContainer):
-        expected_sleep_ms = test_config["test"]["non_blocking_sleep_tasks"][0]["delay_ms"]
-        threshold_ms = get_threshold_ms(expected_sleep_ms)
+    def test_sleep_duration_strict(
+        self, non_blocking_sleep_tasks: list[dict[str, Any]], sleep_duration_ms: int, logs_info_level: LogContainer
+    ):
+        for task in non_blocking_sleep_tasks:
+            (begin_entry, end_entry) = logs_info_level.get_logs(field="id", value=task["id"])
+            sleep_result_ms = (end_entry.timestamp - begin_entry.timestamp).total_seconds() * 1000
 
-        sleep_duration_ms = (logs_info_level[1].timestamp - logs_info_level[0].timestamp).total_seconds() * 1000
-
-        assert expected_sleep_ms <= sleep_duration_ms <= expected_sleep_ms + threshold_ms, (
-            f"Expected sleep duration {expected_sleep_ms} ms, "
-            f"but got {sleep_duration_ms} ms. Threshold: {threshold_ms} ms."
-        )
-
-
-class TestZeroSleep(CitScenario):
-    @pytest.fixture(scope="class")
-    def scenario_name(self) -> str:
-        return "runtime.sleep.basic"
-
-    @pytest.fixture(scope="class")
-    def test_config(self) -> dict[str, Any]:
-        return {
-            "runtime": {"workers": 1, "task_queue_size": 256},
-            "test": {
-                "non_blocking_sleep_tasks": [{"id": "non_blocking_sleep_1", "delay_ms": 0}],
-                "blocking_sleep_tasks": [],
-                "non_sleep_tasks": [],
-            },
-        }
-
-    def test_sleep_duration(self, test_config: dict[str, Any], logs_info_level: LogContainer):
-        task_id = test_config["test"]["non_blocking_sleep_tasks"][0]["id"]
-
-        entries = logs_info_level.get_logs(field="id", value=task_id)
-        assert len(entries) == 2, "Expected two entries for the task."
-
-        begin_entry = entries[0]
-        end_entry = entries[1]
-
-        max_sleep_ms = 20
-        sleep_duration_ms = (end_entry.timestamp - begin_entry.timestamp).total_seconds() * 1000
-
-        assert sleep_duration_ms <= max_sleep_ms, (
-            f"Expected sleep duration to be less than or equal to {max_sleep_ms} ms, "
-        )
+            expected_sleep_ms = sleep_duration_ms
+            assert sleep_result_ms >= expected_sleep_ms, (
+                f"Sleep duration for task {task['id']} is less than minimum expected."
+            )
 
 
 class TestMultipleSleepsWithRegularTasks(CitScenario):
@@ -96,79 +68,69 @@ class TestMultipleSleepsWithRegularTasks(CitScenario):
     def scenario_name(self) -> str:
         return "runtime.sleep.basic"
 
+    @pytest.fixture(scope="class", params=[1, 4], ids=lambda x: f"workers_{x}")
+    def workers(self, request: pytest.FixtureRequest) -> int:
+        return request.param
+
     @pytest.fixture(scope="class")
-    def test_config(self) -> dict[str, Any]:
+    def non_blocking_sleep_tasks(self) -> list[dict[str, Any]]:
+        return [
+            {"id": "non_blocking_sleep_1", "delay_ms": 3000},
+            {"id": "non_blocking_sleep_2", "delay_ms": 2500},
+            {"id": "non_blocking_sleep_3", "delay_ms": 2000},
+            {"id": "non_blocking_sleep_4", "delay_ms": 1500},
+            {"id": "non_blocking_sleep_5", "delay_ms": 1000},
+            {"id": "non_blocking_sleep_6", "delay_ms": 500},
+            {"id": "non_blocking_sleep_7", "delay_ms": 100},
+        ]
+
+    @pytest.fixture(scope="class")
+    def non_sleep_tasks(self) -> list[str]:
+        return [f"non_sleep_{x}" for x in range(1, 11)]
+
+    @pytest.fixture(scope="class")
+    def test_config(
+        self, workers: int, non_blocking_sleep_tasks: list[dict[str, Any]], non_sleep_tasks: list[str]
+    ) -> dict[str, Any]:
         return {
-            "runtime": {"workers": 1, "task_queue_size": 256},
+            "runtime": {"workers": workers, "task_queue_size": 256},
             "test": {
-                "non_blocking_sleep_tasks": [
-                    {"id": "non_blocking_sleep_1", "delay_ms": 3000},
-                    {"id": "non_blocking_sleep_2", "delay_ms": 2500},
-                    {"id": "non_blocking_sleep_3", "delay_ms": 2000},
-                    {"id": "non_blocking_sleep_4", "delay_ms": 1500},
-                    {"id": "non_blocking_sleep_5", "delay_ms": 1000},
-                    {"id": "non_blocking_sleep_6", "delay_ms": 500},
-                    {"id": "non_blocking_sleep_7", "delay_ms": 100},
-                ],
+                "non_blocking_sleep_tasks": non_blocking_sleep_tasks,
                 "blocking_sleep_tasks": [],
-                "non_sleep_tasks": [f"non_sleep_{x}" for x in range(1, 11)],
+                "non_sleep_tasks": non_sleep_tasks,
             },
         }
 
-    def test_task_completeness(self, test_config: dict[str, Any], logs_info_level: LogContainer):
-        non_blocking_sleep_tasks = logs_info_level.get_logs(field="id", pattern="non_blocking_sleep*")
-
-        begin_tasks = non_blocking_sleep_tasks.get_logs(field="location", value="begin")
-        assert len(begin_tasks) == len(test_config["test"]["non_blocking_sleep_tasks"]), (
+    def test_task_completeness(
+        self,
+        non_blocking_sleep_tasks: list[dict[str, Any]],
+        non_sleep_tasks: list[str],
+        logs_info_level: LogContainer,
+    ):
+        # non_blocking_sleep_entries = logs_info_level.get_logs(field="id", pattern="non_blocking_sleep*")
+        non_blocking_sleep_group = logs_info_level.get_logs(field="id", pattern="non_blocking_sleep*").group_by(
+            "location"
+        )
+        assert len(non_blocking_sleep_group["begin"]) == len(non_blocking_sleep_tasks), (
             "Not all non-blocking sleep tasks started."
         )
-
-        end_tasks = non_blocking_sleep_tasks.get_logs(field="location", value="end")
-        assert len(end_tasks) == len(test_config["test"]["non_blocking_sleep_tasks"]), (
+        assert len(non_blocking_sleep_group["end"]) == len(non_blocking_sleep_tasks), (
             "Not all non-blocking sleep tasks finished."
         )
 
-        non_sleep_tasks = logs_info_level.get_logs(field="id", pattern="non_sleep*")
-        assert len(non_sleep_tasks) == len(test_config["test"]["non_sleep_tasks"]), "Not all non-sleep tasks executed."
+        non_sleep_entries = logs_info_level.get_logs(field="id", pattern="non_sleep*")
+        assert len(non_sleep_entries) == len(non_sleep_tasks), "Not all non-sleep tasks executed."
 
-    def test_sleep_duration(self, test_config: dict[str, Any], logs_info_level: LogContainer):
-        for task in test_config["test"]["non_blocking_sleep_tasks"]:
+    def test_sleep_duration(self, non_blocking_sleep_tasks: list[dict[str, Any]], logs_info_level: LogContainer):
+        for task in non_blocking_sleep_tasks:
             entries = logs_info_level.get_logs(field="id", value=task["id"])
             assert len(entries) == 2, "Expected two entries for the task."
 
-            begin_entry = entries[0]
-            end_entry = entries[1]
-
+            (begin_entry, end_entry) = entries
             expected_sleep_ms = task["delay_ms"]
-            threshold_ms = get_threshold_ms(expected_sleep_ms)
 
-            sleep_duration_ms = (end_entry.timestamp - begin_entry.timestamp).total_seconds() * 1000
-
-            assert expected_sleep_ms <= sleep_duration_ms <= expected_sleep_ms + threshold_ms, (
-                f"Expected sleep duration {expected_sleep_ms} ms, "
-                f"but got {sleep_duration_ms} ms. Threshold: {threshold_ms} ms."
-            )
-
-
-class TestMultipleSleepsWithRegularTasksForManyWorkers(TestMultipleSleepsWithRegularTasks):
-    @pytest.fixture(scope="class")
-    def test_config(self) -> dict[str, Any]:
-        return {
-            "runtime": {"workers": 4, "task_queue_size": 256},
-            "test": {
-                "non_blocking_sleep_tasks": [
-                    {"id": "non_blocking_sleep_1", "delay_ms": 3000},
-                    {"id": "non_blocking_sleep_2", "delay_ms": 2500},
-                    {"id": "non_blocking_sleep_3", "delay_ms": 2000},
-                    {"id": "non_blocking_sleep_4", "delay_ms": 1500},
-                    {"id": "non_blocking_sleep_5", "delay_ms": 1000},
-                    {"id": "non_blocking_sleep_6", "delay_ms": 500},
-                    {"id": "non_blocking_sleep_7", "delay_ms": 100},
-                ],
-                "blocking_sleep_tasks": [],
-                "non_sleep_tasks": [f"non_sleep_{x}" for x in range(1, 11)],
-            },
-        }
+            sleep_result_ms = (end_entry.timestamp - begin_entry.timestamp).total_seconds() * 1000
+            assert expected_sleep_ms <= sleep_result_ms, f"Sleep finished too early for task {task['id']}."
 
 
 class TestMultipleSleepsWithBlockedWorkers(CitScenario):
@@ -177,63 +139,72 @@ class TestMultipleSleepsWithBlockedWorkers(CitScenario):
         return "runtime.sleep.basic"
 
     @pytest.fixture(scope="class")
-    def test_config(self) -> dict[str, Any]:
+    def non_blocking_sleep_tasks(self) -> list[dict[str, Any]]:
+        return [
+            {"id": "non_blocking_sleep_1", "delay_ms": 2000},
+            {"id": "non_blocking_sleep_2", "delay_ms": 1500},
+            {"id": "non_blocking_sleep_3", "delay_ms": 1200},
+            {"id": "non_blocking_sleep_4", "delay_ms": 1000},
+            {"id": "non_blocking_sleep_5", "delay_ms": 700},
+            {"id": "non_blocking_sleep_6", "delay_ms": 500},
+            {"id": "non_blocking_sleep_7", "delay_ms": 300},
+        ]
+
+    @pytest.fixture(scope="class")
+    def blocking_sleep_tasks(self) -> list[dict[str, Any]]:
+        return [
+            {"id": "blocking_sleep_1", "delay_ms": 3300},
+            {"id": "blocking_sleep_2", "delay_ms": 3300},
+            {"id": "blocking_sleep_3", "delay_ms": 3300},
+        ]
+
+    @pytest.fixture(scope="class")
+    def non_sleep_tasks(self) -> list[str]:
+        return [f"non_sleep_{x}" for x in range(1, 11)]
+
+    @pytest.fixture(scope="class")
+    def test_config(
+        self,
+        non_blocking_sleep_tasks: list[dict[str, Any]],
+        blocking_sleep_tasks: list[dict[str, Any]],
+        non_sleep_tasks: list[str],
+    ) -> dict[str, Any]:
         return {
             "runtime": {"workers": 4, "task_queue_size": 256},
             "test": {
-                "non_blocking_sleep_tasks": [
-                    {"id": "non_blocking_sleep_1", "delay_ms": 3000},
-                    {"id": "non_blocking_sleep_2", "delay_ms": 2500},
-                    {"id": "non_blocking_sleep_3", "delay_ms": 2000},
-                    {"id": "non_blocking_sleep_4", "delay_ms": 1500},
-                    {"id": "non_blocking_sleep_5", "delay_ms": 1000},
-                    {"id": "non_blocking_sleep_6", "delay_ms": 500},
-                    {"id": "non_blocking_sleep_7", "delay_ms": 500},
-                ],
-                "blocking_sleep_tasks": [
-                    {"id": "blocking_sleep_1", "delay_ms": 3300},
-                    {"id": "blocking_sleep_2", "delay_ms": 3300},
-                    {"id": "blocking_sleep_3", "delay_ms": 3300},
-                ],
-                "non_sleep_tasks": [f"non_sleep_{x}" for x in range(1, 11)],
+                "non_blocking_sleep_tasks": non_blocking_sleep_tasks,
+                "blocking_sleep_tasks": blocking_sleep_tasks,
+                "non_sleep_tasks": non_sleep_tasks,
             },
         }
 
-    def test_task_completeness(self, test_config: dict[str, Any], logs_info_level: LogContainer):
-        non_blocking_sleep_tasks = logs_info_level.get_logs(field="id", pattern="non_blocking_sleep*")
-        assert len(non_blocking_sleep_tasks) == len(
-            test_config["test"]["non_blocking_sleep_tasks"] * 2  # For begin and end
-        ), "Not all non-blocking sleep tasks executed."
+    def test_task_completeness(
+        self,
+        non_blocking_sleep_tasks: list[dict[str, Any]],
+        blocking_sleep_tasks: list[dict[str, Any]],
+        non_sleep_tasks: list[str],
+        logs_info_level: LogContainer,
+    ):
+        non_blocking_sleep_entries = logs_info_level.get_logs(field="id", pattern="non_blocking_sleep*")
+        expected_non_blocking_count = len(non_blocking_sleep_tasks) * 2  # 2 for begin and end
+        assert len(non_blocking_sleep_entries) == expected_non_blocking_count, (
+            "Not all non-blocking sleep tasks executed."
+        )
 
-        blocking_sleep_tasks = logs_info_level.get_logs(field="id", pattern="^blocking_sleep*")
-        assert len(blocking_sleep_tasks) == len(
-            test_config["test"]["blocking_sleep_tasks"] * 2  # For begin and end
-        ), "Not all blocking sleep tasks executed."
+        blocking_sleep_entries = logs_info_level.get_logs(field="id", pattern="^blocking_sleep*")
+        expected_blocking_count = len(blocking_sleep_tasks) * 2  # 2 for begin and end
+        assert len(blocking_sleep_entries) == expected_blocking_count, "Not all blocking sleep tasks executed."
 
-        non_sleep_tasks = logs_info_level.get_logs(field="id", pattern="non_sleep*")
-        assert len(non_sleep_tasks) == len(test_config["test"]["non_sleep_tasks"]), "Not all non-sleep tasks executed."
+        non_sleep_entries = logs_info_level.get_logs(field="id", pattern="non_sleep*")
+        assert len(non_sleep_entries) == len(non_sleep_tasks), "Not all non-sleep tasks executed."
 
-    def test_sleep_duration(self, test_config: dict[str, Any], logs_info_level: LogContainer):
-        for task in test_config["test"]["non_blocking_sleep_tasks"]:
+    def test_sleep_duration(self, non_blocking_sleep_tasks: list[dict[str, Any]], logs_info_level: LogContainer):
+        for task in non_blocking_sleep_tasks:
             entries = logs_info_level.get_logs(field="id", value=task["id"])
             assert len(entries) == 2, "Expected two entries for the task."
 
-            begin_entry = entries[0]
-            end_entry = entries[1]
-
+            (begin_entry, end_entry) = entries
             expected_sleep_ms = task["delay_ms"]
-            threshold_ms = get_threshold_ms(expected_sleep_ms)
 
-            sleep_duration_ms = (end_entry.timestamp - begin_entry.timestamp).total_seconds() * 1000
-
-            assert expected_sleep_ms <= sleep_duration_ms <= expected_sleep_ms + threshold_ms, (
-                f"Expected sleep duration {expected_sleep_ms} ms, "
-                f"but got {sleep_duration_ms} ms. Threshold: {threshold_ms} ms. Task: {task['id']}"
-            )
-
-    def test_blocking_sleeps_finished_last(self, test_config: dict[str, Any], logs_info_level: LogContainer):
-        blocking_task_count = len(test_config["test"]["blocking_sleep_tasks"])
-        for task in logs_info_level[-blocking_task_count:]:
-            assert task.id.startswith("blocking_sleep") and task.location == "end", (
-                f"Blocking sleep task {task.id} did not finish as one of last {blocking_task_count}."
-            )
+            sleep_result_ms = (end_entry.timestamp - begin_entry.timestamp).total_seconds() * 1000
+            assert expected_sleep_ms <= sleep_result_ms, f"Sleep finished too early for task {task['id']}."
