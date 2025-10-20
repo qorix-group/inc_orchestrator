@@ -22,6 +22,7 @@ score_py_pytest(
     name = "cit",
     srcs = glob(["tests/**/*.py"]),
     args = [
+        "--traces=all",
         "--target-path",
         "$(rootpath //component_integration_tests/rust_test_scenarios)",
     ],
@@ -43,7 +44,8 @@ score_py_pytest(
     name = "cit_repeat",
     srcs = glob(["tests/**/*.py"]),
     args = [
-        "--count 5",
+        "--traces=all",
+        "--count=5",
         "--repeat-scope=session",
         "--target-path",
         "$(rootpath //component_integration_tests/rust_test_scenarios)",

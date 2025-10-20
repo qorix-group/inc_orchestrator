@@ -51,7 +51,7 @@ jobs:
         working-directory: component_integration_tests/python_test_cases
         run: |
           source .venv/bin/activate
-          python -m pytest
+          python -m pytest --traces=all
 
       - name: Run Python tests with pytest (Nightly)
         if: github.event_name == 'schedule'
@@ -60,4 +60,4 @@ jobs:
         working-directory: component_integration_tests/python_test_cases
         run: |
           source .venv/bin/activate
-          python -m pytest --count 20 --repeat-scope session
+          python -m pytest --traces=all --count=20 --repeat-scope=session
