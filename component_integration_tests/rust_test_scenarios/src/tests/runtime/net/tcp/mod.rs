@@ -4,6 +4,7 @@ mod tcp_stream;
 
 use async_runtime::io::{AsyncReadExt, AsyncWriteExt};
 use async_runtime::net::TcpStream;
+use server::server_group;
 use tcp_listener::tcp_listener_group;
 use tcp_stream::tcp_stream_group;
 use test_scenarios_rust::scenario::{ScenarioGroup, ScenarioGroupImpl};
@@ -12,8 +13,8 @@ use tracing::info;
 pub fn tcp_scenario_group() -> Box<dyn ScenarioGroup> {
     Box::new(ScenarioGroupImpl::new(
         "tcp",
-        vec![Box::new(server::TcpServer)],
-        vec![tcp_stream_group(), tcp_listener_group()],
+        vec![],
+        vec![tcp_stream_group(), tcp_listener_group(), server_group()],
     ))
 }
 

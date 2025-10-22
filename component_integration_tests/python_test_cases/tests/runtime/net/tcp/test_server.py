@@ -13,7 +13,7 @@ from component_integration_tests.python_test_cases.tests.cit_runtime_scenario im
 class TestTcpServer(CitRuntimeScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "runtime.net.tcp.basic_server"
+        return "runtime.net.tcp.server.basic"
 
     @pytest.fixture(scope="class")
     def connection_params(self) -> dict[str, Any]:
@@ -62,3 +62,80 @@ class TestTcpServer(CitRuntimeScenario):
             assert msg1 == data1
             assert msg2 == data2
             assert msg3 == data3
+
+    def test_server_logs(self, client_connection: socket.socket, executable: Executable) -> None:
+        message = b"Let's check External Traits!"
+        client_connection.sendall(message)
+        executable.wait_for_log(
+            lambda log_container: log_container.find_log(field="message", pattern=f"Written {len(message)} bytes")
+            is not None
+        )
+        logs = executable.get_stdout_until_now()
+        assert logs.find_log(field="message", pattern=f"Read {len(message)} bytes") is not None
+        assert logs.find_log(field="message_read", pattern=message.decode()) is not None
+        assert logs.find_log(field="message", pattern=f"Written {len(message)} bytes") is not None
+
+
+class TestTcpNoResponseServer(CitRuntimeScenario):
+    @pytest.fixture(scope="class")
+    def scenario_name(self) -> str:
+        return "runtime.net.tcp.server.no_response"
+
+    @pytest.fixture(scope="class")
+    def connection_params(self) -> dict[str, Any]:
+        return {"ip": "127.0.0.1", "port": 7878}
+
+    @pytest.fixture(scope="class")
+    def test_config(self, connection_params: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "runtime": {"task_queue_size": 256, "workers": 4},
+            "connection": connection_params,
+        }
+
+    def test_server_logs(self, client_connection: socket.socket, executable: Executable) -> None:
+        message = b"Sending a message, out"
+        client_connection.sendall(message)
+        executable.wait_for_log(
+            lambda log_container: log_container.find_log(
+                "message_read",
+                pattern=message.decode(),
+            )
+            is not None
+        )
+        logs = executable.get_stdout_until_now()
+        assert logs.find_log(field="message_read", pattern=message.decode()) is not None
+
+
+class TestTcpPollWriteServer(CitRuntimeScenario):
+    @pytest.fixture(scope="class")
+    def scenario_name(self) -> str:
+        return "runtime.net.tcp.server.poll_read_write"
+
+    @pytest.fixture(scope="class")
+    def connection_params(self) -> dict[str, Any]:
+        return {"ip": "127.0.0.1", "port": 7878}
+
+    @pytest.fixture(scope="class")
+    def test_config(self, connection_params: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "runtime": {"task_queue_size": 256, "workers": 4},
+            "connection": connection_params,
+        }
+
+    def test_tcp_echo(self, client_connection: socket.socket) -> None:
+        message = b"Echo with poll methods!"
+        client_connection.sendall(message)
+        data = client_connection.recv(1024)
+        assert message == data
+
+    def test_server_logs(self, client_connection: socket.socket, executable: Executable) -> None:
+        message = b"Let's check poll methods!"
+        client_connection.sendall(message)
+        executable.wait_for_log(
+            lambda log_container: log_container.find_log(field="message", pattern=f"Written {len(message)} bytes")
+            is not None
+        )
+        logs = executable.get_stdout_until_now()
+        assert logs.find_log(field="message", pattern=f"Read {len(message)} bytes") is not None
+        assert logs.find_log(field="message_read", pattern=message.decode()) is not None
+        assert logs.find_log(field="message", pattern=f"Written {len(message)} bytes") is not None
