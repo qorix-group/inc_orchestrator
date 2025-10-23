@@ -336,8 +336,8 @@ impl Fds {
     fn new(capacity: usize) -> Self {
         Self {
             fd_to_index: FlatMap::new(capacity),
-            infos: Vec::new(capacity),
-            pollfds: Vec::new(capacity),
+            infos: Vec::new_in_global(capacity),
+            pollfds: Vec::new_in_global(capacity),
         }
     }
     fn add(&mut self, fd: RawFd, id: IoId, interest: IoEventInterest, is_waker: bool) -> Result<()> {
@@ -355,12 +355,14 @@ impl Fds {
 
         // None of these can fail. Capacity was verified above.
         self.fd_to_index.insert(fd, self.infos.len()).expect("Failed to add file descriptor");
-        self.infos.push(FdInfo { id, is_waker });
-        self.pollfds.push(pollfd {
-            fd,
-            events: poll_events_from_interest(&interest),
-            revents: 0,
-        });
+        self.infos.push(FdInfo { id, is_waker }).expect("Failed to add file descriptor info");
+        self.pollfds
+            .push(pollfd {
+                fd,
+                events: poll_events_from_interest(&interest),
+                revents: 0,
+            })
+            .expect("Failed to add pollfd");
 
         Ok(())
     }
@@ -596,24 +598,23 @@ impl Inner {
 
 impl IoSelectorEventContainer for Vec<IoEvent> {
     fn push(&mut self, event: IoEvent) -> bool {
-        self.push(event);
-        true
+        foundation::containers::Vector::push(self, event).is_ok()
     }
 
     fn clear(&mut self) {
-        self.clear();
+        foundation::containers::Vector::clear(self);
     }
 
     fn len(&self) -> usize {
-        self.len()
+        foundation::containers::Vector::len(self)
     }
 
     fn is_empty(&self) -> bool {
-        self.is_empty()
+        foundation::containers::Vector::is_empty(self)
     }
 
     fn capacity(&self) -> usize {
-        self.capacity()
+        foundation::containers::Vector::capacity(self)
     }
 }
 
@@ -721,7 +722,7 @@ mod tests {
         selector.register(read_fd, IoId::new(id), IoEventInterest::READABLE).unwrap();
 
         let (begin_sync, _, join_handle) = create_thread(move || {
-            let mut events = Vec::<IoEvent>::new(8);
+            let mut events = Vec::<IoEvent>::new_in_global(8);
             assert!(selector.select(&mut events, None).is_ok());
             events
         });
@@ -733,7 +734,7 @@ mod tests {
         assert_eq!(unsafe { write(write_fd, &data as *const u8 as *const ffi::c_void, 1_usize) }, 1_isize);
 
         let events = join_handle.join().unwrap();
-        assert_eq!(events.len(), 1);
+        assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
         assert_eq!(events[0].id(), IoId::new(id));
         assert!(events[0].is_readable());
         assert!(!events[0].is_writable());
@@ -750,7 +751,7 @@ mod tests {
         write_until_blocking(write_fd);
 
         let (begin_sync, _, join_handle) = create_thread(move || {
-            let mut events = Vec::<IoEvent>::new(8);
+            let mut events = Vec::<IoEvent>::new_in_global(8);
             assert!(selector.select(&mut events, None).is_ok());
             events
         });
@@ -761,7 +762,7 @@ mod tests {
         read_until_blocking(read_fd);
 
         let events = join_handle.join().unwrap();
-        assert_eq!(events.len(), 1);
+        assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
         assert_eq!(events[0].id(), IoId::new(id));
         assert!(events[0].is_writable());
         assert!(!events[0].is_readable());
@@ -786,10 +787,10 @@ mod tests {
             1_isize
         );
 
-        let mut events = Vec::<IoEvent>::new(8);
+        let mut events = Vec::<IoEvent>::new_in_global(8);
         assert!(selector_clone.select(&mut events, None).is_ok());
 
-        assert_eq!(events.len(), 1);
+        assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
     }
 
     #[test]
@@ -800,7 +801,7 @@ mod tests {
         let selector_clone = selector.clone();
 
         let (begin_sync, _, join_handle) = create_thread(move || {
-            let mut events = Vec::<IoEvent>::new(8);
+            let mut events = Vec::<IoEvent>::new_in_global(8);
             assert!(selector_clone.select(&mut events, None).is_ok());
             events
         });
@@ -815,7 +816,7 @@ mod tests {
         assert_eq!(unsafe { write(write_fd, &data as *const u8 as *const ffi::c_void, 1_usize) }, 1_isize);
 
         let events = join_handle.join().unwrap();
-        assert_eq!(events.len(), 1);
+        assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
         assert_eq!(events[0].id(), IoId::new(id));
         assert!(events[0].is_readable());
         assert!(!events[0].is_writable());
@@ -832,7 +833,7 @@ mod tests {
         write_until_blocking(write_fd);
 
         let (begin_sync, _, join_handle) = create_thread(move || {
-            let mut events = Vec::<IoEvent>::new(8);
+            let mut events = Vec::<IoEvent>::new_in_global(8);
             assert!(selector_clone.select(&mut events, None).is_ok());
             events
         });
@@ -846,7 +847,7 @@ mod tests {
         read_until_blocking(read_fd);
 
         let events = join_handle.join().unwrap();
-        assert_eq!(events.len(), 1);
+        assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
         assert_eq!(events[0].id(), IoId::new(id));
         assert!(events[0].is_writable());
         assert!(!events[0].is_readable());
@@ -861,7 +862,7 @@ mod tests {
         selector.deregister(read_fd).unwrap();
 
         let (begin_sync, _, join_handle) = create_thread(move || {
-            let mut events = Vec::<IoEvent>::new(8);
+            let mut events = Vec::<IoEvent>::new_in_global(8);
             assert_eq!(selector.select(&mut events, Some(Duration::from_secs(2))), Err(CommonErrors::Timeout));
             events
         });
@@ -873,7 +874,7 @@ mod tests {
         assert_eq!(unsafe { write(write_fd, &data as *const u8 as *const ffi::c_void, 1_usize) }, 1_isize);
 
         let events = join_handle.join().unwrap();
-        assert_eq!(events.len(), 0);
+        assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 0);
     }
 
     #[test]
@@ -888,7 +889,7 @@ mod tests {
         write_until_blocking(write_fd);
 
         let (begin_sync, _, join_handle) = create_thread(move || {
-            let mut events = Vec::<IoEvent>::new(8);
+            let mut events = Vec::<IoEvent>::new_in_global(8);
             assert_eq!(selector.select(&mut events, Some(Duration::from_secs(2))), Err(CommonErrors::Timeout));
             events
         });
@@ -899,7 +900,7 @@ mod tests {
         read_until_blocking(read_fd);
 
         let events = join_handle.join().unwrap();
-        assert_eq!(events.len(), 0);
+        assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 0);
     }
 
     #[test]
@@ -911,7 +912,7 @@ mod tests {
         selector.register(read_fd, IoId::new(id), IoEventInterest::READABLE).unwrap();
 
         let (begin_sync, _, join_handle) = create_thread(move || {
-            let mut events = Vec::<IoEvent>::new(8);
+            let mut events = Vec::<IoEvent>::new_in_global(8);
             assert_eq!(
                 selector_clone.select(&mut events, Some(Duration::from_secs(2))),
                 Err(CommonErrors::Timeout)
@@ -931,7 +932,7 @@ mod tests {
         assert_eq!(unsafe { write(write_fd, &data as *const u8 as *const ffi::c_void, 1_usize) }, 1_isize);
 
         let events = join_handle.join().unwrap();
-        assert_eq!(events.len(), 0);
+        assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 0);
     }
 
     #[test]
@@ -946,7 +947,7 @@ mod tests {
         write_until_blocking(write_fd);
 
         let (begin_sync, _, join_handle) = create_thread(move || {
-            let mut events = Vec::<IoEvent>::new(8);
+            let mut events = Vec::<IoEvent>::new_in_global(8);
             assert_eq!(
                 selector_clone.select(&mut events, Some(Duration::from_secs(2))),
                 Err(CommonErrors::Timeout)
@@ -965,7 +966,7 @@ mod tests {
         read_until_blocking(read_fd);
 
         let events = join_handle.join().unwrap();
-        assert_eq!(events.len(), 0);
+        assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 0);
     }
 
     #[test]
@@ -984,13 +985,13 @@ mod tests {
             selector_clone.register(read_fd, IoId::new(id), IoEventInterest::READABLE).unwrap();
 
             let (_, _, join_handle) = create_thread(move || {
-                let mut events = Vec::<IoEvent>::new(8);
+                let mut events = Vec::<IoEvent>::new_in_global(8);
                 assert!(selector_clone.select(&mut events, None).is_ok());
                 events
             });
 
             let events = join_handle.join().unwrap();
-            assert_eq!(events.len(), 1);
+            assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
             assert_eq!(events[0].id(), IoId::new(id));
             assert!(events[0].is_readable());
             assert!(!events[0].is_writable());
@@ -1001,7 +1002,7 @@ mod tests {
             let selector_clone = selector.clone();
 
             let (_, _, join_handle) = create_thread(move || {
-                let mut events = Vec::<IoEvent>::new(8);
+                let mut events = Vec::<IoEvent>::new_in_global(8);
                 assert_eq!(
                     selector_clone.select(&mut events, Some(Duration::from_secs(2))),
                     Err(CommonErrors::Timeout)
@@ -1010,7 +1011,7 @@ mod tests {
             });
 
             let events = join_handle.join().unwrap();
-            assert_eq!(events.len(), 0);
+            assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 0);
         }
 
         // Re-register for readable events. This select should succeed.
@@ -1019,13 +1020,13 @@ mod tests {
             selector_clone.reregister(read_fd, IoId::new(id), IoEventInterest::READABLE).unwrap();
 
             let (_, _, join_handle) = create_thread(move || {
-                let mut events = Vec::<IoEvent>::new(8);
+                let mut events = Vec::<IoEvent>::new_in_global(8);
                 assert!(selector_clone.select(&mut events, None).is_ok());
                 events
             });
 
             let events = join_handle.join().unwrap();
-            assert_eq!(events.len(), 1);
+            assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
             assert_eq!(events[0].id(), IoId::new(id));
             assert!(events[0].is_readable());
             assert!(!events[0].is_writable());
@@ -1044,13 +1045,13 @@ mod tests {
             selector_clone.register(write_fd, IoId::new(id), IoEventInterest::WRITABLE).unwrap();
 
             let (_, _, join_handle) = create_thread(move || {
-                let mut events = Vec::<IoEvent>::new(8);
+                let mut events = Vec::<IoEvent>::new_in_global(8);
                 assert!(selector_clone.select(&mut events, None).is_ok());
                 events
             });
 
             let events = join_handle.join().unwrap();
-            assert_eq!(events.len(), 1);
+            assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
             assert_eq!(events[0].id(), IoId::new(id));
             assert!(events[0].is_writable());
             assert!(!events[0].is_readable());
@@ -1061,7 +1062,7 @@ mod tests {
             let selector_clone = selector.clone();
 
             let (_, _, join_handle) = create_thread(move || {
-                let mut events = Vec::<IoEvent>::new(8);
+                let mut events = Vec::<IoEvent>::new_in_global(8);
                 assert_eq!(
                     selector_clone.select(&mut events, Some(Duration::from_secs(2))),
                     Err(CommonErrors::Timeout)
@@ -1070,7 +1071,7 @@ mod tests {
             });
 
             let events = join_handle.join().unwrap();
-            assert_eq!(events.len(), 0);
+            assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 0);
         }
 
         // Re-register for writable events. This select should succeed.
@@ -1079,13 +1080,13 @@ mod tests {
             selector_clone.reregister(write_fd, IoId::new(id), IoEventInterest::WRITABLE).unwrap();
 
             let (_, _, join_handle) = create_thread(move || {
-                let mut events = Vec::<IoEvent>::new(8);
+                let mut events = Vec::<IoEvent>::new_in_global(8);
                 assert!(selector_clone.select(&mut events, None).is_ok());
                 events
             });
 
             let events = join_handle.join().unwrap();
-            assert_eq!(events.len(), 1);
+            assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
             assert_eq!(events[0].id(), IoId::new(id));
             assert!(events[0].is_writable());
             assert!(!events[0].is_readable());
@@ -1100,13 +1101,13 @@ mod tests {
         selector.register(read_fd, IoId::new(id), IoEventInterest::READABLE).unwrap();
 
         let (_, _, join_handle) = create_thread(move || {
-            let mut events = Vec::<IoEvent>::new(8);
+            let mut events = Vec::<IoEvent>::new_in_global(8);
             assert_eq!(selector.select(&mut events, Some(Duration::from_secs(2))), Err(CommonErrors::Timeout));
             events
         });
 
         let events = join_handle.join().unwrap();
-        assert_eq!(events.len(), 0);
+        assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 0);
     }
 
     #[test]
@@ -1119,13 +1120,13 @@ mod tests {
         write_until_blocking(write_fd);
 
         let (_, _, join_handle) = create_thread(move || {
-            let mut events = Vec::<IoEvent>::new(8);
+            let mut events = Vec::<IoEvent>::new_in_global(8);
             assert_eq!(selector.select(&mut events, Some(Duration::from_secs(2))), Err(CommonErrors::Timeout));
             events
         });
 
         let events = join_handle.join().unwrap();
-        assert_eq!(events.len(), 0);
+        assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 0);
     }
 
     #[test]
@@ -1138,7 +1139,7 @@ mod tests {
         let waker = selector.create_waker(IoId::new(waker_id)).unwrap();
 
         let (begin_sync, _, join_handle) = create_thread(move || {
-            let mut events = Vec::<IoEvent>::new(8);
+            let mut events = Vec::<IoEvent>::new_in_global(8);
             assert!(selector.select(&mut events, None).is_ok());
             events
         });
@@ -1150,7 +1151,7 @@ mod tests {
         waker.wake();
 
         let events = join_handle.join().unwrap();
-        assert_eq!(events.len(), 1);
+        assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
         assert_eq!(events[0].id(), IoId::new(waker_id));
     }
 
@@ -1164,7 +1165,7 @@ mod tests {
         let selector_clone = selector.clone();
 
         let (begin_sync, _, join_handle) = create_thread(move || {
-            let mut events = Vec::<IoEvent>::new(8);
+            let mut events = Vec::<IoEvent>::new_in_global(8);
             assert!(selector_clone.select(&mut events, None).is_ok());
             events
         });
@@ -1177,7 +1178,7 @@ mod tests {
         waker.wake();
 
         let events = join_handle.join().unwrap();
-        assert_eq!(events.len(), 1);
+        assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
         assert_eq!(events[0].id(), IoId::new(waker_id));
     }
 

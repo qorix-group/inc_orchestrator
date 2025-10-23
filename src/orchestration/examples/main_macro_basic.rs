@@ -14,7 +14,7 @@
 use core::time::Duration;
 
 use async_runtime::spawn;
-use foundation::prelude::*;
+use foundation::prelude::{vector_extension::VectorExtension, *};
 use logging_tracing::TracingLibraryBuilder;
 use orchestration::{
     api::{design::Design, Orchestration},
@@ -106,10 +106,10 @@ async fn main() {
     let mut programs = create_orch_programs();
 
     // Spawn all programs
-    let mut handles = Vec::new(programs.len());
+    let mut handles = Vec::new_in_global(programs.len());
     while let Some(mut program) = programs.pop() {
         let handle = spawn(async move { program.run_n(3).await });
-        handles.push(handle);
+        let _ = handles.push(handle);
     }
     for handle in handles.iter_mut() {
         let _ = handle.await;

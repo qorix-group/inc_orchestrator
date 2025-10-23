@@ -18,7 +18,9 @@ use ::core::alloc::Layout;
 use std::alloc::{self, dealloc};
 use std::sync::Arc;
 
-use iceoryx2_bb_container::vec::Vec;
+use iceoryx2_bb_memory::heap_allocator::HeapAllocator;
+
+use crate::containers::Vector;
 
 use crate::prelude::FoundationAtomicU8;
 use crate::types::CommonErrors;
@@ -252,7 +254,7 @@ macro_rules! impl_reusable_for_primitive {
 impl_reusable_for_primitive!(u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize, f32, f64, bool, char);
 
 // Implement for iceoryx2 Vec<T>
-impl<T> ReusableObjectTrait for Vec<T> {
+impl<T> ReusableObjectTrait for crate::containers::PolymorphicVec<'_, T, HeapAllocator> {
     fn reusable_clear(&mut self) {
         self.clear();
     }

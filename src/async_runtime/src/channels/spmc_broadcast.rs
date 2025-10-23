@@ -14,14 +14,16 @@
 use ::core::{future::Future, marker::PhantomData, task::Waker};
 use std::sync::Arc;
 
-use foundation::{not_recoverable_error, prelude::*};
+use foundation::{
+    not_recoverable_error,
+    prelude::{vector_extension::VectorExtension, *},
+};
 
 use crate::futures::{FutureInternalReturn, FutureState};
 
 pub const DEFAULT_CHANNEL_SIZE: usize = 8;
 
 use iceoryx2_bb_elementary::bump_allocator::*;
-use iceoryx2_bb_elementary_traits::relocatable_container::*;
 use iceoryx2_bb_lock_free::mpmc::unique_index_set::*;
 
 ///
@@ -178,9 +180,11 @@ unsafe impl<T: Copy, const SIZE: usize> Sync for Channel<T, SIZE> {}
 
 impl<T: Copy, const SIZE: usize> Channel<T, SIZE> {
     pub fn new(size: usize) -> Self {
-        let mut v = Vec::new(size);
-        for _ in 0..size {
-            v.push(super::spsc::Channel::<T, SIZE>::new());
+        let mut v = Vec::new_in_global(size);
+
+        // Temporary adapter to handle 0 case since Vec::new_in_global(0) is not allowed. This shall be fixed later.
+        if size != 0 {
+            let _ = v.resize_with(size, || super::spsc::Channel::<T, SIZE>::new());
         }
 
         Self {

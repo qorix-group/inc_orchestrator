@@ -50,7 +50,7 @@ use crate::{
         types::{IoEvent, IoEventInterest, IoId, IoRegistryEntry, IoSelector},
     },
 };
-use foundation::prelude::*;
+use foundation::prelude::{vector_extension::VectorExtension, *};
 
 use iceoryx2_bb_container::slotmap::{SlotMap, SlotMapKey};
 
@@ -96,7 +96,7 @@ impl Registrations {
             pending_release_count: FoundationAtomicBool::new(false),
             data: Mutex::new(RegistrationData {
                 tracking: SlotMap::new(count),
-                waiting_release: Vec::new(count),
+                waiting_release: Vec::new_in_global(count),
             }),
         }
     }
@@ -118,7 +118,7 @@ impl Registrations {
 
     fn schedule_registration_for_disposal(&self, key: SlotMapKey) {
         let mut data = self.data.lock().unwrap();
-        data.waiting_release.push(key);
+        data.waiting_release.push(key).expect("Failed to schedule registration for disposal"); // Vec cannot fail here as it has enough capacity
         self.pending_release_count.store(true, Ordering::Release);
     }
 
@@ -253,7 +253,7 @@ impl IoDriver {
             registry: poll.registry().clone(),
             inner: Mutex::new(IoDriverInner {
                 pool: poll,
-                events: Vec::new(max_fd_supported),
+                events: Vec::new_in_global(max_fd_supported),
             }),
             waker: Arc::new(waker),
         }

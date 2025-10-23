@@ -20,7 +20,8 @@
 
 use super::reusable_objects::{ReusableObject, ReusableObjects};
 
-pub use iceoryx2_bb_container::vec::Vec;
+pub use crate::containers::Vec;
+pub use crate::containers::Vector;
 
 /// Type alias for a pool of reusable vectors.
 /// Each vector is managed by the pool and can be checked out, used, and returned for reuse.
@@ -47,7 +48,7 @@ impl<T> Index<usize> for ReusableObject<Vec<T>> {
 impl<T> ReusableObject<Vec<T>> {
     /// Pushes a value onto the end of the pooled vector.
     pub fn push(&mut self, value: T) -> bool {
-        unsafe { self.as_inner_mut().push(value) }
+        unsafe { self.as_inner_mut().push(value).is_ok() }
     }
 
     /// Removes the last element from the pooled vector and returns it, or `None` if empty.
@@ -81,12 +82,14 @@ impl<T> ReusableObject<Vec<T>> {
 #[cfg(test)]
 #[cfg(not(loom))]
 mod tests {
+    use crate::prelude::vector_extension::VectorExtension;
+
     use super::*;
 
     /// Test pushing values and indexing into the pooled vector.
     #[test]
     fn test_push_and_index() {
-        let mut pool = ReusableVecPool::<i32>::new(2, |_| Vec::new(8));
+        let mut pool = ReusableVecPool::<i32>::new(2, |_| Vec::new_in_global(8));
         let mut obj = pool.next_object().unwrap();
 
         obj.push(10);
@@ -101,7 +104,7 @@ mod tests {
     /// Test popping values and clearing the pooled vector.
     #[test]
     fn test_pop_and_clear() {
-        let mut pool = ReusableVecPool::<i32>::new(1, |_| Vec::new(5));
+        let mut pool = ReusableVecPool::<i32>::new(1, |_| Vec::new_in_global(5));
         let mut obj = pool.next_object().unwrap();
 
         obj.push(1);
@@ -119,7 +122,7 @@ mod tests {
     /// Test filling the pooled vector.
     #[test]
     fn test_fill() {
-        let mut pool = ReusableVecPool::<i32>::new(1, |_| Vec::new(10));
+        let mut pool = ReusableVecPool::<i32>::new(1, |_| Vec::new_in_global(10));
         let mut obj = pool.next_object().unwrap();
 
         obj.fill(7);

@@ -54,7 +54,7 @@ impl Default for MockActionBuilder {
 
 impl MockActionBuilder {
     pub fn new() -> MockActionBuilder {
-        Self(MockFnBuilder::<ActionResult>::new_with_default(Ok(())))
+        Self(MockFnBuilder::<ActionResult>::new_in_global(Ok(())))
     }
 
     ///

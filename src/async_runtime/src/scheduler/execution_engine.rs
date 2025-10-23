@@ -32,6 +32,7 @@ use crate::{
 use foundation::containers::growable_vec::GrowableVec;
 use foundation::containers::mpmc_queue::MpmcQueue;
 use foundation::containers::trigger_queue::{TriggerQueue, TriggerQueueConsumer};
+use foundation::prelude::vector_extension::VectorExtension;
 use foundation::prelude::*;
 use foundation::threading::thread_wait_barrier::ThreadWaitBarrier;
 
@@ -335,7 +336,7 @@ impl ExecutionEngineBuilder {
     pub(crate) fn build(self) -> ExecutionEngine {
         // Create async workers part
         let mut worker_interactors = Box::<[WorkerInteractor]>::new_uninit_slice(self.async_workers_cnt);
-        let mut async_queues: Vec<TaskStealQueue> = Vec::new(self.async_workers_cnt);
+        let mut async_queues: Vec<TaskStealQueue> = Vec::new_in_global(self.async_workers_cnt);
 
         let safety_worker_queue;
         let safety_worker = {
@@ -349,20 +350,24 @@ impl ExecutionEngineBuilder {
             }
         };
 
-        let mut async_workers = Vec::new(self.async_workers_cnt);
+        let mut async_workers = Vec::new_in_global(self.async_workers_cnt);
 
         if self.thread_params.priority.is_none() ^ self.thread_params.scheduler_type.is_none() {
             warn!("Either priority or scheduler type is 'None' for async worker, both attributes will be inherited from parent thread.");
         }
 
         for i in 0..self.async_workers_cnt {
-            async_queues.push(create_steal_queue(self.queue_size));
+            async_queues
+                .push(create_steal_queue(self.queue_size))
+                .expect("Failed to add new steal queue for async worker");
 
             let id = WorkerId::new(format!("arunner{}", i).as_str().into(), 0, i as u8, WorkerType::Async);
 
             worker_interactors[i].write(WorkerInteractor::new(async_queues[i].clone(), id));
 
-            async_workers.push(Worker::new(id, self.with_safe_worker.0));
+            async_workers
+                .push(Worker::new(id, self.with_safe_worker.0))
+                .expect("Failed to add new  async worker");
         }
 
         let drivers = Drivers::new();
@@ -376,14 +381,16 @@ impl ExecutionEngineBuilder {
         ));
 
         // Create dedicated workers part
-        let mut dedicated_workers = Vec::new(self.dedicated_workers_ids.len());
+        let mut dedicated_workers = Vec::new_in_global(core::cmp::max(self.dedicated_workers_ids.len(), 1));
         let mut dedicated_queues = Box::<[(WorkerId, Arc<TriggerQueue<TaskRef>>)]>::new_uninit_slice(self.dedicated_workers_ids.len());
 
         for i in 0..self.dedicated_workers_ids.len() {
             let id = self.dedicated_workers_ids[i].0;
             let real_id = WorkerId::new(id, 0, i as u8, WorkerType::Dedicated);
             let thread_params = self.dedicated_workers_ids[i].1.clone();
-            dedicated_workers.push(DedicatedWorker::new(real_id, self.with_safe_worker.0, thread_params));
+            dedicated_workers
+                .push(DedicatedWorker::new(real_id, self.with_safe_worker.0, thread_params))
+                .expect("Failed to add new dedicated worker");
             unsafe {
                 dedicated_queues[i]
                     .as_mut_ptr()
