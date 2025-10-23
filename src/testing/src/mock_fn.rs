@@ -97,7 +97,7 @@ impl<OutType> MockFnBuilder<OutType> {
     /// Create MockFn whose output types do not have automatic default values, i.e. does not
     /// implement the Default trait, such as ActionResult
     ///
-    pub fn new_with_default(def_val: OutType) -> MockFnBuilder<OutType> {
+    pub fn new_in_global(def_val: OutType) -> MockFnBuilder<OutType> {
         Self(MockFn {
             call_count: AtomicUsize::new(0),
             default_value: def_val,

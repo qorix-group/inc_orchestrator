@@ -29,6 +29,7 @@ use foundation::containers::growable_vec::GrowableVec;
 use foundation::containers::reusable_objects::ReusableObject;
 use foundation::containers::reusable_vec_pool::ReusableVecPool;
 use foundation::not_recoverable_error;
+use foundation::prelude::vector_extension::VectorExtension;
 use foundation::prelude::*;
 
 /// Builder for constructing a concurrency group of actions to be executed concurrently.
@@ -79,7 +80,7 @@ impl ConcurrencyBuilder {
                 reusable_future_pool: Concurrency::create_reusable_future_pool(design.config.max_concurrent_action_executions),
             },
             actions: actions.into(),
-            futures_vec_pool: ReusableVecPool::<ActionMeta>::new(design.config.max_concurrent_action_executions, |_| Vec::new(length)),
+            futures_vec_pool: ReusableVecPool::<ActionMeta>::new(design.config.max_concurrent_action_executions, |_| Vec::new_in_global(length)),
         })
     }
 }
@@ -112,7 +113,7 @@ impl Concurrency {
 
     /// Creates a reusable future pool
     fn create_reusable_future_pool(pool_size: usize) -> ReusableBoxFuturePool<ActionResult> {
-        let mut vec_pool = ReusableVecPool::<ActionMeta>::new(pool_size, |_| Vec::new(1));
+        let mut vec_pool = ReusableVecPool::<ActionMeta>::new(pool_size, |_| Vec::new_in_global(1));
         let vec = vec_pool.next_object().unwrap();
         ReusableBoxFuturePool::<ActionResult>::for_value(pool_size, Self::execute_impl("dummy".into(), vec))
     }

@@ -12,7 +12,9 @@
 //
 use ::core::sync::atomic::Ordering;
 use foundation::{
-    containers::trigger_queue::TriggerQueueConsumer, prelude::FoundationAtomicBool, threading::thread_wait_barrier::ThreadReadyNotifier,
+    containers::trigger_queue::TriggerQueueConsumer,
+    prelude::{vector_extension::VectorExtension, FoundationAtomicBool},
+    threading::thread_wait_barrier::ThreadReadyNotifier,
 };
 use std::sync::Arc;
 
@@ -83,7 +85,7 @@ impl DedicatedWorker {
                         let internal = WorkerInner {
                             dedicated_scheduler,
                             consumer: queue,
-                            local_storage: Vec::new(local_size),
+                            local_storage: Vec::new_in_global(local_size),
                             id,
                             stop_signal,
                         };
@@ -164,7 +166,8 @@ impl WorkerInner {
 
             match self.consumer.pop_blocking_with_timeout(::core::time::Duration::from_millis(100)) {
                 Ok(task_ref) => {
-                    self.local_storage.push(task_ref);
+                    self.local_storage.push(task_ref).expect("Failed to push task into local storage");
+                    // Storage is empty
                 }
                 Err(CommonErrors::Timeout) => {
                     continue;

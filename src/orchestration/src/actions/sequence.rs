@@ -17,7 +17,7 @@ use crate::common::tag::Tag;
 use async_runtime::futures::reusable_box_future::{ReusableBoxFuture, ReusableBoxFuturePool};
 use foundation::{
     containers::{growable_vec::GrowableVec, reusable_objects::ReusableObject, reusable_vec_pool::ReusableVecPool},
-    prelude::*,
+    prelude::{vector_extension::VectorExtension, *},
 };
 
 const REUSABLE_FUTURE_POOL_SIZE: usize = 2;
@@ -79,9 +79,9 @@ impl SequenceBuilder {
         // Move the actions from Builder's GrowableVec to Sequence's fixed-sized Vec
         // Here we also reverse the order, so that the actions become already in the correct order,
         // when they are popped out in the execute_impl() later on
-        let mut actions = Vec::<Box<dyn ActionTrait>>::new(self.actions.len());
+        let mut actions = Vec::<Box<dyn ActionTrait>>::new_in_global(self.actions.len());
         while let Some(action) = self.actions.pop() {
-            actions.push(action);
+            actions.push(action).expect("Unable to transfer action from Builder to Sequence");
         }
 
         // Finally, return the `Sequence` action
@@ -99,7 +99,8 @@ impl SequenceBuilder {
     /// Create pools of reusable futures vec and reusable future
     ///
     fn create_pools(futures_size: usize) -> (ReusableVecPool<ReusableBoxFuture<ActionResult>>, ReusableBoxFuturePool<ActionResult>) {
-        let mut futures_vec_pool = ReusableVecPool::<ReusableBoxFuture<ActionResult>>::new(REUSABLE_VEC_POOL_SIZE, |_| Vec::new(futures_size));
+        let mut futures_vec_pool =
+            ReusableVecPool::<ReusableBoxFuture<ActionResult>>::new(REUSABLE_VEC_POOL_SIZE, |_| Vec::new_in_global(futures_size));
         let futures_vec = futures_vec_pool.next_object().unwrap();
 
         // Populate the futures' collection to initialize the reusable future pool's layout

@@ -11,13 +11,16 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+use crate::containers::vector_extension::VectorExtension;
 use ::core::{
     alloc::Layout,
     mem::MaybeUninit,
     ops::{Deref, DerefMut},
     slice::{Iter, IterMut},
 };
-use iceoryx2_bb_container::vec::*;
+
+use crate::containers::Vec;
+use crate::containers::Vector;
 
 ///
 /// [`GrowableVec`] is extension to iceoryx2 [`Vec`] with has one time dynamically allocated size. This implementation will grow the size of container when
@@ -27,7 +30,7 @@ use iceoryx2_bb_container::vec::*;
 /// The [`GrowableVec`] will grow by `2` each time there is no more space to push value into.
 ///
 pub struct GrowableVec<T> {
-    inner: Vec<MaybeUninit<T>>, // MaybeUninit only for regrow, it's zero cast anyway
+    inner: Vec<T>,
     is_locked: bool,
 }
 
@@ -42,7 +45,7 @@ impl<T> GrowableVec<T> {
         assert_eq!(Layout::new::<T>(), Layout::new::<MaybeUninit<T>>());
 
         Self {
-            inner: Vec::new(init_size),
+            inner: Vec::new_in_global(init_size),
             is_locked: false,
         }
     }
@@ -91,16 +94,12 @@ impl<T> GrowableVec<T> {
 
     /// Remove and return last elem in container
     pub fn pop(&mut self) -> Option<T> {
-        self.inner.pop().map(|mu| unsafe { mu.assume_init() })
+        self.inner.pop()
     }
 
     /// Removes the element at the specified index, and returns the element if the index is valid.
     pub fn remove(&mut self, index: usize) -> Option<T> {
-        if index < self.inner.len() {
-            Some(unsafe { self.inner.remove(index).assume_init() })
-        } else {
-            None
-        }
+        self.inner.remove(index)
     }
 
     // Adds `value` to end of vector. Return true if action succeeded
@@ -109,16 +108,12 @@ impl<T> GrowableVec<T> {
             self.reallocate_internal();
         }
 
-        self.inner.push(MaybeUninit::new(value))
+        self.inner.push(value).is_ok()
     }
 
     /// Remove all elements in container
     pub fn clear(&mut self) {
-        for _ in 0..self.inner.len() {
-            unsafe {
-                self.inner.pop().unwrap().assume_init_drop();
-            }
-        }
+        self.inner.clear();
     }
 
     ///
@@ -127,23 +122,11 @@ impl<T> GrowableVec<T> {
     fn reallocate_internal(&mut self) {
         // TODO: This is workaround, proper impl is simple but requires access to MetaVec internals which is not possible currently.
         // We can copy a code from MetaVec and adapt if we need something better.
-        let mut new_container = Vec::new(self.inner.capacity() * 2);
+        let mut new_container = Vec::new_in_global(self.inner.capacity() * 2);
 
-        // Fake that we have data inside so internal push position gets correct
-        for _ in 0..self.inner.len() {
-            new_container.push(MaybeUninit::uninit());
+        while let Some(v) = self.inner.remove(0) {
+            new_container.push(v).expect("Failed to push value during reallocation");
         }
-
-        // Do the copy from source
-        unsafe {
-            ::core::ptr::copy_nonoverlapping(
-                self.inner.as_slice().as_ptr(),
-                new_container.as_mut_slice().as_mut_ptr(),
-                self.inner.len(),
-            );
-        }
-        // manually forget all data since since it was copied -> results in move like action
-        self.inner.clear(); // Inner clear to drop data as MaybeUnint prevent drop on T
 
         // move into self
         self.inner = new_container;
@@ -178,11 +161,11 @@ impl<T> DerefMut for GrowableVec<T> {
 #[allow(clippy::from_over_into)]
 impl<T> Into<Vec<T>> for GrowableVec<T> {
     fn into(mut self) -> Vec<T> {
-        let mut first = Vec::new(self.len());
+        let mut first = Vec::new_in_global(self.len());
 
         // Reverse order
         for _ in 0..self.len() {
-            first.push(self.pop().unwrap());
+            first.push(self.pop().unwrap()).expect("Failed to push value during conversion");
         }
 
         let len = first.len();
@@ -272,6 +255,23 @@ mod tests {
         assert!(data.push(1));
         assert_eq!(6, data.capacity()); // double the size
         assert_eq!(4, data.len()); // still 4 items are there
+    }
+
+    #[test]
+    fn test_when_no_more_space_and_not_locked_grows_and_preserves_order() {
+        let mut data = GrowableVec::<u8>::new(3);
+
+        data.push(0);
+        data.push(1);
+        data.push(2);
+
+        assert!(data.push(3));
+        assert_eq!(6, data.capacity()); // double the size
+        assert_eq!(4, data.len()); // still 4 items are there
+
+        for i in 0..data.len() {
+            assert_eq!(data[i], i as u8);
+        }
     }
 
     #[test]

@@ -52,7 +52,8 @@ use crate::{
     program::Program,
 };
 use ::core::marker::PhantomData;
-use foundation::prelude::Vec;
+use foundation::prelude::vector_extension::VectorExtension;
+use foundation::prelude::{Vec, Vector};
 use foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
 use std::path::Path;
 use std::rc::Rc;
@@ -191,14 +192,14 @@ pub struct OrchProgramManager {
 impl OrchProgramManager {
     /// Moves all programs out of the manager and returns them.
     pub fn get_programs(&mut self) -> Vec<Program> {
-        let empty = Vec::new(0);
+        let empty = Vec::new_in_global(0);
         core::mem::replace(&mut self.programs, empty)
     }
 
     /// Moves the named program out of the manager and returns it.
     pub fn get_program(&mut self, name: &str) -> Option<Program> {
         if let Some((index, _)) = self.programs.iter().enumerate().find(|(_, program)| program.name == name) {
-            Some(self.programs.remove(index))
+            self.programs.remove(index)
         } else {
             None
         }
@@ -219,11 +220,11 @@ impl OrchProgramManager {
 
     /// Retrieve a shutdown notifier for all shutdown events.
     pub fn get_shutdown_all_notifier(&self) -> Result<Box<dyn ShutdownNotifier>, CommonErrors> {
-        let mut shutdown_notifiers = Vec::new(self.shutdown_events.len());
+        let mut shutdown_notifiers = Vec::new_in_global(self.shutdown_events.len());
 
         for event in self.shutdown_events.iter() {
             if let Some(notifier) = event.creator().borrow_mut().create_shutdown_notifier() {
-                shutdown_notifiers.push(notifier);
+                let _ = shutdown_notifiers.push(notifier);
             } else {
                 return Err(CommonErrors::GenericError);
             }

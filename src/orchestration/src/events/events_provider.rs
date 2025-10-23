@@ -23,6 +23,7 @@ use crate::{
     actions::{sync::Sync, trigger::Trigger},
     common::tag::AsTagTrait,
 };
+use foundation::prelude::vector_extension::VectorExtension;
 use foundation::prelude::*;
 
 use crate::{actions::action::ActionTrait, common::tag::Tag, events::local_events::LocalEvent};
@@ -63,7 +64,7 @@ impl<GlobalProvider: IpcProvider + 'static> Default for EventsProvider<GlobalPro
 impl<GlobalProvider: IpcProvider + 'static> EventsProvider<GlobalProvider> {
     pub fn new() -> Self {
         Self {
-            events: Vec::new(DEFAULT_EVENTS_CAPACITY),
+            events: Vec::new_in_global(DEFAULT_EVENTS_CAPACITY),
             local_event_next_id: 0,
             ipc: Rc::new(RefCell::new(GlobalProvider::new())),
             timer_event_next_id: 0,
@@ -121,10 +122,12 @@ impl<GlobalProvider: IpcProvider + 'static> EventsProvider<GlobalProvider> {
 
         let creator: Rc<RefCell<dyn EventCreatorTrait>> = Rc::new(RefCell::new(creator_builder(system_event, system_event_tag)));
 
-        self.events.push(DeploymentEventInfo {
-            system_tag: system_event_tag,
-            creator: Rc::clone(&creator),
-        });
+        self.events
+            .push(DeploymentEventInfo {
+                system_tag: system_event_tag,
+                creator: Rc::clone(&creator),
+            })
+            .map_err(|_| CommonErrors::NoSpaceLeft)?;
 
         Ok(creator)
     }

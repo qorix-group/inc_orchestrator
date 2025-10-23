@@ -147,7 +147,7 @@ impl<T> TriggerQueue<T> {
                 return;
             }
 
-            container.push(val.unwrap());
+            container.push(val.unwrap()).unwrap(); // There is still a place as it was checked above
         }
     }
 
@@ -179,6 +179,8 @@ impl<T> TriggerQueue<T> {
 #[cfg(test)]
 #[cfg(not(loom))]
 mod tests {
+    use crate::prelude::vector_extension::VectorExtension;
+
     use super::*;
     use core::sync::atomic::Ordering;
     use core::time::Duration;
@@ -189,10 +191,10 @@ mod tests {
     where
         I: IntoIterator<Item = T>,
     {
-        let mut result = Vec::new(size);
+        let mut result = Vec::new_in_global(size);
 
         for item in iter {
-            result.push(item);
+            result.push(item).unwrap();
         }
 
         result
@@ -232,7 +234,7 @@ mod tests {
     #[test]
     fn test_pop_into_vec_empty_queue() {
         let queue = TriggerQueue::<i32>::new(128);
-        let mut vec = Vec::new(128);
+        let mut vec = Vec::new_in_global(128);
         queue.pop_into_vec(&mut vec);
         assert!(vec.is_empty());
     }
@@ -246,7 +248,7 @@ mod tests {
         queue.push(2);
 
         // Create a vector with capacity for more elements
-        let mut vec = Vec::new(128);
+        let mut vec = Vec::new_in_global(128);
         queue.pop_into_vec(&mut vec);
 
         // Should contain exactly the elements pushed
@@ -264,7 +266,7 @@ mod tests {
             queue.push(i);
         }
 
-        let mut vec = Vec::new(10);
+        let mut vec = Vec::new_in_global(10);
         queue.pop_into_vec(&mut vec);
 
         // Should take as many elements as possible
@@ -371,7 +373,7 @@ mod tests {
         const ITEMS_PER_PRODUCER: i32 = 200;
 
         // Spawn multiple producer threads
-        let mut handles = Vec::new(NUM_PRODUCERS);
+        let mut handles = Vec::new_in_global(NUM_PRODUCERS);
         for p in 0..NUM_PRODUCERS {
             let q = Arc::clone(&queue_clone1);
             let handle = thread::spawn(move || {
@@ -386,21 +388,21 @@ mod tests {
                     }
                 }
             });
-            handles.push(handle);
+            handles.push(handle).unwrap();
         }
 
         // Consumer thread using pop_into_vec
         let consumer = thread::spawn(move || {
             let expected_total = NUM_PRODUCERS as i32 * ITEMS_PER_PRODUCER;
-            let mut all_received = Vec::new(expected_total as usize);
+            let mut all_received = Vec::new_in_global(expected_total as usize);
 
             while all_received.len() < expected_total as usize {
-                let mut batch = Vec::new(50);
+                let mut batch = Vec::new_in_global(50);
                 queue_clone2.pop_into_vec(&mut batch);
 
                 if !batch.is_empty() {
                     for e in batch.as_slice() {
-                        all_received.push(*e);
+                        all_received.push(*e).unwrap();
                     }
                 } else {
                     thread::sleep(Duration::from_millis(10));

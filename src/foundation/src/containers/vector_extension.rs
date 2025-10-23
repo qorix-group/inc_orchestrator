@@ -11,13 +11,18 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use iceoryx2_bb_container::vec::Vec;
+use iceoryx2_bb_memory::heap_allocator::HeapAllocator;
+
+use crate::prelude::*;
 
 /// This module provides an extension trait for iceoryx2 `Vec<T>` to add `swap_remove` and `remove` methods.
 pub trait VectorExtension<T> {
     /// Removes the element at the specified index by swapping it with the last element
     /// and then popping the last element. If the index is out of bounds, it returns `None`.
     fn swap_remove(&mut self, index: usize) -> Option<T>;
+
+    /// Creates a new `Vec<T>` with the specified capacity, using the global heap allocator.
+    fn new_in_global(capacity: usize) -> Self;
 }
 
 impl<T> VectorExtension<T> for Vec<T> {
@@ -32,19 +37,27 @@ impl<T> VectorExtension<T> for Vec<T> {
 
         self.pop()
     }
+
+    fn new_in_global(capacity: usize) -> Self
+    where
+        Self: Sized,
+    {
+        let capacity = core::cmp::max(capacity, 1); // TODO: Remove this workaround when Vec supports zero capacity
+        Vec::new(HeapAllocator::global(), capacity).expect("Failed to create Vec with specified capacity")
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use iceoryx2_bb_container::vec::Vec;
+    use crate::containers::Vec;
 
     #[test]
     fn swap_remove_mid_element() {
         const VEC_SIZE: usize = 10;
-        let mut vec = Vec::new(VEC_SIZE);
+        let mut vec = Vec::new_in_global(VEC_SIZE);
         for i in 0..VEC_SIZE {
-            vec.push(i);
+            vec.push(i).unwrap();
         }
 
         // only the last element is swapped with the element at index 5
@@ -58,9 +71,9 @@ mod tests {
     #[test]
     fn swap_remove_first_element() {
         const VEC_SIZE: usize = 10;
-        let mut vec = Vec::new(VEC_SIZE);
+        let mut vec = Vec::new_in_global(VEC_SIZE);
         for i in 0..VEC_SIZE {
-            vec.push(i);
+            vec.push(i).unwrap();
         }
         assert_eq!(vec.swap_remove(0).unwrap(), 0);
         assert_eq!(vec[0], 9);
@@ -71,9 +84,9 @@ mod tests {
     #[test]
     fn swap_remove_last_element() {
         const VEC_SIZE: usize = 10;
-        let mut vec = Vec::new(VEC_SIZE);
+        let mut vec = Vec::new_in_global(VEC_SIZE);
         for i in 0..VEC_SIZE {
-            vec.push(i);
+            vec.push(i).unwrap();
         }
         assert_eq!(vec.swap_remove(VEC_SIZE - 1).unwrap(), 9);
         assert_eq!(vec[0], 0);
@@ -83,8 +96,8 @@ mod tests {
 
     #[test]
     fn swap_remove_vec_with_one_element() {
-        let mut vec = Vec::new(1);
-        vec.push(100);
+        let mut vec = Vec::new_in_global(1);
+        vec.push(100).unwrap();
         assert_eq!(vec.swap_remove(0).unwrap(), 100);
         assert_eq!(vec.len(), 0);
     }
@@ -92,9 +105,9 @@ mod tests {
     #[test]
     fn swap_remove_out_of_bounds() {
         const VEC_SIZE: usize = 10;
-        let mut vec = Vec::new(VEC_SIZE);
+        let mut vec = Vec::new_in_global(VEC_SIZE);
         for i in 0..VEC_SIZE {
-            vec.push(i);
+            vec.push(i).unwrap();
         }
         assert_eq!(vec.swap_remove(VEC_SIZE), None); // This should return None
     }
@@ -122,9 +135,9 @@ mod tests {
         }
 
         const VEC_SIZE: usize = 10;
-        let mut vec = Vec::new(VEC_SIZE);
+        let mut vec = Vec::new_in_global(VEC_SIZE);
         for i in 0..VEC_SIZE {
-            vec.push(TestData { data: i });
+            vec.push(TestData { data: i }).unwrap();
         }
         vec.remove(5);
         assert_eq!(unsafe { DROP_COUNTER }, 1); // Ensure that the drop was called exactly once

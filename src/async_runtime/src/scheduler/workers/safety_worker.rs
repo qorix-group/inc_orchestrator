@@ -14,7 +14,9 @@ use ::core::sync::atomic::Ordering;
 use ::core::task::Context;
 use std::sync::Arc;
 
-use foundation::{containers::trigger_queue::TriggerQueue, threading::thread_wait_barrier::ThreadReadyNotifier};
+use foundation::{
+    containers::trigger_queue::TriggerQueue, prelude::vector_extension::VectorExtension, threading::thread_wait_barrier::ThreadReadyNotifier,
+};
 use iceoryx2_bb_posix::thread::Thread;
 
 use crate::{
@@ -85,7 +87,7 @@ impl SafetyWorker {
                     move || {
                         let internal = WorkerInner {
                             queue,
-                            local_storage: Vec::new(local_size),
+                            local_storage: Vec::new_in_global(local_size),
                             id,
                             stop_signal,
                         };
@@ -156,7 +158,8 @@ impl WorkerInner {
 
             match consumer.pop_blocking_with_timeout(::core::time::Duration::from_millis(100)) {
                 Ok(task_ref) => {
-                    self.local_storage.push(task_ref);
+                    // Storage is empty
+                    self.local_storage.push(task_ref).expect("Failed to push task into local storage");
                 }
                 Err(CommonErrors::Timeout) => {
                     continue;

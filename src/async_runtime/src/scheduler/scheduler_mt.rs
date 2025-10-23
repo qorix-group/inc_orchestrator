@@ -68,7 +68,7 @@ impl AsyncScheduler {
         AsyncScheduler {
             worker_access,
             num_of_searching_workers: FoundationAtomicU8::new(0),
-            parked_workers_indexes: std::sync::Mutex::new(Vec::new(workers_cnt)),
+            parked_workers_indexes: std::sync::Mutex::new(Vec::new_in_global(workers_cnt)),
             global_queue,
             safety_worker_queue,
             io_unparker,
@@ -163,7 +163,7 @@ impl AsyncScheduler {
             num_of_searching = self.num_of_searching_workers.fetch_sub(1, ::core::sync::atomic::Ordering::SeqCst);
         }
 
-        guard.push(id.worker_id() as usize); // worker_id is index in worker_access
+        guard.push(id.worker_id() as usize).expect("Failed to push worker id"); // worker_id is index in worker_access
         num_of_searching == 1
     }
 
@@ -291,12 +291,12 @@ pub(crate) fn scheduler_new(workers_cnt: usize, local_queue_size: u32, drivers: 
     // artificially construct a scheduler
 
     let mut worker_interactors = BoxInternal::<[WorkerInteractor]>::new_uninit_slice(workers_cnt);
-    let mut queues: Vec<TaskStealQueue> = Vec::new(workers_cnt);
+    let mut queues: Vec<TaskStealQueue> = Vec::new_in_global(workers_cnt);
 
     for i in 0..workers_cnt {
         let c = create_steal_queue(local_queue_size);
 
-        queues.push(c.clone());
+        queues.push(c.clone()).unwrap();
 
         worker_interactors[i].write(WorkerInteractor::new(
             c,
