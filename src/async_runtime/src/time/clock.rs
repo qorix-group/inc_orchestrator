@@ -71,7 +71,7 @@ impl Sub for Instant {
 /// A clock that provides the current time as an `Instant`.
 pub struct Clock;
 
-#[cfg(not(feature = "vm_time_correction"))]
+#[cfg(any(not(target_arch = "x86_64"), feature = "disable_vm_correction"))]
 impl Clock {
     /// Returns the current time as an `Instant`.
     pub fn now() -> Instant {
@@ -84,12 +84,13 @@ impl Clock {
     }
 }
 
-#[cfg(feature = "vm_time_correction")]
+#[cfg(all(target_arch = "x86_64", not(feature = "disable_vm_correction")))]
 static LAST_INSTANT: std::sync::Mutex<Option<std::time::Instant>> = std::sync::Mutex::new(None);
-#[cfg(feature = "vm_time_correction")]
+
+#[cfg(all(target_arch = "x86_64", not(feature = "disable_vm_correction")))]
 static INIT: std::sync::Once = std::sync::Once::new();
 
-#[cfg(feature = "vm_time_correction")]
+#[cfg(all(target_arch = "x86_64", not(feature = "disable_vm_correction")))]
 impl Clock {
     fn last_instant() -> &'static std::sync::Mutex<Option<std::time::Instant>> {
         INIT.call_once(|| {
