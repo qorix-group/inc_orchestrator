@@ -142,6 +142,12 @@ impl ParkerTrait for WorkerInteractor {
     where
         AfterParkDecision: FnOnce(),
     {
+        // Do not sleep if duration is 0 but still do handle state transitions correctly
+        if timeout.as_ref().is_some_and(|dur| dur.is_zero()) {
+            self.move_to_executing(scheduler);
+            return Ok(());
+        }
+
         if let Some(mut io) = driver.try_get_access() {
             let mut _guard = self.mtx.lock().unwrap();
 
