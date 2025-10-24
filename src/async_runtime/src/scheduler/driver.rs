@@ -89,6 +89,7 @@ impl Inner {
         self.time.process_timeouts();
     }
 
+    /// Parks the current worker until the next timeout needs to be processed. Returns true if the worker was actually parked, false otherwise.
     pub fn park(&self, scheduler: &AsyncScheduler, worker: &WorkerInteractor) {
         let _exit_guard = ScopeGuardBuilder::new(true)
             .on_init(|_| Ok(()) as Result<(), ()>)
@@ -126,17 +127,15 @@ impl Inner {
             return;
         }
 
+        info!(
+            "Next promised wakeup time: {}, previous for worker: {} next expire time {:?} expire time u64: {}",
+            global_promis_next_time_wakeup, previous_wakeup_time, expire_time, expire_time_u64
+        );
+
         self.park_with_timeout(scheduler, worker, &expire_time_instant, expire_time_u64);
     }
 
     fn park_with_timeout(&self, scheduler: &AsyncScheduler, worker: &WorkerInteractor, expire_time_instant: &Instant, expire_time_u64: u64) {
-        // We do it before CME to keep state consistent
-        let dur = self.time.duration_since_now(expire_time_instant);
-        if dur.is_zero() {
-            warn!("Tried to park with duration zero or lower, looks like a worker was stuck for some time, unparking immediately");
-            return;
-        }
-
         let res = worker.park(
             scheduler,
             &self.io,
@@ -145,7 +144,7 @@ impl Inner {
                 self.next_promised_wakeup.store(expire_time_u64, ::core::sync::atomic::Ordering::Relaxed);
                 self.stash_promised_wakeup_time_for_worker(expire_time_u64);
             },
-            Some(dur),
+            Some(self.time.duration_since_now(expire_time_instant)),
         );
 
         if let Err(CommonErrors::Timeout) = res {
