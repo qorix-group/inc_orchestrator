@@ -96,15 +96,14 @@ rust_binary(
     deps = _EXAMPLE_DEPS,
 )
 
-
 rust_binary(
     name = "inter_process_event_sender",
     srcs = [
         "examples/inter_process_event/sender.rs",
     ] + glob(["examples/common/**/*.rs"]),
+    crate_root = "examples/inter_process_event/sender.rs",
     visibility = ["//visibility:public"],
     deps = _EXAMPLE_DEPS,
-    crate_root = "examples/inter_process_event/sender.rs",
 )
 
 rust_binary(
