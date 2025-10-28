@@ -4,6 +4,7 @@ use crate::tests::orchestration::{
 };
 use orchestration_concurrency::{MultipleConcurrency, NestedConcurrency, SingleConcurrency};
 use orchestration_dedicated_worker::dedicated_worker_scenario_group;
+use orchestration_graph::graph_scenario_group;
 use orchestration_sequence::{AwaitSequence, NestedSequence, SingleSequence};
 use orchestration_sleep::SleepUnderLoad;
 use orchestration_trigger_sync::{
@@ -41,6 +42,7 @@ macro_rules! generic_async_test_func {
 mod orchestration_concurrency;
 mod orchestration_dedicated_worker;
 mod orchestration_double_handler_catch;
+mod orchestration_graph;
 mod orchestration_if_else;
 mod orchestration_methods;
 mod orchestration_sequence;
@@ -147,6 +149,7 @@ pub fn orchestration_scenario_group() -> Box<dyn ScenarioGroup> {
             ifelse_scenario_group(),
             tag_methods_scenario_group(),
             dedicated_worker_scenario_group(),
+            graph_scenario_group(),
         ],
     ))
 }
