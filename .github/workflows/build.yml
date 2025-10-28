@@ -8,6 +8,9 @@ on:
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  SCORE_QNX_USER: ${{ secrets.SCORE_QNX_USER }}
+  SCORE_QNX_PASSWORD: ${{ secrets.SCORE_QNX_PASSWORD }}
+  SCORE_QNX_LICENSE: ${{ secrets.SCORE_QNX_LICENSE }}
 jobs:
   build:
     name: Build Bazel Code

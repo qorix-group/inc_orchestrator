@@ -4,7 +4,8 @@
 set -e
 
 echo "Does not work yet"
-
+  if [[ ! -f "$HOME/.netrc" ]]; then
+    echo "Error: Either SCORE_QNX_USER/SCORE_QNX_PASSWORD must be set, or $HOME/.netrc must exist."
 # # Check if SCORE_QNX_USER is set
 # if [[ -z "${SCORE_QNX_USER}" ]]; then
 #   echo "Error: SCORE_QNX_USER is not set. This shall be myQNX portal username."
