@@ -159,7 +159,7 @@ crate.annotation(
     repositories = ["score_orchestrator_crates"],
 )
 
-# iceoryx2 does not yet support QNX8 correctly
+#iceoryx2 does not yet support QNX8 correctly
 crate.annotation(
     crate = "iceoryx2-pal-posix",
     patches = ["//patches:qnx8_iceoryx2.patch"],

@@ -4,6 +4,11 @@
 set -e
 
 echo "Does not work yet"
+if [ -f "virtualization/_BUILD" ]; then
+  echo "Error: _BUILD file found in src/virtualization/. Please rename it to BUILD. If You do so, //.... target will stop working until this is not reverted. Sorry for the inconvenience."
+  exit 1
+fi
+
   if [[ ! -f "$HOME/.netrc" ]]; then
     echo "Error: Either SCORE_QNX_USER/SCORE_QNX_PASSWORD must be set, or $HOME/.netrc must exist."
 # # Check if SCORE_QNX_USER is set
