@@ -79,6 +79,21 @@ Build all targets:
 bazel build //...
 ```
 
+## Build for QNX8
+
+### Preparations
+
+Please follow [Where to obtain the QNX 8.0 SDP](https://github.com/eclipse-score/toolchains_qnx?tab=readme-ov-file#where-to-obtain-the-qnx-80-sdp) to
+get access to QNX8 and how to setup QNX8 for `S-CORE`.
+
+In above link You will also find an instructions how to replace SDP in case You need to use other one (ie HW specific).
+
+
+### Building
+```bash
+./scripts/build_qnx8.sh BAZEL_TARGET (default is //src/...)
+```
+
 ## Run
 
 List all binary targets, including examples:

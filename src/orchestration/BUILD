@@ -95,3 +95,24 @@ rust_binary(
     visibility = ["//visibility:public"],
     deps = _EXAMPLE_DEPS,
 )
+
+
+rust_binary(
+    name = "inter_process_event_sender",
+    srcs = [
+        "examples/inter_process_event/sender.rs",
+    ] + glob(["examples/common/**/*.rs"]),
+    visibility = ["//visibility:public"],
+    deps = _EXAMPLE_DEPS,
+    crate_root = "examples/inter_process_event/sender.rs",
+)
+
+rust_binary(
+    name = "inter_process_event_receiver",
+    srcs = [
+        "examples/inter_process_event/receiver.rs",
+    ] + glob(["examples/common/**/*.rs"]),
+    crate_root = "examples/inter_process_event/receiver.rs",
+    visibility = ["//visibility:public"],
+    deps = _EXAMPLE_DEPS,
+)
