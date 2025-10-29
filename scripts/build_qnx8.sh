@@ -15,11 +15,11 @@ if [[ -z "${SCORE_QNX_USER}" || -z "${SCORE_QNX_PASSWORD}" ]]; then
   fi
 fi
 
-echo "Note: If it fails with 'Error downloading [https://www.qnx.com/download/download/79858/installation.tgz' access this link from webbrowser and accept the license agreement."
+echo "Note: If it fails with 'Error downloading [https://www.qnx.com/download/download/79858/installation.tgz]' access this link from webbrowser and accept the license agreement."
 
 # Use default argument //src/... if none provided
 if [ $# -eq 0 ]; then
   set -- //src/...
 fi
 
-bazel build  --platforms=@score_toolchains_rust//platforms:aarch64-unknown-qnx8_0 --credential_helper=*.qnx.com=%workspace%/scripts/internal/qnx_creds.py "$@"
+bazel build --config=build_qnx8 --credential_helper=*.qnx.com=%workspace%/scripts/internal/qnx_creds.py "$@"
