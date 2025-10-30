@@ -4,7 +4,7 @@ resolver = "2"
 # Used when executing cargo from project root.
 default-members = [
     "src/foundation",
-    "src/async_runtime",
+    "src/kyron",
     "src/orchestration",
     "src/logging_tracing",
     "src/xtask",
@@ -14,7 +14,7 @@ default-members = [
 # Include component integration tests as a member for IDE support and Bazel builds.
 members = [
     "src/foundation",
-    "src/async_runtime",
+    "src/kyron",
     "src/orchestration",
     "src/logging_tracing",
     "src/xtask",
@@ -23,7 +23,7 @@ members = [
     "component_integration_tests/rust_test_scenarios",
     "src/orchestration/examples/camera_drv_object_det",
     "src/orchestration_macros",
-    "src/async_runtime_macros",
+    "src/kyron_macros",
 ]
 
 
@@ -32,7 +32,7 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace.dependencies]
-async_runtime = { path = "src/async_runtime" }
+kyron = { path = "src/kyron" }
 foundation = { path = "src/foundation" }
 logging_tracing = { path = "src/logging_tracing" }
 orchestration = { path = "src/orchestration" }
@@ -40,7 +40,7 @@ testing = { path = "src/testing" }
 testing_macros = { path = "src/testing_macros" }
 xtask = { path = "src/xtask" }
 orchestration_macros = { path = "src/orchestration_macros" }
-async_runtime_macros = { path = "src/async_runtime_macros" }
+kyron_macros = { path = "src/kyron_macros" }
 
 iceoryx2 = { git = "https://github.com/eclipse-iceoryx/iceoryx2.git", rev = "d3d1c9a727d3dc405733081923be5dba8213d6d8" }
 iceoryx2-cal = { git = "https://github.com/eclipse-iceoryx/iceoryx2.git", rev = "d3d1c9a727d3dc405733081923be5dba8213d6d8" }

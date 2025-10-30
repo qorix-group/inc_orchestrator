@@ -1,5 +1,5 @@
 [package]
-name = "async_runtime_macros"
+name = "kyron_macros"
 version.workspace = true
 edition.workspace = true
 

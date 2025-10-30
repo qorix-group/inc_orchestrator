@@ -24,35 +24,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b0674a1ddeecb70197781e945de4b3b8ffb61fa939a5597bcf48503737663100"
 
 [[package]]
-name = "async_runtime"
-version = "0.1.0"
-dependencies = [
- "async_runtime_macros",
- "foundation",
- "iceoryx2",
- "iceoryx2-bb-container",
- "iceoryx2-bb-elementary",
- "iceoryx2-bb-elementary-traits",
- "iceoryx2-bb-lock-free",
- "iceoryx2-bb-posix",
- "iceoryx2-cal",
- "iceoryx2-pal-concurrency-sync",
- "libc",
- "loom",
- "testing",
- "testing_macros",
-]
-
-[[package]]
-name = "async_runtime_macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -100,9 +71,9 @@ checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
 name = "camera_drv_object_det"
 version = "0.1.0"
 dependencies = [
- "async_runtime",
  "cc",
  "foundation",
+ "kyron",
  "logging_tracing",
  "orchestration",
  "orchestration_macros",
@@ -824,6 +795,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "kyron"
+version = "0.1.0"
+dependencies = [
+ "foundation",
+ "iceoryx2",
+ "iceoryx2-bb-container",
+ "iceoryx2-bb-elementary",
+ "iceoryx2-bb-elementary-traits",
+ "iceoryx2-bb-lock-free",
+ "iceoryx2-bb-posix",
+ "iceoryx2-cal",
+ "iceoryx2-pal-concurrency-sync",
+ "kyron_macros",
+ "libc",
+ "loom",
+ "testing",
+ "testing_macros",
+]
+
+[[package]]
+name = "kyron_macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -976,11 +976,11 @@ checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
 name = "orchestration"
 version = "0.1.0"
 dependencies = [
- "async_runtime",
- "async_runtime_macros",
  "foundation",
  "iceoryx2",
  "iceoryx2-bb-container",
+ "kyron",
+ "kyron_macros",
  "libc",
  "logging_tracing",
  "loom",
@@ -1179,9 +1179,9 @@ checksum = "caf4aa5b0f434c91fe5c7f1ecb6a5ece2130b02ad2a590589dda5146df959001"
 name = "rust_test_scenarios"
 version = "0.1.0"
 dependencies = [
- "async_runtime",
  "foundation",
  "futures",
+ "kyron",
  "libc",
  "orchestration",
  "serde",

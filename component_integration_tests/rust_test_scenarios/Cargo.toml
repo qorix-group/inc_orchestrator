@@ -5,7 +5,7 @@ edition.workspace = true
 
 [dependencies]
 orchestration.workspace = true
-async_runtime.workspace = true
+kyron.workspace = true
 foundation.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
