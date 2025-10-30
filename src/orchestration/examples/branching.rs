@@ -80,7 +80,7 @@ fn main() {
     let mut program1 = program_manager.get_program("ExampleProgram1").unwrap();
     let mut program2 = program_manager.get_program("ExampleProgram2").unwrap();
 
-    let (builder, _engine_id) = AsyncRuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(256).workers(2));
+    let (builder, _engine_id) = kyron::runtime::RuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(256).workers(2));
     let mut runtime = builder.build().unwrap();
     runtime.block_on(async move {
         info!("Running program 1");

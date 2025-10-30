@@ -58,7 +58,7 @@ fn main() {
         .with_thread_names(true)
         .init();
 
-    let (builder, _engine_id) = AsyncRuntimeBuilder::new().with_engine(
+    let (builder, _engine_id) = kyron::runtime::RuntimeBuilder::new().with_engine(
         ExecutionEngineBuilder::new()
             .task_queue_size(256)
             .workers(3)

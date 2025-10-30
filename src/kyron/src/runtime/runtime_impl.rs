@@ -25,18 +25,18 @@ pub enum RuntimeErrors {
     NoResultAvailable,
 }
 
-pub struct AsyncRuntimeBuilder {
+pub struct RuntimeBuilder {
     engine_builders: GrowableVec<ExecutionEngineBuilder>,
     next_id: usize,
 }
 
-impl Default for AsyncRuntimeBuilder {
+impl Default for RuntimeBuilder {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl AsyncRuntimeBuilder {
+impl RuntimeBuilder {
     pub fn new() -> Self {
         Self {
             engine_builders: GrowableVec::<ExecutionEngineBuilder>::new(1),
@@ -55,7 +55,7 @@ impl AsyncRuntimeBuilder {
     }
 
     #[allow(clippy::result_unit_err)]
-    pub fn build(mut self) -> Result<AsyncRuntime, ()> {
+    pub fn build(mut self) -> Result<Runtime, ()> {
         let mut engines = GrowableVec::<ExecutionEngine>::new(1);
         loop {
             let item = self.engine_builders.pop();
@@ -67,20 +67,20 @@ impl AsyncRuntimeBuilder {
         }
 
         engines.reverse();
-        Ok(AsyncRuntime { engines: engines.into() })
+        Ok(Runtime { engines: engines.into() })
     }
 }
 
 ///
 /// The main runtime for managing and executing asynchronous tasks across one or more engines.
 ///
-/// `AsyncRuntime` owns a set of [`ExecutionEngine`] instances and provides a unified API to
-/// execute, wait for, and shut down tasks. Engines are configured and added via [`AsyncRuntimeBuilder`].
-pub struct AsyncRuntime {
+/// `Runtime` owns a set of [`ExecutionEngine`] instances and provides a unified API to
+/// execute, wait for, and shut down tasks. Engines are configured and added via [`RuntimeBuilder`].
+pub struct Runtime {
     engines: Vec<ExecutionEngine>,
 }
 
-impl AsyncRuntime {
+impl Runtime {
     /// Runs the given future to completion on the default engine, blocking the current thread.
     ///
     /// Returns the result of the future
@@ -167,7 +167,7 @@ mod tests {
         let drop_counter1_clone = drop_counter1.clone();
 
         let threads_while: usize = {
-            let (builder, engine_id) = AsyncRuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(8).workers(3));
+            let (builder, engine_id) = RuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(8).workers(3));
             let mut runtime = builder.build().unwrap();
             let t: Result<Result<u32, ()>, RuntimeErrors> = runtime.block_on_engine(engine_id, async move {
                 drop_counter1_clone.fetch_add(1, Ordering::SeqCst);
@@ -196,13 +196,13 @@ mod tests {
     // for an example CI run.
     #[cfg(not(miri))]
     fn test_async_runtime_return_value() {
-        let (builder, engine_id) = AsyncRuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(8).workers(3));
+        let (builder, engine_id) = RuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(8).workers(3));
         let mut runtime = builder.build().unwrap();
         let ret: Result<i32, ()> = runtime.block_on_engine(engine_id, async move { Ok(23) }).unwrap();
 
         assert_eq!(ret, Ok(23));
 
-        let (builder, engine_id) = AsyncRuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(8).workers(3));
+        let (builder, engine_id) = RuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(8).workers(3));
         let mut runtime = builder.build().unwrap();
         let ret: Result<i32, ()> = runtime.block_on_engine(engine_id, async move { Ok(42) }).unwrap();
 
@@ -218,7 +218,7 @@ mod tests {
     // for an example CI run.
     #[cfg(not(miri))]
     fn test_async_runtime_async_run_and_late_wait() {
-        let (builder, engine_id) = AsyncRuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(8).workers(2));
+        let (builder, engine_id) = RuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(8).workers(2));
         let mut runtime = builder.build().unwrap();
 
         let barrier = Arc::new(ThreadWaitBarrier::new(1));
@@ -247,7 +247,7 @@ mod tests {
     // for an example CI run.
     #[cfg(not(miri))]
     fn test_async_runtime_wait_for_all_engines() {
-        let (builder, engine_id1) = AsyncRuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(8).workers(2));
+        let (builder, engine_id1) = RuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(8).workers(2));
         let (builder, engine_id2) = builder.with_engine(ExecutionEngineBuilder::new().task_queue_size(8).workers(2));
         let mut runtime = builder.build().unwrap();
 
@@ -284,7 +284,7 @@ mod tests {
         let builder3 = ExecutionEngineBuilder::new().workers(3);
 
         // Add them in order
-        let (builder, _id1) = AsyncRuntimeBuilder::new().with_engine(builder1);
+        let (builder, _id1) = RuntimeBuilder::new().with_engine(builder1);
         let (builder, _id2) = builder.with_engine(builder2);
         let (builder, _id3) = builder.with_engine(builder3);
 

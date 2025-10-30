@@ -54,7 +54,7 @@ fn main() {
     logger.init_log_trace();
 
     // Create runtime
-    let (builder, _engine_id) = AsyncRuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(256).workers(1));
+    let (builder, _engine_id) = kyron::runtime::RuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(256).workers(1));
 
     let mut runtime = builder.build().unwrap();
 

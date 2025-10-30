@@ -18,7 +18,7 @@
 //! # Details
 //!
 //! ## Engines
-//! The runtime can consist of multiple execution engines. Each engine can be added using [`crate::runtime::kyron::AsyncRuntimeBuilder::with_engine`] and configured through the [`crate::scheduler::execution_engine::ExecutionEngineBuilder`] interface.
+//! The runtime can consist of multiple execution engines. Each engine can be added using [`crate::runtime::kyron::kyron::runtime::RuntimeBuilder::with_engine`] and configured through the [`crate::scheduler::execution_engine::ExecutionEngineBuilder`] interface.
 //!
 //! Engines allow you to separate different aspects of your application, such as running different components with different priorities.
 //!
