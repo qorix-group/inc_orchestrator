@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-foundation.workspace = true
+kyron_foundation.workspace = true
 
 iceoryx2 = {workspace = true, optional = true}
 iceoryx2-cal = {workspace = true, optional = true}
