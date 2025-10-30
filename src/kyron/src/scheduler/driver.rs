@@ -16,9 +16,9 @@
 use ::core::{ops::Deref, task::Waker};
 use std::sync::Arc;
 
-use foundation::prelude::FoundationAtomicU64;
-use foundation::prelude::ScopeGuardBuilder;
-use foundation::prelude::*;
+use kyron_foundation::prelude::FoundationAtomicU64;
+use kyron_foundation::prelude::ScopeGuardBuilder;
+use kyron_foundation::prelude::*;
 
 use crate::io::driver::IoDriver;
 use crate::io::AsyncSelector;

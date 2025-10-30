@@ -50,7 +50,7 @@ use crate::{
         types::{IoEvent, IoEventInterest, IoId, IoRegistryEntry, IoSelector},
     },
 };
-use foundation::prelude::{vector_extension::VectorExtension, *};
+use kyron_foundation::prelude::{vector_extension::VectorExtension, *};
 
 use iceoryx2_bb_container::slotmap::{SlotMap, SlotMapKey};
 

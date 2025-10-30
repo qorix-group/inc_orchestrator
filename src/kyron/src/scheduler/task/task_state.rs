@@ -10,7 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
-use foundation::sync::foundation_atomic::FoundationAtomicU32;
+use kyron_foundation::sync::foundation_atomic::FoundationAtomicU32;
 
 /// TODO: For now no use-case for IDLE, I keep it.
 const TASK_STATE_IDLE: u32 = 0b0000_0001;

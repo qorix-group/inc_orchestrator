@@ -23,7 +23,7 @@ use crate::{
     actions::action::{ActionExecError, ActionResult},
     core::orch_locks::OrchTryLock,
 };
-use foundation::prelude::*;
+use kyron_foundation::prelude::*;
 
 const MAX_NUM_OF_EVENTS: usize = 8;
 

@@ -11,7 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use foundation::prelude::FoundationAtomicPtr;
+use kyron_foundation::prelude::FoundationAtomicPtr;
 
 use super::task::async_task::*;
 use core::task::{RawWaker, RawWakerVTable, Waker};

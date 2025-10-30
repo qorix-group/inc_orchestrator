@@ -14,10 +14,10 @@ use ::core::sync::atomic::Ordering;
 use ::core::task::Context;
 use std::sync::Arc;
 
-use foundation::{
+use iceoryx2_bb_posix::thread::Thread;
+use kyron_foundation::{
     containers::trigger_queue::TriggerQueue, prelude::vector_extension::VectorExtension, threading::thread_wait_barrier::ThreadReadyNotifier,
 };
-use iceoryx2_bb_posix::thread::Thread;
 
 use crate::{
     scheduler::{
@@ -29,7 +29,7 @@ use crate::{
     },
     TaskRef,
 };
-use foundation::prelude::*;
+use kyron_foundation::prelude::*;
 
 use super::{spawn_thread, worker_types::WorkerId, ThreadParameters};
 

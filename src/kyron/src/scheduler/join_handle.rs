@@ -10,8 +10,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
-use foundation::prelude::*;
-use foundation::{not_recoverable_error, prelude::CommonErrors};
+use kyron_foundation::prelude::*;
+use kyron_foundation::{not_recoverable_error, prelude::CommonErrors};
 
 use crate::{
     futures::{FutureInternalReturn, FutureState},

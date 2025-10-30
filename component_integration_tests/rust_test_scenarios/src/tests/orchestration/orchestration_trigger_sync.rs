@@ -2,8 +2,8 @@ use crate::internals::runtime_helper::Runtime;
 use test_scenarios_rust::scenario::Scenario;
 
 use super::*;
-use foundation::prelude::*;
 use futures::future;
+use kyron_foundation::prelude::*;
 use orchestration::{
     api::{design::Design, Orchestration},
     common::DesignConfig,

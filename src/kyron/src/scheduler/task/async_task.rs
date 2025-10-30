@@ -20,9 +20,9 @@ use ::core::mem;
 use ::core::ops::{Deref, DerefMut};
 use ::core::pin::Pin;
 use core::{ptr::NonNull, task::Context, task::Waker};
-use foundation::cell::UnsafeCell;
-use foundation::not_recoverable_error;
-use foundation::prelude::*;
+use kyron_foundation::cell::UnsafeCell;
+use kyron_foundation::not_recoverable_error;
+use kyron_foundation::prelude::*;
 
 ///
 /// Table of pointers to access API of generic `AsyncTask` without a need to know it's type along a way

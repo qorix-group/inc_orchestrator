@@ -19,9 +19,9 @@ use crate::scheduler::driver::Drivers;
 use ::core::future::Future;
 use core::cell::Cell;
 use core::cell::RefCell;
-use foundation::containers::spmc_queue::BoundProducerConsumer;
-use foundation::not_recoverable_error;
-use foundation::prelude::error;
+use kyron_foundation::containers::spmc_queue::BoundProducerConsumer;
+use kyron_foundation::not_recoverable_error;
+use kyron_foundation::prelude::error;
 
 use ::core::pin::Pin;
 use std::{rc::Rc, sync::Arc};

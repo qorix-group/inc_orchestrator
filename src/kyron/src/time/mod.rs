@@ -16,9 +16,9 @@ use ::core::time::Duration;
 use ::core::{ptr::NonNull, task::Waker};
 use std::sync::RwLock;
 
-use foundation::create_arr_storage;
-use foundation::prelude::{AllocationError, FixedSizePoolAllocator};
-use foundation::prelude::{BaseAllocator, CommonErrors};
+use kyron_foundation::create_arr_storage;
+use kyron_foundation::prelude::{AllocationError, FixedSizePoolAllocator};
+use kyron_foundation::prelude::{BaseAllocator, CommonErrors};
 
 use crate::time::clock::*;
 use crate::time::wheel::ExpireInfo;
@@ -308,7 +308,7 @@ impl Inner {
             ::core::ptr::write(
                 e.as_ptr(),
                 TimeEntry {
-                    next: foundation::sync::foundation_atomic::FoundationAtomicPtr::new(::core::ptr::null_mut()),
+                    next: kyron_foundation::sync::foundation_atomic::FoundationAtomicPtr::new(::core::ptr::null_mut()),
                     data: wheel::TimeoutData { waker, expire_at },
                 },
             );

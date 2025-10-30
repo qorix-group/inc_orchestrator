@@ -31,8 +31,8 @@ use ::core::{
     task::{Context, Poll},
     time::Duration,
 };
-use foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
 use kyron::{time::clock::Clock, JoinHandle};
+use kyron_foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
 use tracing::trace;
 
 #[cfg(not(any(test, feature = "runtime-api-mock")))]

@@ -19,8 +19,8 @@ use std::time::Instant;
 
 use crate::actions::action::{ActionResult, ActionTrait, ReusableBoxFutureResult};
 
-use foundation::containers::{reusable_objects::ReusableObject, reusable_objects::ReusableObjects};
 use kyron::futures::reusable_box_future::{ReusableBoxFuture, ReusableBoxFuturePool};
+use kyron_foundation::containers::{reusable_objects::ReusableObject, reusable_objects::ReusableObjects};
 use std::sync::{Arc, Mutex};
 use testing::{
     mock_fn::{CallableTrait, MockFn, MockFnBuilder},

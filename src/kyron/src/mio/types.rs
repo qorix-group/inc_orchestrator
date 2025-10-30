@@ -18,7 +18,7 @@ use core::{
     time::Duration,
 };
 
-use foundation::prelude::CommonErrors;
+use kyron_foundation::prelude::CommonErrors;
 use std::os::fd::{AsRawFd, RawFd};
 
 /// The return type for I/O operations.

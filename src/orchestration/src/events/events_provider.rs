@@ -23,8 +23,8 @@ use crate::{
     actions::{sync::Sync, trigger::Trigger},
     common::tag::AsTagTrait,
 };
-use foundation::prelude::vector_extension::VectorExtension;
-use foundation::prelude::*;
+use kyron_foundation::prelude::vector_extension::VectorExtension;
+use kyron_foundation::prelude::*;
 
 use crate::{actions::action::ActionTrait, common::tag::Tag, events::local_events::LocalEvent};
 
@@ -256,7 +256,7 @@ impl AsTagTrait for &DeploymentEventInfo {
 mod tests {
     use super::*;
     use crate::testing::OrchTestingPoller;
-    use foundation::prelude::CommonErrors;
+    use kyron_foundation::prelude::CommonErrors;
     use testing::assert_poll_ready;
 
     #[test]

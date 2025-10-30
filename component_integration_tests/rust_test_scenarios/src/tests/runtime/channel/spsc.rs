@@ -5,7 +5,7 @@ use test_scenarios_rust::scenario::Scenario;
 use kyron::channels::spsc;
 use kyron::spawn;
 
-use foundation::prelude::CommonErrors;
+use kyron_foundation::prelude::CommonErrors;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::hint;

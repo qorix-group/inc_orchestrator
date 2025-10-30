@@ -16,10 +16,10 @@ use core::time::Duration;
 use std::{rc::Rc, sync::Arc};
 
 use crate::scheduler::{context::ctx_get_drivers, driver::Drivers, scheduler_mt::DedicatedScheduler, waker::create_waker, workers::Thread};
-use foundation::base::fast_rand::FastRand;
-use foundation::containers::spmc_queue::BoundProducerConsumer;
-use foundation::prelude::*;
-use foundation::threading::thread_wait_barrier::ThreadReadyNotifier;
+use kyron_foundation::base::fast_rand::FastRand;
+use kyron_foundation::containers::spmc_queue::BoundProducerConsumer;
+use kyron_foundation::prelude::*;
+use kyron_foundation::threading::thread_wait_barrier::ThreadReadyNotifier;
 
 use crate::scheduler::{
     context::{ctx_get_worker_id, ctx_initialize, ContextBuilder},
@@ -410,8 +410,8 @@ mod tests {
         use crate::{box_future, AsyncTask, FoundationAtomicBool, TaskRef};
         use core::sync::atomic;
         use core::time::Duration;
-        use foundation::prelude::debug;
-        use foundation::threading::thread_wait_barrier::ThreadWaitBarrier;
+        use kyron_foundation::prelude::debug;
+        use kyron_foundation::threading::thread_wait_barrier::ThreadWaitBarrier;
         use std::sync::Arc;
 
         async fn test_fn(b: Arc<FoundationAtomicBool>) {

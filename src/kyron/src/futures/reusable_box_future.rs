@@ -21,7 +21,7 @@ use ::core::{
     ptr::NonNull,
 };
 
-use foundation::prelude::{CommonErrors, FoundationAtomicU8};
+use kyron_foundation::prelude::{CommonErrors, FoundationAtomicU8};
 use std::sync::Arc;
 
 ///
@@ -273,7 +273,7 @@ impl<OutType> DerefMut for ReusableBoxFuture<OutType> {
 mod tests {
     use core::panic::{AssertUnwindSafe, RefUnwindSafe, UnwindSafe};
 
-    use foundation::prelude::FoundationAtomicU16;
+    use kyron_foundation::prelude::FoundationAtomicU16;
 
     use super::*;
 

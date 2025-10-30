@@ -11,8 +11,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use foundation::prelude::*;
 use kyron::{runtime::*, spawn};
+use kyron_foundation::prelude::*;
 
 //
 // This is a test program and the following should happen:

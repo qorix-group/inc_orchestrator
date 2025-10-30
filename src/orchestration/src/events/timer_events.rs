@@ -13,11 +13,11 @@
 
 use core::time::Duration;
 
-use foundation::prelude::warn;
 use kyron::{
     futures::sleep,
     time::clock::{Clock, Instant},
 };
+use kyron_foundation::prelude::warn;
 
 use crate::events::event_traits::ListenerTrait;
 

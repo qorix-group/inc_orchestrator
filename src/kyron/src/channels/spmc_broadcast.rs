@@ -14,7 +14,7 @@
 use ::core::{future::Future, marker::PhantomData, task::Waker};
 use std::sync::Arc;
 
-use foundation::{
+use kyron_foundation::{
     not_recoverable_error,
     prelude::{vector_extension::VectorExtension, *},
 };

@@ -22,8 +22,8 @@ use kyron::{
 
 use ::core::future::Future;
 use core::time::Duration;
-use foundation::prelude::*;
 use iceoryx2::prelude::*;
+use kyron_foundation::prelude::*;
 
 pub struct X {}
 

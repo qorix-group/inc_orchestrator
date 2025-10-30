@@ -13,8 +13,8 @@
 
 use core::time::Duration;
 
-use foundation::not_recoverable_error;
-use foundation::prelude::*;
+use kyron_foundation::not_recoverable_error;
+use kyron_foundation::prelude::*;
 
 use crate::io::bridgedfd::BridgedFd;
 use crate::io::AsyncSelector;

@@ -16,8 +16,8 @@ use crate::mio::{
     types::{IoCall, IoEvent, IoEventInterest, IoId, IoRegistryEntry, IoResult, IoSelector, IoSelectorEventContainer, Result},
 };
 use core::time::Duration;
-use foundation::{containers::vector_extension::VectorExtension, not_recoverable_error, prelude::*};
 use iceoryx2_bb_container::flatmap::FlatMap;
+use kyron_foundation::{containers::vector_extension::VectorExtension, not_recoverable_error, prelude::*};
 use libc::{
     close, fcntl, pipe, poll, pollfd, read, write, EAGAIN, EINTR, FD_CLOEXEC, F_SETFD, F_SETFL, O_CLOEXEC, O_NONBLOCK, POLLERR, POLLHUP, POLLIN,
     POLLOUT, POLLPRI,
@@ -598,23 +598,23 @@ impl Inner {
 
 impl IoSelectorEventContainer for Vec<IoEvent> {
     fn push(&mut self, event: IoEvent) -> bool {
-        foundation::containers::Vector::push(self, event).is_ok()
+        kyron_foundation::containers::Vector::push(self, event).is_ok()
     }
 
     fn clear(&mut self) {
-        foundation::containers::Vector::clear(self);
+        kyron_foundation::containers::Vector::clear(self);
     }
 
     fn len(&self) -> usize {
-        foundation::containers::Vector::len(self)
+        kyron_foundation::containers::Vector::len(self)
     }
 
     fn is_empty(&self) -> bool {
-        foundation::containers::Vector::is_empty(self)
+        kyron_foundation::containers::Vector::is_empty(self)
     }
 
     fn capacity(&self) -> usize {
-        foundation::containers::Vector::capacity(self)
+        kyron_foundation::containers::Vector::capacity(self)
     }
 }
 
@@ -734,7 +734,7 @@ mod tests {
         assert_eq!(unsafe { write(write_fd, &data as *const u8 as *const ffi::c_void, 1_usize) }, 1_isize);
 
         let events = join_handle.join().unwrap();
-        assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
+        assert_eq!(<kyron_foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
         assert_eq!(events[0].id(), IoId::new(id));
         assert!(events[0].is_readable());
         assert!(!events[0].is_writable());
@@ -762,7 +762,7 @@ mod tests {
         read_until_blocking(read_fd);
 
         let events = join_handle.join().unwrap();
-        assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
+        assert_eq!(<kyron_foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
         assert_eq!(events[0].id(), IoId::new(id));
         assert!(events[0].is_writable());
         assert!(!events[0].is_readable());
@@ -790,7 +790,7 @@ mod tests {
         let mut events = Vec::<IoEvent>::new_in_global(8);
         assert!(selector_clone.select(&mut events, None).is_ok());
 
-        assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
+        assert_eq!(<kyron_foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
     }
 
     #[test]
@@ -816,7 +816,7 @@ mod tests {
         assert_eq!(unsafe { write(write_fd, &data as *const u8 as *const ffi::c_void, 1_usize) }, 1_isize);
 
         let events = join_handle.join().unwrap();
-        assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
+        assert_eq!(<kyron_foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
         assert_eq!(events[0].id(), IoId::new(id));
         assert!(events[0].is_readable());
         assert!(!events[0].is_writable());
@@ -847,7 +847,7 @@ mod tests {
         read_until_blocking(read_fd);
 
         let events = join_handle.join().unwrap();
-        assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
+        assert_eq!(<kyron_foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
         assert_eq!(events[0].id(), IoId::new(id));
         assert!(events[0].is_writable());
         assert!(!events[0].is_readable());
@@ -874,7 +874,7 @@ mod tests {
         assert_eq!(unsafe { write(write_fd, &data as *const u8 as *const ffi::c_void, 1_usize) }, 1_isize);
 
         let events = join_handle.join().unwrap();
-        assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 0);
+        assert_eq!(<kyron_foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 0);
     }
 
     #[test]
@@ -900,7 +900,7 @@ mod tests {
         read_until_blocking(read_fd);
 
         let events = join_handle.join().unwrap();
-        assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 0);
+        assert_eq!(<kyron_foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 0);
     }
 
     #[test]
@@ -932,7 +932,7 @@ mod tests {
         assert_eq!(unsafe { write(write_fd, &data as *const u8 as *const ffi::c_void, 1_usize) }, 1_isize);
 
         let events = join_handle.join().unwrap();
-        assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 0);
+        assert_eq!(<kyron_foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 0);
     }
 
     #[test]
@@ -966,7 +966,7 @@ mod tests {
         read_until_blocking(read_fd);
 
         let events = join_handle.join().unwrap();
-        assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 0);
+        assert_eq!(<kyron_foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 0);
     }
 
     #[test]
@@ -991,7 +991,7 @@ mod tests {
             });
 
             let events = join_handle.join().unwrap();
-            assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
+            assert_eq!(<kyron_foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
             assert_eq!(events[0].id(), IoId::new(id));
             assert!(events[0].is_readable());
             assert!(!events[0].is_writable());
@@ -1011,7 +1011,7 @@ mod tests {
             });
 
             let events = join_handle.join().unwrap();
-            assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 0);
+            assert_eq!(<kyron_foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 0);
         }
 
         // Re-register for readable events. This select should succeed.
@@ -1026,7 +1026,7 @@ mod tests {
             });
 
             let events = join_handle.join().unwrap();
-            assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
+            assert_eq!(<kyron_foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
             assert_eq!(events[0].id(), IoId::new(id));
             assert!(events[0].is_readable());
             assert!(!events[0].is_writable());
@@ -1051,7 +1051,7 @@ mod tests {
             });
 
             let events = join_handle.join().unwrap();
-            assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
+            assert_eq!(<kyron_foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
             assert_eq!(events[0].id(), IoId::new(id));
             assert!(events[0].is_writable());
             assert!(!events[0].is_readable());
@@ -1071,7 +1071,7 @@ mod tests {
             });
 
             let events = join_handle.join().unwrap();
-            assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 0);
+            assert_eq!(<kyron_foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 0);
         }
 
         // Re-register for writable events. This select should succeed.
@@ -1086,7 +1086,7 @@ mod tests {
             });
 
             let events = join_handle.join().unwrap();
-            assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
+            assert_eq!(<kyron_foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
             assert_eq!(events[0].id(), IoId::new(id));
             assert!(events[0].is_writable());
             assert!(!events[0].is_readable());
@@ -1107,7 +1107,7 @@ mod tests {
         });
 
         let events = join_handle.join().unwrap();
-        assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 0);
+        assert_eq!(<kyron_foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 0);
     }
 
     #[test]
@@ -1126,7 +1126,7 @@ mod tests {
         });
 
         let events = join_handle.join().unwrap();
-        assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 0);
+        assert_eq!(<kyron_foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 0);
     }
 
     #[test]
@@ -1151,7 +1151,7 @@ mod tests {
         waker.wake();
 
         let events = join_handle.join().unwrap();
-        assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
+        assert_eq!(<kyron_foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
         assert_eq!(events[0].id(), IoId::new(waker_id));
     }
 
@@ -1178,7 +1178,7 @@ mod tests {
         waker.wake();
 
         let events = join_handle.join().unwrap();
-        assert_eq!(<foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
+        assert_eq!(<kyron_foundation::containers::Vec<_> as IoSelectorEventContainer>::len(&events), 1);
         assert_eq!(events[0].id(), IoId::new(waker_id));
     }
 

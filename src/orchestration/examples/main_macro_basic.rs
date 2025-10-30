@@ -13,8 +13,8 @@
 
 use core::time::Duration;
 
-use foundation::prelude::{vector_extension::VectorExtension, *};
 use kyron::spawn;
+use kyron_foundation::prelude::{vector_extension::VectorExtension, *};
 use logging_tracing::TracingLibraryBuilder;
 use orchestration::{
     api::{design::Design, Orchestration},

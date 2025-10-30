@@ -17,8 +17,8 @@ use std::sync::{Arc, Mutex};
 
 use kyron::futures::reusable_box_future::*;
 
-use foundation::not_recoverable_error;
-use foundation::prelude::*;
+use kyron_foundation::not_recoverable_error;
+use kyron_foundation::prelude::*;
 
 use crate::api::design::Design;
 

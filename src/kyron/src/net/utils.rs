@@ -14,7 +14,7 @@
 use core::net::{AddrParseError, SocketAddr};
 use std::io::ErrorKind;
 
-use foundation::prelude::error;
+use kyron_foundation::prelude::error;
 
 use crate::net::NetResult;
 
