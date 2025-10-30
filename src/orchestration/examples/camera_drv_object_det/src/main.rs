@@ -135,7 +135,7 @@ fn main() {
 
     // Create runtime
     let (builder, _engine_id) =
-        runtime::AsyncRuntimeBuilder::new().with_engine(runtime::ExecutionEngineBuilder::new().task_queue_size(256).workers(3));
+        runtime::kyron::runtime::RuntimeBuilder::new().with_engine(runtime::ExecutionEngineBuilder::new().task_queue_size(256).workers(3));
     let mut runtime = builder.build().unwrap();
 
     // Build Orchestration

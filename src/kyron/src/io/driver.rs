@@ -223,7 +223,7 @@ impl<T: IoSelector> IoDriverHandle<T> {
 
 impl Default for IoDriver {
     fn default() -> Self {
-        // TODO: This shall be routed to AsyncRuntime builder, once we have configuration exposed there
+        // TODO: This shall be routed to kyron::Runtime builder, once we have configuration exposed there
         IoDriver::new(AsyncSelector::new(1024))
     }
 }

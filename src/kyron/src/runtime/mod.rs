@@ -11,9 +11,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-mod async_runtime;
+mod runtime_impl;
 
-pub use async_runtime::*;
+pub use runtime_impl::*;
 
 // Re-export scheduler component for runtime configuration purposes
 pub use crate::scheduler::execution_engine::*;

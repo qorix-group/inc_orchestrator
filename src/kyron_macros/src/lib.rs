@@ -414,7 +414,7 @@ pub fn main(attr: TokenStream, item: TokenStream) -> TokenStream {
 
         #fn_vis fn main() #return_clause{
             // Build runtime
-            let (builder, _engine_id) = AsyncRuntimeBuilder::new().with_engine(
+            let (builder, _engine_id) = RuntimeBuilder::new().with_engine(
                 ExecutionEngineBuilder::new()
                 .task_queue_size(#task_queue_size_ts)
                 .workers(#worker_threads_ts)

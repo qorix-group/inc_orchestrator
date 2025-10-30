@@ -58,7 +58,7 @@ async fn blocking_task(id: String, block_condition: Arc<(Condvar, Mutex<bool>)>,
 }
 
 /// Common run implementation.
-fn common_run(mut rt: AsyncRuntime, dedicated_workers: Vec<DedicatedWorkerConfig>, info_fn: fn(&str)) {
+fn common_run(mut rt: kyron::Runtime, dedicated_workers: Vec<DedicatedWorkerConfig>, info_fn: fn(&str)) {
     rt.block_on(async move {
         let mut joiner = RuntimeJoiner::new();
         let mid_barrier = MultiExecutionBarrier::new(dedicated_workers.len());

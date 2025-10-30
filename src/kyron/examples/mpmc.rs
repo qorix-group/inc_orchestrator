@@ -16,7 +16,7 @@ use kyron::{runtime::*, spawn};
 
 //
 // This is a test program and the following should happen:
-// * create an AsyncRuntime with 1 worker and a queue size of 8.
+// * create an kyron::Runtime with 1 worker and a queue size of 8.
 // * spawn a task on the runtime that spawns 14 tasks on the same worker again
 // * tasks 0 to 7 are added to the workers local queue
 // * when task 8 is added, there is no more room in the local queue, resulting in half of the queue
@@ -38,7 +38,7 @@ fn main() {
         .with_max_level(Level::DEBUG)
         .init();
 
-    let (builder, _engine_id) = AsyncRuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(8).workers(1));
+    let (builder, _engine_id) = kyron::runtime::RuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(8).workers(1));
     let mut runtime = builder.build().unwrap();
 
     runtime.block_on(async {
