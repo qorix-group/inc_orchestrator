@@ -4,8 +4,8 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-async_runtime.workspace = true
-async_runtime_macros.workspace = true
+kyron.workspace = true
+kyron_macros.workspace = true
 foundation.workspace = true
 
 iceoryx2.workspace = true
@@ -18,7 +18,7 @@ tracing-subscriber.workspace = true
 [dev-dependencies]
 testing.workspace = true
 testing_macros.workspace = true
-async_runtime = { workspace = true, features = ["runtime-api-mock"] }
+kyron = { workspace = true, features = ["runtime-api-mock"] }
 
 [target.'cfg(loom)'.dependencies]
 loom = { version = "0.7", features = ["checkpoint"] }
