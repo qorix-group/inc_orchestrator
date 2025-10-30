@@ -19,7 +19,7 @@ rust_library(
     edition = "2021",
     visibility = ["//visibility:public"],
     deps = [
-        "//src/foundation:libfoundation",
+        "//src/kyron_foundation:libkyron_foundation",
     ],
 )
 

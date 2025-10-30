@@ -14,9 +14,9 @@ load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 load("@score_orchestrator_crates//:defs.bzl", "all_crate_deps")
 
 rust_library(
-    name = "libfoundation",
+    name = "libkyron_foundation",
     srcs = glob(["src/**/*.rs"]),
-    crate_name = "foundation",
+    crate_name = "kyron_foundation",
     visibility = ["//visibility:public"],
     deps = all_crate_deps(
         normal = True,
@@ -25,5 +25,5 @@ rust_library(
 
 rust_test(
     name = "tests",
-    crate = ":libfoundation",
+    crate = ":libkyron_foundation",
 )

@@ -432,7 +432,7 @@ mod tests {
     use std::sync::Arc;
     use std::thread;
 
-    // used from async_runtime.rs unit test
+    // used from kyron.rs unit test
     impl ExecutionEngine {
         pub fn worker_count(&self) -> usize {
             self.async_workers.len()

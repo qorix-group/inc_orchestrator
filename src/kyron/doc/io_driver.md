@@ -1,6 +1,6 @@
 # Networking support
 
-**Async runtime** aims to provide easy way to use it applications that were previously using `OSS` crates for runtimes like `tokio` or `async_std` still targeting automotive software grade.
+**Kyron** aims to provide easy way to use it applications that were previously using `OSS` crates for runtimes like `tokio` or `async_std` still targeting automotive software grade.
 
 ## Layered view
 
