@@ -23,7 +23,7 @@
 
 use ::core::ops::{Deref, DerefMut};
 
-use foundation::{
+use kyron_foundation::{
     cell::{UnsafeCell, UnsafeCellExt},
     prelude::{CommonErrors, FoundationAtomicBool},
 };

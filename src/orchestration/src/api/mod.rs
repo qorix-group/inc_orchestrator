@@ -52,9 +52,9 @@ use crate::{
     program::Program,
 };
 use ::core::marker::PhantomData;
-use foundation::prelude::vector_extension::VectorExtension;
-use foundation::prelude::{Vec, Vector};
-use foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
+use kyron_foundation::prelude::vector_extension::VectorExtension;
+use kyron_foundation::prelude::{Vec, Vector};
+use kyron_foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
 use std::path::Path;
 use std::rc::Rc;
 

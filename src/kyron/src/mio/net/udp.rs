@@ -20,7 +20,7 @@ use std::{
     os::fd::AsRawFd,
 };
 
-use foundation::prelude::info;
+use kyron_foundation::prelude::info;
 
 use crate::{
     impl_io_source_proxy,

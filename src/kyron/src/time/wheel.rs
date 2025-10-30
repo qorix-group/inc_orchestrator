@@ -13,7 +13,7 @@
 
 use ::core::ptr::NonNull;
 use ::core::sync::atomic::Ordering;
-use foundation::prelude::*;
+use kyron_foundation::prelude::*;
 
 use ::core::task::Waker;
 

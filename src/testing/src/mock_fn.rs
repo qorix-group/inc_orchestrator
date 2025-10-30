@@ -11,7 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use foundation::containers::reusable_objects::ReusableObjectTrait;
+use kyron_foundation::containers::reusable_objects::ReusableObjectTrait;
 
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};

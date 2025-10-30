@@ -18,8 +18,8 @@ use crate::{
     scheduler::{context::ctx_get_worker_id, join_handle::JoinHandle},
 };
 use ::core::future::Future;
-use foundation::not_recoverable_error;
-use foundation::prelude::*;
+use kyron_foundation::not_recoverable_error;
+use kyron_foundation::prelude::*;
 
 pub type SafetyResult<T, E> = Result<T, E>;
 

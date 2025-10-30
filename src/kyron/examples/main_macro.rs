@@ -11,8 +11,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use foundation::prelude::{vector_extension::VectorExtension, *};
 use kyron::spawn;
+use kyron_foundation::prelude::{vector_extension::VectorExtension, *};
 
 // A simple example for main macro usage with all default engine parameters
 #[kyron::main]

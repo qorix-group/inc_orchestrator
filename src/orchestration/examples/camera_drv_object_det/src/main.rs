@@ -17,8 +17,8 @@ pub mod object_detection;
 use camera_driver::CameraDriver;
 use object_detection::ObjectDetection;
 
-use foundation::prelude::*;
 use kyron::{futures::sleep, *};
+use kyron_foundation::prelude::*;
 use logging_tracing::{TraceScope, TracingLibraryBuilder};
 use orchestration::{
     api::{design::Design, Orchestration},

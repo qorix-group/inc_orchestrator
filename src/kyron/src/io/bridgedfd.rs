@@ -12,7 +12,7 @@
 //
 use core::task::{ready, Context, Poll};
 
-use foundation::prelude::{error, CommonErrors};
+use kyron_foundation::prelude::{error, CommonErrors};
 
 use crate::{
     io::{

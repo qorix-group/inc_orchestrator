@@ -16,7 +16,7 @@
 use ::core::{future::Future, task::Waker, time::Duration};
 use std::sync::Arc;
 
-use foundation::prelude::FoundationAtomicU16;
+use kyron_foundation::prelude::FoundationAtomicU16;
 
 #[cfg(test)]
 use testing::prelude::{CallableTrait, MockFn};

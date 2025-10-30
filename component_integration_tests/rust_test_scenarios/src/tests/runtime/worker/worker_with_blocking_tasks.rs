@@ -2,8 +2,8 @@ use crate::internals::execution_barrier::{MultiExecutionBarrier, RuntimeJoiner};
 use crate::internals::runtime_helper::Runtime;
 use test_scenarios_rust::scenario::Scenario;
 
-use foundation::threading::thread_wait_barrier::ThreadReadyNotifier;
 use kyron::spawn;
+use kyron_foundation::threading::thread_wait_barrier::ThreadReadyNotifier;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

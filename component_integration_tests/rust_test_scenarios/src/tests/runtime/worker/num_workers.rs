@@ -1,7 +1,7 @@
 use crate::internals::execution_barrier::{MultiExecutionBarrier, RuntimeJoiner};
 use crate::internals::runtime_helper::Runtime;
-use foundation::threading::thread_wait_barrier::ThreadReadyNotifier;
 use kyron::spawn;
+use kyron_foundation::threading::thread_wait_barrier::ThreadReadyNotifier;
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 use test_scenarios_rust::scenario::Scenario;

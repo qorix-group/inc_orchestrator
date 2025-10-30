@@ -28,7 +28,7 @@ use std::sync::{LazyLock, Mutex};
 use std::thread;
 
 use crate::actions::action::{ActionExecError, ActionResult};
-use foundation::prelude::*;
+use kyron_foundation::prelude::*;
 
 static EVENT_OBJ: LazyLock<Mutex<Event>> = LazyLock::new(|| {
     let mut evts: HashMap<usize, (Listener<ipc_threadsafe::Service>, Option<Waker>, bool)> = HashMap::new();

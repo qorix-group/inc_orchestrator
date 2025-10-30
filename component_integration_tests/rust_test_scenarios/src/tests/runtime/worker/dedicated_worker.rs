@@ -1,9 +1,9 @@
 use crate::internals::execution_barrier::{MultiExecutionBarrier, RuntimeJoiner};
 use crate::internals::runtime_helper::{DedicatedWorkerConfig, Runtime};
 use crate::internals::thread_params::{current_thread_affinity, current_thread_priority_params, ThreadPriorityParams};
-use foundation::threading::thread_wait_barrier::ThreadReadyNotifier;
 use kyron::prelude::*;
 use kyron::{spawn, spawn_on_dedicated};
+use kyron_foundation::threading::thread_wait_barrier::ThreadReadyNotifier;
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;

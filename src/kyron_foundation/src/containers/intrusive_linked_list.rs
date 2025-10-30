@@ -75,7 +75,7 @@ pub unsafe trait Item {
     /// like this:
     ///
     /// ```
-    /// # use foundation::containers::intrusive_linked_list::{Item, Link};
+    /// # use kyron_foundation::containers::intrusive_linked_list::{Item, Link};
     /// # struct MyStruct { link: Link }
     /// unsafe impl Item for MyStruct {
     ///     fn link_field_offset() -> usize {

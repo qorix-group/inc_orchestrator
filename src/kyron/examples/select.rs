@@ -11,12 +11,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use foundation::prelude::*;
 use kyron::{
     prelude::*,
     safety::{ensure_safety_enabled, spawn, SafetyResult},
     select,
 };
+use kyron_foundation::prelude::*;
 
 fn main() {
     tracing_subscriber::fmt()

@@ -11,7 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use foundation::prelude::trace;
+use kyron_foundation::prelude::trace;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 /// IMPORTANT: This is temporary solution for iceoryx integration. This will be re-written later.

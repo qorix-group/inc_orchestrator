@@ -11,8 +11,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use foundation::prelude::*;
 use kyron::runtime::*;
+use kyron_foundation::prelude::*;
 use logging_tracing::TracingLibraryBuilder;
 use orchestration::{
     actions::{ifelse::IfElse, invoke::Invoke, sequence::SequenceBuilder, sync::SyncBuilder, trigger::TriggerBuilder},

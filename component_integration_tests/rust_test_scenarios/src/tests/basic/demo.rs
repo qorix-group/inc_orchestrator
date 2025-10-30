@@ -5,7 +5,7 @@ use serde_json::Value;
 use test_scenarios_rust::scenario::Scenario;
 
 use core::time::Duration;
-use foundation::prelude::*;
+use kyron_foundation::prelude::*;
 use orchestration::common::tag::Tag;
 
 use super::*;

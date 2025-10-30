@@ -16,8 +16,8 @@ use crate::io::driver::{IoDriver, IoDriverUnparker};
 use crate::scheduler::scheduler_mt::AsyncScheduler;
 use crate::scheduler::task::async_task::TaskRef;
 use ::core::ops::Deref;
-use foundation::containers::spmc_queue::*;
-use foundation::{not_recoverable_error, prelude::*};
+use kyron_foundation::containers::spmc_queue::*;
+use kyron_foundation::{not_recoverable_error, prelude::*};
 use std::sync::Arc;
 
 use ::core::sync::atomic::Ordering;

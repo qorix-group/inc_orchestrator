@@ -14,11 +14,11 @@
 use super::action::{ActionBaseMeta, ActionResult, ActionTrait, ReusableBoxFutureResult};
 use crate::common::tag::Tag;
 
-use foundation::{
+use kyron::futures::reusable_box_future::{ReusableBoxFuture, ReusableBoxFuturePool};
+use kyron_foundation::{
     containers::{growable_vec::GrowableVec, reusable_objects::ReusableObject, reusable_vec_pool::ReusableVecPool},
     prelude::{vector_extension::VectorExtension, *},
 };
-use kyron::futures::reusable_box_future::{ReusableBoxFuture, ReusableBoxFuturePool};
 
 const REUSABLE_FUTURE_POOL_SIZE: usize = 2;
 const REUSABLE_VEC_POOL_SIZE: usize = 2;

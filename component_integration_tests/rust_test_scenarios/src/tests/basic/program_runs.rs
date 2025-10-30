@@ -2,7 +2,7 @@ use crate::internals::runtime_helper::Runtime;
 use test_scenarios_rust::scenario::Scenario;
 
 use core::time::Duration;
-use foundation::prelude::*;
+use kyron_foundation::prelude::*;
 use orchestration::common::tag::Tag;
 use orchestration::core::metering::MeterTrait;
 

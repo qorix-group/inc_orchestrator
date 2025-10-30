@@ -18,8 +18,8 @@ use crate::{
 };
 use ::core::future::Future;
 
-use foundation::prelude::CommonErrors;
 use kyron::{core::types::UniqueWorkerId, futures::reusable_box_future::ReusableBoxFuture, futures::reusable_box_future::ReusableBoxFuturePool};
+use kyron_foundation::prelude::CommonErrors;
 use std::sync::{Arc, Mutex};
 
 #[cfg(not(any(test, feature = "runtime-api-mock")))]

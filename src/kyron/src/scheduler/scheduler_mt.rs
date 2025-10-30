@@ -18,9 +18,9 @@ use crate::ctx_get_handler;
 use crate::io::driver::IoDriverUnparker;
 use crate::{scheduler::context::ctx_get_worker_id, TaskRef};
 use ::core::ops::Deref;
-use foundation::containers::trigger_queue::TriggerQueue;
-use foundation::not_recoverable_error;
-use foundation::{
+use kyron_foundation::containers::trigger_queue::TriggerQueue;
+use kyron_foundation::not_recoverable_error;
+use kyron_foundation::{
     containers::{mpmc_queue::MpmcQueue, spmc_queue::BoundProducerConsumer, vector_extension::VectorExtension},
     prelude::*,
 };

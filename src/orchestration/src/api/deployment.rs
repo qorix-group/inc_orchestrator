@@ -21,8 +21,8 @@ use crate::{
     common::tag::Tag,
     program::ProgramBuilder,
 };
-use foundation::prelude::CommonErrors;
 use kyron::core::types::UniqueWorkerId;
+use kyron_foundation::prelude::CommonErrors;
 
 pub struct Deployment<'a> {
     api: &'a mut OrchestrationApi<_DesignTag>,
@@ -145,7 +145,7 @@ mod tests {
     use super::*;
     use crate::common::DesignConfig;
     use core::marker::PhantomData;
-    use foundation::containers::growable_vec::GrowableVec;
+    use kyron_foundation::containers::growable_vec::GrowableVec;
 
     fn setup_api_single_design() -> OrchestrationApi<crate::api::_DesignTag> {
         let design_tag = Tag::from_str_static("test_design");
@@ -155,7 +155,7 @@ mod tests {
         design.register_event("SomeUserEvent".into()).unwrap();
 
         let mut api = OrchestrationApi {
-            designs: foundation::containers::growable_vec::GrowableVec::default(),
+            designs: kyron_foundation::containers::growable_vec::GrowableVec::default(),
             events: crate::events::events_provider::EventsProvider::default(),
             shutdown_events: GrowableVec::default(),
             _p: PhantomData,
@@ -172,7 +172,7 @@ mod tests {
         design.register_event("SomeUserEvent".into()).unwrap();
 
         let mut api = OrchestrationApi {
-            designs: foundation::containers::growable_vec::GrowableVec::default(),
+            designs: kyron_foundation::containers::growable_vec::GrowableVec::default(),
             events: crate::events::events_provider::EventsProvider::default(),
             shutdown_events: GrowableVec::default(),
             _p: PhantomData,

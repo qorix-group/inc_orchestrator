@@ -23,7 +23,7 @@ use core::{
 };
 use std::sync::{Arc, Mutex};
 
-use foundation::{
+use kyron_foundation::{
     cell::UnsafeCell,
     containers::intrusive_linked_list,
     not_recoverable_error,

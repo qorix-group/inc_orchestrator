@@ -11,10 +11,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 use ::core::future::Future;
-use foundation::containers::Vec;
+use kyron_foundation::containers::Vec;
 
 use crate::scheduler::execution_engine::{ExecutionEngine, ExecutionEngineBuilder, JoinHandle};
-use foundation::containers::growable_vec::GrowableVec;
+use kyron_foundation::containers::growable_vec::GrowableVec;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum RuntimeErrors {
@@ -142,7 +142,7 @@ mod tests {
     use super::*;
     use core::sync::atomic::{AtomicUsize, Ordering};
     use core::time::Duration;
-    use foundation::threading::thread_wait_barrier::ThreadWaitBarrier;
+    use kyron_foundation::threading::thread_wait_barrier::ThreadWaitBarrier;
     use std::fs;
     use std::sync::Arc;
     use std::thread;

@@ -11,7 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 use ::core::sync::atomic::Ordering;
-use foundation::{
+use kyron_foundation::{
     containers::trigger_queue::TriggerQueueConsumer,
     prelude::{vector_extension::VectorExtension, FoundationAtomicBool},
     threading::thread_wait_barrier::ThreadReadyNotifier,
@@ -31,7 +31,7 @@ use crate::{
     },
     TaskRef,
 };
-use foundation::prelude::*;
+use kyron_foundation::prelude::*;
 
 use super::worker_types::WorkerId;
 

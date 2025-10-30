@@ -12,7 +12,7 @@
 //
 
 use ::core::{future::Future, marker::PhantomData, task::Waker};
-use foundation::{not_recoverable_error, prelude::*};
+use kyron_foundation::{not_recoverable_error, prelude::*};
 use std::sync::Arc;
 
 use crate::{

@@ -14,7 +14,7 @@
 use crate::actions::action::ActionResult;
 use crate::events::event_traits::{IpcProvider, ListenerTrait, NotifierTrait};
 use ::core::future::Future;
-use foundation::prelude::*;
+use kyron_foundation::prelude::*;
 
 /// StubGlobalEvents to enable compilation when iceoryx IPC is not enabled.
 pub struct StubGlobalEvents;

@@ -29,12 +29,12 @@ use crate::{
     },
     AsyncTask, Future,
 };
-use foundation::containers::growable_vec::GrowableVec;
-use foundation::containers::mpmc_queue::MpmcQueue;
-use foundation::containers::trigger_queue::{TriggerQueue, TriggerQueueConsumer};
-use foundation::prelude::vector_extension::VectorExtension;
-use foundation::prelude::*;
-use foundation::threading::thread_wait_barrier::ThreadWaitBarrier;
+use kyron_foundation::containers::growable_vec::GrowableVec;
+use kyron_foundation::containers::mpmc_queue::MpmcQueue;
+use kyron_foundation::containers::trigger_queue::{TriggerQueue, TriggerQueueConsumer};
+use kyron_foundation::prelude::vector_extension::VectorExtension;
+use kyron_foundation::prelude::*;
+use kyron_foundation::threading::thread_wait_barrier::ThreadWaitBarrier;
 
 pub struct JoinHandle<T> {
     recv: TriggerQueueConsumer<T>,
