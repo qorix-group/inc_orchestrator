@@ -19,8 +19,8 @@ use std::time::Instant;
 
 use crate::actions::action::{ActionResult, ActionTrait, ReusableBoxFutureResult};
 
-use async_runtime::futures::reusable_box_future::{ReusableBoxFuture, ReusableBoxFuturePool};
 use foundation::containers::{reusable_objects::ReusableObject, reusable_objects::ReusableObjects};
+use kyron::futures::reusable_box_future::{ReusableBoxFuture, ReusableBoxFuturePool};
 use std::sync::{Arc, Mutex};
 use testing::{
     mock_fn::{CallableTrait, MockFn, MockFnBuilder},
@@ -152,7 +152,7 @@ impl OrchTestingPoller {
     pub fn new(future: ReusableBoxFuture<ActionResult>) -> Self {
         Self {
             poller: TestingFuturePoller::new(future.into_pin()),
-            waker: async_runtime::testing::get_task_based_waker(),
+            waker: kyron::testing::get_task_based_waker(),
         }
     }
 
@@ -169,7 +169,7 @@ impl OrchTestingPoller {
     {
         let mut poll = TestingFuturePoller::new(f);
 
-        let waker = async_runtime::testing::get_task_based_waker();
+        let waker = kyron::testing::get_task_based_waker();
         let now = Instant::now();
 
         let mut result = None;

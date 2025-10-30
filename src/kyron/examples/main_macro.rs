@@ -11,11 +11,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use async_runtime::spawn;
 use foundation::prelude::{vector_extension::VectorExtension, *};
+use kyron::spawn;
 
 // A simple example for main macro usage with all default engine parameters
-#[async_runtime::main]
+#[kyron::main]
 async fn main() {
     tracing_subscriber::fmt().with_target(false).with_max_level(Level::INFO).init();
 

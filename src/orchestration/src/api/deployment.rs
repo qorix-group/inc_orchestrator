@@ -21,8 +21,8 @@ use crate::{
     common::tag::Tag,
     program::ProgramBuilder,
 };
-use async_runtime::core::types::UniqueWorkerId;
 use foundation::prelude::CommonErrors;
+use kyron::core::types::UniqueWorkerId;
 
 pub struct Deployment<'a> {
     api: &'a mut OrchestrationApi<_DesignTag>,

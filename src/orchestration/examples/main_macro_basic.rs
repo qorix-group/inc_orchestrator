@@ -13,8 +13,8 @@
 
 use core::time::Duration;
 
-use async_runtime::spawn;
 use foundation::prelude::{vector_extension::VectorExtension, *};
+use kyron::spawn;
 use logging_tracing::TracingLibraryBuilder;
 use orchestration::{
     api::{design::Design, Orchestration},
@@ -89,7 +89,7 @@ fn create_orch_programs() -> Vec<Program> {
     program_manager.get_programs()
 }
 
-#[async_runtime::main(
+#[kyron::main(
     task_queue_size = 64,
     worker_threads = 2,
     dedicated_workers = [

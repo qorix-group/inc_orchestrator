@@ -233,7 +233,7 @@ fn expr_to_usize(expr: &Expr) -> Result<usize> {
 ///
 /// # Usage
 ///```
-/// #[async_runtime::main(
+/// #[kyron::main(
 ///     task_queue_size = 128,                // Optional, must be power of two, default: 256
 ///     worker_threads = 4,                   // Optional, range: 1..=128, default: 2
 ///     worker_thread_parameters = {          // Optional, default: inherited from parent thread
@@ -409,7 +409,7 @@ pub fn main(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     // Now produce the expansion
     let expanded = quote! {
-        use async_runtime::prelude::*;
+        use kyron::prelude::*;
 
 
         #fn_vis fn main() #return_clause{
@@ -452,9 +452,9 @@ fn thread_parameters_to_tokens(tp: &ThreadParams, is_async_worker: bool) -> proc
 
     let scheduler_type_token = if let Some(scheduler_type) = &tp.scheduler_type {
         let st = match scheduler_type.value().as_str() {
-            "Fifo" => quote! { async_runtime::scheduler::SchedulerType::Fifo },
-            "RoundRobin" => quote! { async_runtime::scheduler::SchedulerType::RoundRobin },
-            "Other" => quote! { async_runtime::scheduler::SchedulerType::Other },
+            "Fifo" => quote! { kyron::scheduler::SchedulerType::Fifo },
+            "RoundRobin" => quote! { kyron::scheduler::SchedulerType::RoundRobin },
+            "Other" => quote! { kyron::scheduler::SchedulerType::Other },
             other => {
                 return syn::Error::new_spanned(scheduler_type, format!("Invalid scheduler_type: {}", other)).to_compile_error();
             }

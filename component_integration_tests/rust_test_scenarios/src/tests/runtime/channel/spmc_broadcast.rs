@@ -2,9 +2,9 @@ use crate::internals::execution_barrier::RuntimeJoiner;
 use crate::internals::runtime_helper::Runtime;
 use test_scenarios_rust::scenario::Scenario;
 
-use async_runtime::channels::spmc_broadcast;
-use async_runtime::spawn;
 use foundation::prelude::CommonErrors;
+use kyron::channels::spmc_broadcast;
+use kyron::spawn;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

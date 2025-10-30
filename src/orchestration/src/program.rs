@@ -31,14 +31,14 @@ use ::core::{
     task::{Context, Poll},
     time::Duration,
 };
-use async_runtime::{time::clock::Clock, JoinHandle};
 use foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
+use kyron::{time::clock::Clock, JoinHandle};
 use tracing::trace;
 
 #[cfg(not(any(test, feature = "runtime-api-mock")))]
-use async_runtime::safety::spawn_from_reusable;
+use kyron::safety::spawn_from_reusable;
 #[cfg(any(test, feature = "runtime-api-mock"))]
-use async_runtime::testing::mock::safety::spawn_from_reusable;
+use kyron::testing::mock::safety::spawn_from_reusable;
 
 ///
 /// Whole description to Task Chain is delivered via this instance. It shall hold all actions that build as Task Chain
@@ -323,8 +323,8 @@ mod tests {
         common::DesignConfig,
         prelude::{Invoke, InvokeResult},
     };
-    use async_runtime::testing;
     use core::time::Duration;
+    use kyron::testing;
     use std::sync::{Arc, Mutex};
     use testing_macros::ensure_clear_mock_runtime;
 

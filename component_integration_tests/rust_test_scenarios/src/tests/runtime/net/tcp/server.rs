@@ -1,11 +1,11 @@
 use crate::internals::net_helper::{create_tcp_listener, ConnectionParameters};
 use crate::internals::runtime_helper::Runtime;
 use crate::tests::runtime::net::tcp::handle_connection_with_echo_response;
-use async_runtime::io::{AsyncRead, AsyncReadExt, AsyncWrite, ReadBuf};
-use async_runtime::net::TcpStream;
-use async_runtime::spawn;
 use core::task::Poll;
 use futures::future::poll_fn;
+use kyron::io::{AsyncRead, AsyncReadExt, AsyncWrite, ReadBuf};
+use kyron::net::TcpStream;
+use kyron::spawn;
 use std::io::Error;
 use std::pin::Pin;
 use test_scenarios_rust::scenario::{Scenario, ScenarioGroup, ScenarioGroupImpl};

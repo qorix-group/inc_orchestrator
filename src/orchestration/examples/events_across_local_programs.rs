@@ -11,8 +11,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use async_runtime::runtime::*;
 use foundation::prelude::*;
+use kyron::runtime::*;
 use logging_tracing::TracingLibraryBuilder;
 use orchestration::{
     actions::{invoke::Invoke, sequence::SequenceBuilder, sync::SyncBuilder, trigger::TriggerBuilder},
@@ -96,11 +96,11 @@ fn main() {
         let mut program1 = programs.pop().unwrap();
         let mut program2 = programs.pop().unwrap();
 
-        let h1 = async_runtime::spawn(async move {
+        let h1 = kyron::spawn(async move {
             let _ = program1.run_n(3).await;
         });
 
-        let h2 = async_runtime::spawn(async move {
+        let h2 = kyron::spawn(async move {
             let _ = program2.run_n(3).await;
         });
 

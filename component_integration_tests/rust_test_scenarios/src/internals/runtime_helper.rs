@@ -1,7 +1,7 @@
-use async_runtime::core::types::UniqueWorkerId;
-use async_runtime::prelude::ThreadParameters as AsyncRtThreadParameters;
-use async_runtime::runtime::*;
-use async_runtime::scheduler::SchedulerType;
+use kyron::core::types::UniqueWorkerId;
+use kyron::prelude::ThreadParameters as AsyncRtThreadParameters;
+use kyron::runtime::*;
+use kyron::scheduler::SchedulerType;
 use serde::{de, Deserialize, Deserializer};
 use serde_json::Value;
 use tracing::debug;

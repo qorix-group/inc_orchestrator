@@ -16,8 +16,8 @@ use crate::{
     common::{orch_tag::OrchestrationTag, DesignConfig},
     prelude::{ActionBaseMeta, ActionResult, ActionTrait, ReusableBoxFutureResult},
 };
-use async_runtime::futures::reusable_box_future::{ReusableBoxFuture, ReusableBoxFuturePool};
 use core::future::Future;
+use kyron::futures::reusable_box_future::{ReusableBoxFuture, ReusableBoxFuturePool};
 use std::sync::{Arc, Mutex};
 
 /// The trait that needs to be implemented by the IfElse condition object provided by the user.

@@ -1,6 +1,6 @@
 use crate::internals::net_helper::{create_udp_listener, ConnectionParameters};
 use crate::internals::runtime_helper::Runtime;
-use async_runtime::{net::UdpSocket, spawn};
+use kyron::{net::UdpSocket, spawn};
 use std::sync::Arc;
 use test_scenarios_rust::scenario::{Scenario, ScenarioGroup, ScenarioGroupImpl};
 use tracing::{debug, info};

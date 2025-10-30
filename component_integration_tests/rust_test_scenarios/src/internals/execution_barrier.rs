@@ -1,5 +1,5 @@
-use async_runtime::JoinHandle;
 use foundation::threading::thread_wait_barrier::{ThreadReadyNotifier, ThreadWaitBarrier};
+use kyron::JoinHandle;
 
 use futures::future;
 use std::sync::Arc;

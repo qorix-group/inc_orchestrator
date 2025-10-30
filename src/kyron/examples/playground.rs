@@ -11,10 +11,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #![allow(dead_code, unused_imports, unused_variables)]
-use async_runtime::futures::sleep;
-use async_runtime::ipc::iceoryx2::EventBuilderAsyncExt;
-use async_runtime::prelude::*;
-use async_runtime::{
+use kyron::futures::sleep;
+use kyron::ipc::iceoryx2::EventBuilderAsyncExt;
+use kyron::prelude::*;
+use kyron::{
     runtime::*,
     safety::{self, ensure_safety_enabled},
     spawn,
