@@ -11,9 +11,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-//! # Async Runtime Crate
+//! # Kyron Crate
 //!
-//! `async_runtime` is a library that provides a customizable `async/await` runtime for concurrent programming.
+//! `kyron` is a library that provides a customizable `async/await` runtime for concurrent programming.
 //!
 //! # Details
 //!
@@ -69,7 +69,7 @@ pub mod time;
 #[cfg(any(test, feature = "runtime-api-mock"))]
 pub mod testing;
 
-// Re-export from `async_runtime_macros` crate
+// Re-export from `kyron_macros` crate
 pub use kyron_macros::main;
 
 // Re-export scheduler components for runtime API

@@ -89,7 +89,7 @@ impl Runtime {
         &self.exec_engines
     }
 
-    pub fn build(&self) -> kyron::Runtime {
+    pub fn build(&self) -> kyron::runtime::Runtime {
         debug!("Creating kyron::Runtime with {} execution engines", self.exec_engines.len());
 
         let mut async_rt_builder = kyron::runtime::RuntimeBuilder::new();

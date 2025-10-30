@@ -14,34 +14,34 @@ load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 load("@score_orchestrator_crates//:defs.bzl", "all_crate_deps")
 
 _COMMON_DEPS = [
-    "//src/foundation:libfoundation",
+    "//src/kyron_foundation:libkyron_foundation",
 ] + all_crate_deps(
     normal = True,
 )
 
 rust_library(
-    name = "libasync_runtime",
+    name = "libkyron",
     srcs = glob(["src/**/*.rs"]),
     crate_features = select({
         "//conditions:default": [],
         "//src/flags:runtime_disable_time_correction": ["disable_vm_correction"],
     }),
-    crate_name = "async_runtime",
+    crate_name = "kyron",
     proc_macro_deps = [
-        "//src/async_runtime_macros:runtime_macros",
+        "//src/kyron_macros:runtime_macros",
     ],
     visibility = ["//visibility:public"],
     deps = _COMMON_DEPS,
 )
 
 rust_library(
-    name = "libasync_runtime_mocked",
+    name = "libkyron_mocked",
     testonly = True,
     srcs = glob(["src/**/*.rs"]),
     crate_features = ["runtime-api-mock"],
-    crate_name = "async_runtime",
+    crate_name = "kyron",
     proc_macro_deps = [
-        "//src/async_runtime_macros:runtime_macros",
+        "//src/kyron_macros:runtime_macros",
     ],
     visibility = ["//visibility:public"],
     deps = _COMMON_DEPS,
@@ -49,11 +49,11 @@ rust_library(
 
 rust_test(
     name = "tests",
-    crate = ":libasync_runtime",
+    crate = ":libkyron",
     deps = all_crate_deps(
         normal = True,
     ) + [
-        "//src/async_runtime:libasync_runtime",
+        "//src/kyron:libkyron",
         "//src/testing:test_utils",
     ],
 )

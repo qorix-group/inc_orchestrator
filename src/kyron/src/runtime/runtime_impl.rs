@@ -160,7 +160,7 @@ mod tests {
     /// ```
     #[test]
     #[ignore]
-    fn test_async_runtime_drop_cleanup() {
+    fn test_kyron_drop_cleanup() {
         let before = count_threads();
 
         let drop_counter1 = Arc::new(AtomicUsize::new(0));
@@ -195,7 +195,7 @@ mod tests {
     // See https://github.com/qorix-group/inc_orchestrator_internal/actions/runs/15675294733/job/44154074863?pr=47
     // for an example CI run.
     #[cfg(not(miri))]
-    fn test_async_runtime_return_value() {
+    fn test_kyron_return_value() {
         let (builder, engine_id) = RuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(8).workers(3));
         let mut runtime = builder.build().unwrap();
         let ret: Result<i32, ()> = runtime.block_on_engine(engine_id, async move { Ok(23) }).unwrap();
@@ -217,7 +217,7 @@ mod tests {
     // See https://github.com/qorix-group/inc_orchestrator_internal/actions/runs/15675294733/job/44154074863?pr=47
     // for an example CI run.
     #[cfg(not(miri))]
-    fn test_async_runtime_async_run_and_late_wait() {
+    fn test_kyron_async_run_and_late_wait() {
         let (builder, engine_id) = RuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(8).workers(2));
         let mut runtime = builder.build().unwrap();
 
@@ -246,7 +246,7 @@ mod tests {
     // See https://github.com/qorix-group/inc_orchestrator_internal/actions/runs/15675294733/job/44154074863?pr=47
     // for an example CI run.
     #[cfg(not(miri))]
-    fn test_async_runtime_wait_for_all_engines() {
+    fn test_kyron_wait_for_all_engines() {
         let (builder, engine_id1) = RuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(8).workers(2));
         let (builder, engine_id2) = builder.with_engine(ExecutionEngineBuilder::new().task_queue_size(8).workers(2));
         let mut runtime = builder.build().unwrap();
@@ -277,7 +277,7 @@ mod tests {
 
     #[test]
     #[cfg(not(miri))] // Provenance issues
-    fn test_async_runtime_builder_build_preserves_order() {
+    fn test_kyron_builder_build_preserves_order() {
         // three builders with worker_count as a distinguishable property
         let builder1 = ExecutionEngineBuilder::new().workers(1);
         let builder2 = ExecutionEngineBuilder::new().workers(2);

@@ -7,7 +7,7 @@ Incubation repo for orchestration
 
 ## Feature status and roadmap
 
-* [Async Runtime](src/async_runtime/doc/features.md)
+* [Async Runtime](src/kyron/doc/features.md)
 * [Orchestration](src/orchestration/doc/features.md)
 
 ## Continuous Integration Nightly Tests

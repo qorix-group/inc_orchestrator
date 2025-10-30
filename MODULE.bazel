@@ -132,8 +132,8 @@ crate.from_cargo(
     cargo_lockfile = "//:Cargo.lock",
     manifests = [
         "//:Cargo.toml",
-        "//:src/foundation/Cargo.toml",
-        "//:src/async_runtime/Cargo.toml",
+        "//:src/kyron_foundation/Cargo.toml",
+        "//:src/kyron/Cargo.toml",
         "//:src/logging_tracing/Cargo.toml",
         "//:src/orchestration/Cargo.toml",
         "//:src/testing/Cargo.toml",
@@ -142,7 +142,7 @@ crate.from_cargo(
         "//component_integration_tests/rust_test_scenarios:Cargo.toml",
         "//src/orchestration/examples/camera_drv_object_det:Cargo.toml",
         "//src/orchestration_macros:Cargo.toml",
-        "//src/async_runtime_macros:Cargo.toml",
+        "//src/kyron_macros:Cargo.toml",
     ],
 
     # This shall not be here but rules_rust 0.61.0 or even 0.67.0 does not correct finds out that when we use out platform it shall append

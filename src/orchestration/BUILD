@@ -14,14 +14,14 @@ load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
 load("@score_orchestrator_crates//:defs.bzl", "all_crate_deps")
 
 _BASE_DEPS = [
-    "//src/foundation:libfoundation",
+    "//src/kyron_foundation:libkyron_foundation",
     "//src/logging_tracing:liblogging_tracing",
 ] + all_crate_deps(
     normal = True,
 )
 
 _COMMON_DEPS = _BASE_DEPS + [
-    "//src/async_runtime:libasync_runtime",
+    "//src/kyron:libkyron",
 ]
 
 _EXAMPLE_DEPS = _COMMON_DEPS + [
@@ -52,7 +52,7 @@ rust_test(
         "//src/testing_macros:test_macro_utils",
     ],
     deps = _BASE_DEPS + [
-        "//src/async_runtime:libasync_runtime_mocked",
+        "//src/kyron:libkyron_mocked",
         "//src/testing:test_utils",
     ],
 )
@@ -72,7 +72,7 @@ rust_binary(
         "examples/main_macro_basic.rs",
     ] + glob(["examples/common/**/*.rs"]),
     proc_macro_deps = [
-        "//src/async_runtime_macros:runtime_macros",
+        "//src/kyron_macros:runtime_macros",
     ],
     visibility = ["//visibility:public"],
     deps = _EXAMPLE_DEPS,
