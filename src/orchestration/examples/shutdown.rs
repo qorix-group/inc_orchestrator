@@ -11,9 +11,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use async_runtime::runtime::*;
 use core::time::Duration;
 use foundation::prelude::*;
+use kyron::runtime::*;
 use logging_tracing::{TraceScope, TracingLibraryBuilder};
 use orchestration::{
     api::{design::Design, Orchestration},

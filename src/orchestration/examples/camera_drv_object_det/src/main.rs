@@ -17,8 +17,8 @@ pub mod object_detection;
 use camera_driver::CameraDriver;
 use object_detection::ObjectDetection;
 
-use async_runtime::{futures::sleep, *};
 use foundation::prelude::*;
+use kyron::{futures::sleep, *};
 use logging_tracing::{TraceScope, TracingLibraryBuilder};
 use orchestration::{
     api::{design::Design, Orchestration},
@@ -166,15 +166,15 @@ fn main() {
         let mut program2 = programs.pop().unwrap();
         let mut program3 = programs.pop().unwrap();
 
-        let h1 = async_runtime::spawn(async move {
+        let h1 = kyron::spawn(async move {
             let _ = program1.run_n(3).await;
         });
 
-        let h2 = async_runtime::spawn(async move {
+        let h2 = kyron::spawn(async move {
             let _ = program2.run_n(3).await;
         });
 
-        let h3 = async_runtime::spawn(async move {
+        let h3 = kyron::spawn(async move {
             let _ = program3.run_n(3).await;
         });
 

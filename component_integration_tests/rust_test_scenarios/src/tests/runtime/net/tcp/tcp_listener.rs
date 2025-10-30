@@ -1,8 +1,8 @@
 use crate::internals::net_helper::{create_tcp_listener, ConnectionParameters};
 use crate::internals::runtime_helper::Runtime;
 use crate::tests::runtime::net::tcp::handle_connection_with_echo_response;
-use async_runtime::net::TcpListener;
-use async_runtime::spawn;
+use kyron::net::TcpListener;
+use kyron::spawn;
 use test_scenarios_rust::scenario::{Scenario, ScenarioGroup, ScenarioGroupImpl};
 use tracing::info;
 

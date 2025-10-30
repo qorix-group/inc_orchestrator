@@ -1,8 +1,8 @@
 use crate::internals::net_helper::{create_tcp_stream, ConnectionParameters};
 use crate::internals::runtime_helper::Runtime;
-use async_runtime::io::{AsyncReadExt, AsyncWriteExt};
-use async_runtime::net::TcpStream;
-use async_runtime::spawn;
+use kyron::io::{AsyncReadExt, AsyncWriteExt};
+use kyron::net::TcpStream;
+use kyron::spawn;
 use serde_json::Value;
 use test_scenarios_rust::scenario::{Scenario, ScenarioGroup, ScenarioGroupImpl};
 use tracing::info;

@@ -18,16 +18,14 @@ use crate::{
 };
 use ::core::future::Future;
 
-use async_runtime::{
-    core::types::UniqueWorkerId, futures::reusable_box_future::ReusableBoxFuture, futures::reusable_box_future::ReusableBoxFuturePool,
-};
 use foundation::prelude::CommonErrors;
+use kyron::{core::types::UniqueWorkerId, futures::reusable_box_future::ReusableBoxFuture, futures::reusable_box_future::ReusableBoxFuturePool};
 use std::sync::{Arc, Mutex};
 
 #[cfg(not(any(test, feature = "runtime-api-mock")))]
-use async_runtime::safety::spawn_from_reusable_on_dedicated;
+use kyron::safety::spawn_from_reusable_on_dedicated;
 #[cfg(any(test, feature = "runtime-api-mock"))]
-use async_runtime::testing::mock::spawn_from_reusable_on_dedicated;
+use kyron::testing::mock::spawn_from_reusable_on_dedicated;
 
 /// A result of an invoke action.
 pub type InvokeResult = Result<(), UserErrValue>;

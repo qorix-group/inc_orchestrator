@@ -15,7 +15,7 @@
 use ::core::future::Future;
 use std::sync::Arc;
 
-use async_runtime::channels::spmc_broadcast::*;
+use kyron::channels::spmc_broadcast::*;
 
 use crate::common::tag::Tag;
 use crate::events::event_traits::{ListenerTrait, NotifierTrait};

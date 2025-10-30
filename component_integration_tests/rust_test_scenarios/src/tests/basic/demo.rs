@@ -1,5 +1,5 @@
 use crate::internals::runtime_helper::Runtime;
-use async_runtime::futures::reusable_box_future::ReusableBoxFuturePool;
+use kyron::futures::reusable_box_future::ReusableBoxFuturePool;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use test_scenarios_rust::scenario::Scenario;
@@ -175,15 +175,15 @@ impl Scenario for ProgramDemo {
 
         // Put programs into runtime and run them
         runtime.block_on(async move {
-            let h1 = async_runtime::spawn(async move {
+            let h1 = kyron::spawn(async move {
                 let _ = program_acc.run().await;
             });
 
-            let h2 = async_runtime::spawn(async move {
+            let h2 = kyron::spawn(async move {
                 let _ = program_s2m.run().await;
             });
 
-            let h3 = async_runtime::spawn(async move {
+            let h3 = kyron::spawn(async move {
                 let _ = program_m2s.run().await;
             });
 

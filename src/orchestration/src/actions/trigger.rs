@@ -21,7 +21,7 @@ use crate::{
 use super::action::{ActionBaseMeta, ReusableBoxFutureResult};
 use crate::common::tag::Tag;
 
-use async_runtime::futures::reusable_box_future::*;
+use kyron::futures::reusable_box_future::*;
 
 pub struct TriggerBuilder;
 

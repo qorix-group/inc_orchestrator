@@ -2,7 +2,7 @@ use crate::internals::execution_barrier::RuntimeJoiner;
 use crate::internals::runtime_helper::Runtime;
 use test_scenarios_rust::scenario::Scenario;
 
-use async_runtime::spawn;
+use kyron::spawn;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

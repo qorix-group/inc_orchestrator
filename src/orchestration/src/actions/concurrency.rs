@@ -18,18 +18,18 @@ use crate::common::tag::Tag;
 use ::core::future::Future;
 use ::core::pin::Pin;
 use ::core::task::{Context, Poll};
-use async_runtime::futures::reusable_box_future::ReusableBoxFuturePool;
-use async_runtime::futures::{FutureInternalReturn, FutureState};
-#[cfg(any(test, feature = "runtime-api-mock"))]
-use async_runtime::testing::mock::*;
-#[cfg(not(any(test, feature = "runtime-api-mock")))]
-use async_runtime::*;
 use foundation::containers::growable_vec::GrowableVec;
 use foundation::containers::reusable_objects::ReusableObject;
 use foundation::containers::reusable_vec_pool::ReusableVecPool;
 use foundation::not_recoverable_error;
 use foundation::prelude::vector_extension::VectorExtension;
 use foundation::prelude::*;
+use kyron::futures::reusable_box_future::ReusableBoxFuturePool;
+use kyron::futures::{FutureInternalReturn, FutureState};
+#[cfg(any(test, feature = "runtime-api-mock"))]
+use kyron::testing::mock::*;
+#[cfg(not(any(test, feature = "runtime-api-mock")))]
+use kyron::*;
 
 /// Builder for constructing a concurrency group of actions to be executed concurrently.
 /// Allows adding multiple branches (actions) and finalizing into a [`Concurrency`] object.
@@ -245,7 +245,7 @@ mod tests {
     use crate::testing::MockActionBuilder;
     use crate::testing::OrchTestingPoller;
     use ::core::task::Poll;
-    use async_runtime::testing::mock;
+    use kyron::testing::mock;
     use testing_macros::ensure_clear_mock_runtime;
 
     #[test]

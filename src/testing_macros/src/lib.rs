@@ -27,7 +27,7 @@ pub fn ensure_clear_mock_runtime(_attr: TokenStream, item: TokenStream) -> Token
     let output = quote! {
         #(#attrs)*
         #vis #sig {
-            async_runtime::testing::mock::runtime::init();
+            kyron::testing::mock::runtime::init();
             let __result = (|| #block)();
             __result
         }

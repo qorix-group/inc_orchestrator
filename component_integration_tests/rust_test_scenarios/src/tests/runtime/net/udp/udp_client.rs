@@ -1,6 +1,6 @@
 use crate::internals::net_helper::{create_default_udp_client, ConnectionParameters};
 use crate::internals::runtime_helper::Runtime;
-use async_runtime::{net::UdpSocket, spawn};
+use kyron::{net::UdpSocket, spawn};
 use serde_json::Value;
 use std::net::SocketAddr;
 use std::sync::Arc;

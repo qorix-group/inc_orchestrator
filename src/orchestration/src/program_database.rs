@@ -23,9 +23,9 @@ use crate::{
     },
     events::events_provider::EventCreator,
 };
-use async_runtime::core::types::UniqueWorkerId;
 use foundation::prelude::*;
 use iceoryx2_bb_container::flatmap::{FlatMap, FlatMapError};
+use kyron::core::types::UniqueWorkerId;
 use std::{
     boxed::Box,
     rc::Rc,
@@ -357,7 +357,7 @@ mod tests {
         testing::OrchTestingPoller,
     };
     use ::core::task::Poll;
-    use async_runtime::testing;
+    use kyron::testing;
     use testing_macros::ensure_clear_mock_runtime;
 
     #[test]

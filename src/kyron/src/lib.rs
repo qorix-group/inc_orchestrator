@@ -18,7 +18,7 @@
 //! # Details
 //!
 //! ## Engines
-//! The runtime can consist of multiple execution engines. Each engine can be added using [`crate::runtime::async_runtime::AsyncRuntimeBuilder::with_engine`] and configured through the [`crate::scheduler::execution_engine::ExecutionEngineBuilder`] interface.
+//! The runtime can consist of multiple execution engines. Each engine can be added using [`crate::runtime::kyron::AsyncRuntimeBuilder::with_engine`] and configured through the [`crate::scheduler::execution_engine::ExecutionEngineBuilder`] interface.
 //!
 //! Engines allow you to separate different aspects of your application, such as running different components with different priorities.
 //!
@@ -70,7 +70,7 @@ pub mod time;
 pub mod testing;
 
 // Re-export from `async_runtime_macros` crate
-pub use async_runtime_macros::main;
+pub use kyron_macros::main;
 
 // Re-export scheduler components for runtime API
 pub use crate::scheduler::join_handle::JoinHandle;

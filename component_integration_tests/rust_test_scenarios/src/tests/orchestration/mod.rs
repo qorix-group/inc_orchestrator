@@ -18,8 +18,8 @@ use test_scenarios_rust::scenario::{ScenarioGroup, ScenarioGroupImpl};
 
 use orchestration_double_handler_catch::{CatchDoubleDiffHandlerError, CatchDoubleSameHandlerError};
 
-use async_runtime::futures::reusable_box_future::ReusableBoxFuturePool;
-use async_runtime::futures::{sleep, yield_now};
+use kyron::futures::reusable_box_future::ReusableBoxFuturePool;
+use kyron::futures::{sleep, yield_now};
 
 use orchestration::{common::tag::Tag, prelude::*};
 
