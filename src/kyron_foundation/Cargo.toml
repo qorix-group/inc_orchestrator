@@ -1,5 +1,5 @@
 [package]
-name = "foundation"
+name = "kyron_foundation"
 version.workspace = true
 edition.workspace = true
 

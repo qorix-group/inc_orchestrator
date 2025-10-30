@@ -3,7 +3,7 @@ resolver = "2"
 # Split to default members without component integration tests.
 # Used when executing cargo from project root.
 default-members = [
-    "src/foundation",
+    "src/kyron_foundation",
     "src/kyron",
     "src/orchestration",
     "src/logging_tracing",
@@ -13,7 +13,7 @@ default-members = [
 ]
 # Include component integration tests as a member for IDE support and Bazel builds.
 members = [
-    "src/foundation",
+    "src/kyron_foundation",
     "src/kyron",
     "src/orchestration",
     "src/logging_tracing",
@@ -33,7 +33,7 @@ edition = "2021"
 
 [workspace.dependencies]
 kyron = { path = "src/kyron" }
-foundation = { path = "src/foundation" }
+kyron_foundation = { path = "src/kyron_foundation" }
 logging_tracing = { path = "src/logging_tracing" }
 orchestration = { path = "src/orchestration" }
 testing = { path = "src/testing" }

@@ -4,4 +4,4 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-foundation.workspace = true
+kyron_foundation.workspace = true
