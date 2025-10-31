@@ -325,8 +325,8 @@ mod tests {
     };
     use core::time::Duration;
     use kyron::testing;
+    use kyron_testing_macros::ensure_clear_mock_runtime;
     use std::sync::{Arc, Mutex};
-    use testing_macros::ensure_clear_mock_runtime;
 
     #[test]
     #[ensure_clear_mock_runtime]

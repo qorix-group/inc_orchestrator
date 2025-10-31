@@ -291,7 +291,7 @@ impl ActionTrait for Catch {
 #[cfg(not(loom))]
 mod tests {
 
-    use testing::prelude::CallableTrait;
+    use kyron_testing::prelude::CallableTrait;
 
     use super::*;
     use core::{
@@ -365,7 +365,7 @@ mod tests {
         let action = Box::new(MockAction::default());
         let builder = CatchBuilder::new(ErrorFilter::UserErrors.into(), action);
 
-        let mut handler_mock = testing::mock_fn::MockFnBuilder::<bool>::new().times(0).build();
+        let mut handler_mock = kyron_testing::mock_fn::MockFnBuilder::<bool>::new().times(0).build();
 
         let mut catch = builder
             .catch(move |_err| {
@@ -386,7 +386,7 @@ mod tests {
         let action = Box::new(MockActionBuilder::new().will_once(Err(UserErrValue::from(64).into())).build());
         let builder = CatchBuilder::new(ErrorFilter::UserErrors.into(), action);
 
-        let mut handler_mock = testing::mock_fn::MockFnBuilder::<bool>::new().times(1).build();
+        let mut handler_mock = kyron_testing::mock_fn::MockFnBuilder::<bool>::new().times(1).build();
 
         let mut catch = builder
             .catch(move |_err| {
@@ -408,7 +408,7 @@ mod tests {
             let action = Box::new(MockActionBuilder::new().will_once(Err(ActionExecError::Timeout)).build());
             let builder = CatchBuilder::new(ErrorFilter::UserErrors.into(), action);
 
-            let mut handler_mock = testing::mock_fn::MockFnBuilder::<bool>::new().times(0).build();
+            let mut handler_mock = kyron_testing::mock_fn::MockFnBuilder::<bool>::new().times(0).build();
 
             let mut catch = builder
                 .catch(move |_err| {
@@ -428,7 +428,7 @@ mod tests {
             let action = Box::new(MockActionBuilder::new().will_once(Err(UserErrValue::from(64).into())).build());
             let builder = CatchBuilder::new(ErrorFilter::Timeouts.into(), action);
 
-            let mut handler_mock = testing::mock_fn::MockFnBuilder::<bool>::new().times(0).build();
+            let mut handler_mock = kyron_testing::mock_fn::MockFnBuilder::<bool>::new().times(0).build();
 
             let mut catch = builder
                 .catch(move |_err| {
@@ -450,7 +450,7 @@ mod tests {
         let action = Box::new(MockActionBuilder::new().will_once(Err(ActionExecError::Internal)).build());
         let builder = CatchBuilder::new(ErrorFilter::UserErrors.into(), action);
 
-        let mut handler_mock = testing::mock_fn::MockFnBuilder::<bool>::new().times(0).build();
+        let mut handler_mock = kyron_testing::mock_fn::MockFnBuilder::<bool>::new().times(0).build();
 
         let mut catch = builder
             .catch(move |_err| {
@@ -471,7 +471,7 @@ mod tests {
         let action = Box::new(MockActionBuilder::new().will_once(Err(UserErrValue::from(64).into())).build());
         let builder = CatchBuilder::new(ErrorFilter::UserErrors.into(), action);
 
-        let mut handler_mock = testing::mock_fn::MockFnBuilder::<bool>::new().times(1).build();
+        let mut handler_mock = kyron_testing::mock_fn::MockFnBuilder::<bool>::new().times(1).build();
 
         let mut catch = builder
             .catch_recoverable(move |_err| {
@@ -493,7 +493,7 @@ mod tests {
         let action = Box::new(MockActionBuilder::new().will_once(Err(UserErrValue::from(64).into())).build());
         let builder = CatchBuilder::new(ErrorFilter::UserErrors.into(), action);
 
-        let mut handler_mock = testing::mock_fn::MockFnBuilder::<bool>::new().times(1).build();
+        let mut handler_mock = kyron_testing::mock_fn::MockFnBuilder::<bool>::new().times(1).build();
 
         let mut catch = builder
             .catch_recoverable(move |_err| {

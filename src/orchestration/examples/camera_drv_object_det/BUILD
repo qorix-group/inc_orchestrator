@@ -15,7 +15,7 @@ load("@rules_rust//rust:defs.bzl", "rust_binary")
 load("@score_orchestrator_crates//:defs.bzl", "all_crate_deps")
 
 _BASE_DEPS = [
-    "//src/kyron_foundation:libkyron_foundation",
+    "//src/kyron-foundation:libkyron_foundation",
     "//src/logging_tracing:liblogging_tracing",
 ] + all_crate_deps(
     normal = True,
