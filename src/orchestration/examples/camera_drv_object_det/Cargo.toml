@@ -6,7 +6,7 @@ edition.workspace = true
 [dependencies]
 orchestration.workspace = true
 kyron.workspace = true
-kyron_foundation.workspace = true
+kyron-foundation.workspace = true
 logging_tracing.workspace = true
 orchestration_macros = { workspace = true }
 

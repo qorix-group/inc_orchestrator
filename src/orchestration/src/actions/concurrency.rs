@@ -246,7 +246,7 @@ mod tests {
     use crate::testing::OrchTestingPoller;
     use ::core::task::Poll;
     use kyron::testing::mock;
-    use testing_macros::ensure_clear_mock_runtime;
+    use kyron_testing_macros::ensure_clear_mock_runtime;
 
     #[test]
     fn concurrency_builder_using_new() {

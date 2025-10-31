@@ -563,7 +563,7 @@ mod tests {
 
     #[test]
     #[cfg(not(miri))]
-    #[testing_macros::ensure_clear_mock_runtime]
+    #[kyron_testing_macros::ensure_clear_mock_runtime]
     fn graph_action_execute_ok_actions() {
         use crate::testing::OrchTestingPoller;
         use ::core::task::Poll;
@@ -620,7 +620,7 @@ mod tests {
 
     #[test]
     #[cfg(not(miri))]
-    #[testing_macros::ensure_clear_mock_runtime]
+    #[kyron_testing_macros::ensure_clear_mock_runtime]
     fn graph_action_executed_twice() {
         use crate::testing::OrchTestingPoller;
         use ::core::task::Poll;
@@ -672,7 +672,7 @@ mod tests {
 
     #[test]
     #[cfg(not(miri))]
-    #[testing_macros::ensure_clear_mock_runtime]
+    #[kyron_testing_macros::ensure_clear_mock_runtime]
     fn graph_action_execute_ok_and_err_actions() {
         use crate::testing::OrchTestingPoller;
         use ::core::task::Poll;
@@ -735,7 +735,7 @@ mod tests {
 
     #[test]
     #[cfg(not(miri))]
-    #[testing_macros::ensure_clear_mock_runtime]
+    #[kyron_testing_macros::ensure_clear_mock_runtime]
     fn graph_action_execute_ok_and_two_err_actions() {
         use crate::testing::OrchTestingPoller;
         use ::core::task::Poll;
@@ -797,7 +797,7 @@ mod tests {
 
     #[test]
     #[cfg(not(miri))]
-    #[testing_macros::ensure_clear_mock_runtime]
+    #[kyron_testing_macros::ensure_clear_mock_runtime]
     #[should_panic]
     fn graph_action_panics_if_polled_after_future_reported_ready() {
         use crate::testing::OrchTestingPoller;
@@ -850,7 +850,7 @@ mod tests {
 
     #[test]
     #[cfg(not(miri))]
-    #[testing_macros::ensure_clear_mock_runtime]
+    #[kyron_testing_macros::ensure_clear_mock_runtime]
     fn graph_action_fails_first_time_and_succeeds_second_time() {
         use crate::testing::OrchTestingPoller;
         use ::core::task::Poll;

@@ -5,8 +5,8 @@ edition.workspace = true
 
 [dependencies]
 kyron.workspace = true
-kyron_macros.workspace = true
-kyron_foundation.workspace = true
+kyron-macros.workspace = true
+kyron-foundation.workspace = true
 
 iceoryx2.workspace = true
 iceoryx2-bb-container.workspace = true
@@ -16,8 +16,8 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 
 [dev-dependencies]
-testing.workspace = true
-testing_macros.workspace = true
+kyron-testing.workspace = true
+kyron-testing-macros.workspace = true
 kyron = { workspace = true, features = ["runtime-api-mock"] }
 
 [target.'cfg(loom)'.dependencies]

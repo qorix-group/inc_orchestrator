@@ -358,7 +358,7 @@ mod tests {
     };
     use ::core::task::Poll;
     use kyron::testing;
-    use testing_macros::ensure_clear_mock_runtime;
+    use kyron_testing_macros::ensure_clear_mock_runtime;
 
     #[test]
     fn test_register_invoke_fn() {

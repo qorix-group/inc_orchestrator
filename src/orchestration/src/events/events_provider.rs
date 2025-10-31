@@ -257,7 +257,7 @@ mod tests {
     use super::*;
     use crate::testing::OrchTestingPoller;
     use kyron_foundation::prelude::CommonErrors;
-    use testing::assert_poll_ready;
+    use kyron_testing::assert_poll_ready;
 
     #[test]
     fn new_provider() {
