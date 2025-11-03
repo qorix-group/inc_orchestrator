@@ -7,6 +7,7 @@
     * `select` - run multiple actions in first win fashion
     * `sync` - receive notification
     * `trigger` - send notification in process or across process
+    * `local_graph` - model dependencies as Direct Acyclic Graph
 
 * Configuration:
     * Full decouple of application logic (defined flow) from it's deployment
@@ -35,4 +36,3 @@
 
 # Planned features
 * `mw_com` support
-* `DAG` (Direct Acyclic Graph) action ( CW44.2025)
