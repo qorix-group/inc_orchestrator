@@ -10,7 +10,7 @@ use orchestration::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 async fn generic_just_log_task(name: &str) -> InvokeResult {
     info!(id = name);
@@ -52,7 +52,7 @@ impl BasicIfElse {
 
         let branch_true_tag = design.register_invoke_async("branch_true".into(), just_log_task!("true"))?;
         let branch_false_tag = design.register_invoke_async("branch_false".into(), just_log_task!("false"))?;
-        let condition_tag = design.register_if_else_arc_condition("condition".into(), Arc::new(SettableCondition { condition }))?;
+        let condition_tag = design.register_if_else_arc_mutex_condition("condition".into(), Arc::new(Mutex::new(SettableCondition { condition })))?;
 
         design.add_program("basic_if_else_program", move |design, builder| {
             builder.with_run_action(IfElse::from_tag(
@@ -119,7 +119,7 @@ impl NestedIfElse {
         design.register_invoke_async("branch_false_true".into(), just_log_task!("false_true"))?;
         design.register_invoke_async("branch_false_false".into(), just_log_task!("false_false"))?;
         design.register_if_else_arc_condition("outer_condition".into(), Arc::new(SettableCondition { condition: outer_condition }))?;
-        design.register_if_else_arc_condition("inner_condition".into(), Arc::new(SettableCondition { condition: inner_condition }))?;
+        design.register_if_else_condition("inner_condition".into(), SettableCondition { condition: inner_condition })?;
 
         design.add_program("basic_if_else_program", move |design, builder| {
             builder.with_run_action(IfElse::from_design(
