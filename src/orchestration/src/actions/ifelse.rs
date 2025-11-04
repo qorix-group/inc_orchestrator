@@ -228,11 +228,11 @@ mod tests {
         }
 
         let true_branch = Box::new(
-            MockActionBuilder::new()
-                .will_once(Err(ActionExecError::UserError(0xcafe_u64.into())))
+            MockActionBuilder::<()>::new()
+                .will_once_return(Err(ActionExecError::UserError(0xcafe_u64.into())))
                 .build(),
         );
-        let false_branch = Box::new(MockActionBuilder::new().times(0).build());
+        let false_branch = Box::new(MockActionBuilder::<()>::new().times(0).build());
         let mut ifelse = IfElse::from_arc_condition(Arc::new(TestCond {}), true_branch, false_branch, &config);
 
         let mut mock = OrchTestingPoller::new(ifelse.try_execute().unwrap());
@@ -251,10 +251,10 @@ mod tests {
             }
         }
 
-        let true_branch = Box::new(MockActionBuilder::new().times(0).build());
+        let true_branch = Box::new(MockActionBuilder::<()>::new().times(0).build());
         let false_branch = Box::new(
-            MockActionBuilder::new()
-                .will_once(Err(ActionExecError::UserError(0xbeef_u64.into())))
+            MockActionBuilder::<()>::new()
+                .will_once_return(Err(ActionExecError::UserError(0xbeef_u64.into())))
                 .build(),
         );
         let mut ifelse = IfElse::from_arc_condition(Arc::new(TestCond {}), true_branch, false_branch, &config);
