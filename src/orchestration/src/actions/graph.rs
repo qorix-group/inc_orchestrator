@@ -449,9 +449,9 @@ mod tests {
     #[should_panic(expected = "Invalid node ID.")]
     fn graph_builder_panics_for_invalid_node_id() {
         // Create mock actions
-        let action_a = Box::new(MockActionBuilder::new().build());
-        let action_b = Box::new(MockActionBuilder::new().build());
-        let action_c = Box::new(MockActionBuilder::new().build());
+        let action_a = Box::new(MockActionBuilder::<()>::new().build());
+        let action_b = Box::new(MockActionBuilder::<()>::new().build());
+        let action_c = Box::new(MockActionBuilder::<()>::new().build());
 
         // Create a graph builder
         let mut builder = LocalGraphActionBuilder::new();
@@ -468,9 +468,9 @@ mod tests {
     #[should_panic(expected = "Self-loop edges are not allowed.")]
     fn graph_builder_panics_for_self_loop_edge() {
         // Create mock actions
-        let action_a = Box::new(MockActionBuilder::new().build());
-        let action_b = Box::new(MockActionBuilder::new().build());
-        let action_c = Box::new(MockActionBuilder::new().build());
+        let action_a = Box::new(MockActionBuilder::<()>::new().build());
+        let action_b = Box::new(MockActionBuilder::<()>::new().build());
+        let action_c = Box::new(MockActionBuilder::<()>::new().build());
 
         // Create a graph builder
         let mut builder = LocalGraphActionBuilder::new();
@@ -487,9 +487,9 @@ mod tests {
     #[should_panic(expected = "Invalid edge ID.")]
     fn graph_builder_panics_for_invalid_edge_id() {
         // Create mock actions
-        let action_a = Box::new(MockActionBuilder::new().build());
-        let action_b = Box::new(MockActionBuilder::new().build());
-        let action_c = Box::new(MockActionBuilder::new().build());
+        let action_a = Box::new(MockActionBuilder::<()>::new().build());
+        let action_b = Box::new(MockActionBuilder::<()>::new().build());
+        let action_c = Box::new(MockActionBuilder::<()>::new().build());
 
         // Create a graph builder
         let mut builder = LocalGraphActionBuilder::new();
@@ -506,9 +506,9 @@ mod tests {
     #[should_panic(expected = "Duplicate edges are not allowed.")]
     fn graph_builder_panics_for_duplicate_edges() {
         // Create mock actions
-        let action_a = Box::new(MockActionBuilder::new().build());
-        let action_b = Box::new(MockActionBuilder::new().build());
-        let action_c = Box::new(MockActionBuilder::new().build());
+        let action_a = Box::new(MockActionBuilder::<()>::new().build());
+        let action_b = Box::new(MockActionBuilder::<()>::new().build());
+        let action_c = Box::new(MockActionBuilder::<()>::new().build());
 
         // Create a graph builder
         let mut builder = LocalGraphActionBuilder::new();
@@ -534,11 +534,11 @@ mod tests {
     #[should_panic(expected = "Graph contains a cycle, which is not allowed.")]
     fn graph_builder_panics_if_graph_contains_cycle() {
         // Create mock actions
-        let action_a = Box::new(MockActionBuilder::new().build());
-        let action_b = Box::new(MockActionBuilder::new().build());
-        let action_c = Box::new(MockActionBuilder::new().build());
-        let action_d = Box::new(MockActionBuilder::new().build());
-        let action_e = Box::new(MockActionBuilder::new().build());
+        let action_a = Box::new(MockActionBuilder::<()>::new().build());
+        let action_b = Box::new(MockActionBuilder::<()>::new().build());
+        let action_c = Box::new(MockActionBuilder::<()>::new().build());
+        let action_d = Box::new(MockActionBuilder::<()>::new().build());
+        let action_e = Box::new(MockActionBuilder::<()>::new().build());
 
         // Create a design with default config and a graph builder
         let design = Design::new("Design".into(), DesignConfig::default());
@@ -568,14 +568,17 @@ mod tests {
         use crate::testing::OrchTestingPoller;
         use ::core::task::Poll;
         use kyron::testing::mock;
-        use std::sync::{Arc, Mutex};
-        let log = Arc::new(Mutex::new(vec![]));
+        use kyron_testing::prelude::Sequence;
+        let seq = Sequence::new();
         // Create mock actions
-        let action_1 = Box::new(MockActionBuilder::new().will_once(Ok(())).with_log(1, log.clone()).build());
-        let action_2 = Box::new(MockActionBuilder::new().will_once(Ok(())).with_log(2, log.clone()).build());
-        let action_3 = Box::new(MockActionBuilder::new().will_once(Ok(())).with_log(3, log.clone()).build());
-        let action_4 = Box::new(MockActionBuilder::new().will_once(Ok(())).with_log(4, log.clone()).build());
-        let action_5 = Box::new(MockActionBuilder::new().will_once(Ok(())).with_log(5, log.clone()).build());
+        // Note: We use `in_sequence` here to enforce a deterministic, top-down execution order in tests.
+        // In practice, nodes 2 and 3 could run in parallel, so this sequence does not reflect actual concurrency.
+        // This approach ensures predictable test results, even though real execution may differ.
+        let action_1 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq).build());
+        let action_2 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq).build());
+        let action_3 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq).build());
+        let action_4 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq).build());
+        let action_5 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq).build());
 
         // Create a design with default config and a graph builder
         let design = Design::new("Design".into(), DesignConfig::default());
@@ -614,8 +617,6 @@ mod tests {
             mock::runtime::step();
         };
         assert_eq!(result, Poll::Ready(Ok(())));
-        // Verify the execution order
-        assert_eq!(*log.lock().unwrap(), vec![1, 2, 3, 4, 5]);
     }
 
     #[test]
@@ -625,14 +626,17 @@ mod tests {
         use crate::testing::OrchTestingPoller;
         use ::core::task::Poll;
         use kyron::testing::mock;
-        use std::sync::{Arc, Mutex};
-        let log = Arc::new(Mutex::new(vec![]));
+        use kyron_testing::prelude::Sequence;
+        let seq = Sequence::new();
         // Create mock actions
-        let action_1 = Box::new(MockActionBuilder::new().times(2).with_log(1, log.clone()).build());
-        let action_2 = Box::new(MockActionBuilder::new().times(2).with_log(2, log.clone()).build());
-        let action_3 = Box::new(MockActionBuilder::new().times(2).with_log(3, log.clone()).build());
-        let action_4 = Box::new(MockActionBuilder::new().times(2).with_log(4, log.clone()).build());
-        let action_5 = Box::new(MockActionBuilder::new().times(2).with_log(5, log.clone()).build());
+        // Note: We use `in_sequence` here to enforce a deterministic, top-down execution order in tests.
+        // In practice, nodes 2 and 3 could run in parallel, so this sequence does not reflect actual concurrency.
+        // This approach ensures predictable test results, even though real execution may differ.
+        let action_1 = Box::new(MockActionBuilder::<()>::new().times(2).in_sequence(&seq).build());
+        let action_2 = Box::new(MockActionBuilder::<()>::new().times(2).in_sequence(&seq).build());
+        let action_3 = Box::new(MockActionBuilder::<()>::new().times(2).in_sequence(&seq).build());
+        let action_4 = Box::new(MockActionBuilder::<()>::new().times(2).in_sequence(&seq).build());
+        let action_5 = Box::new(MockActionBuilder::<()>::new().times(2).in_sequence(&seq).build());
 
         // Create a design with default config and a graph builder
         let design = Design::new("Design".into(), DesignConfig::default());
@@ -665,9 +669,9 @@ mod tests {
                 mock::runtime::step();
             };
             assert_eq!(result, Poll::Ready(Ok(())));
+            // This should be called whenever the graph is executed in a loop testing scenario
+            seq.verify_executed_order_and_prepare_for_next_iteration();
         }
-        // Verify the execution order
-        assert_eq!(*log.lock().unwrap(), vec![1, 2, 3, 4, 5, 1, 2, 3, 4, 5]);
     }
 
     #[test]
@@ -677,17 +681,20 @@ mod tests {
         use crate::testing::OrchTestingPoller;
         use ::core::task::Poll;
         use kyron::testing::mock;
-        use std::sync::{Arc, Mutex};
-        let log = Arc::new(Mutex::new(vec![]));
+        use kyron_testing::prelude::Sequence;
+        let seq = Sequence::new();
         // Create mock actions
-        let action_1 = Box::new(MockActionBuilder::new().will_once(Ok(())).with_log(1, log.clone()).build());
+        // Note: We use `in_sequence` here to enforce a deterministic, top-down execution order in tests.
+        // In practice, nodes 2 and 3 could run in parallel, so this sequence does not reflect actual concurrency.
+        // This approach ensures predictable test results, even though real execution may differ.
+        let action_1 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq).build());
         let action_2 = Box::new(
-            MockActionBuilder::new()
-                .will_once(Err(ActionExecError::Internal))
-                .with_log(2, log.clone())
+            MockActionBuilder::<()>::new()
+                .will_once_return(Err(ActionExecError::Internal))
+                .in_sequence(&seq)
                 .build(),
         );
-        let action_3 = Box::new(MockActionBuilder::new().will_once(Ok(())).with_log(3, log.clone()).build());
+        let action_3 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq).build());
         // Action 4 and 5 should not be executed as action 2 fails for the graph below
         // Graph structure from left to right:
         //       2
@@ -695,8 +702,8 @@ mod tests {
         //     1   4---> 5
         //      \ /
         //       3
-        let action_4 = Box::new(MockActionBuilder::new().with_log(4, log.clone()).build());
-        let action_5 = Box::new(MockActionBuilder::new().with_log(5, log.clone()).build());
+        let action_4 = Box::new(MockActionBuilder::<()>::new().in_sequence(&seq).build());
+        let action_5 = Box::new(MockActionBuilder::<()>::new().in_sequence(&seq).build());
 
         // Create a design with default config and a graph builder
         let design = Design::new("Design".into(), DesignConfig::default());
@@ -729,8 +736,6 @@ mod tests {
             mock::runtime::step();
         };
         assert_eq!(result, Poll::Ready(Err(ActionExecError::Internal)));
-        // Verify the execution order
-        assert_eq!(*log.lock().unwrap(), vec![1, 2, 3]);
     }
 
     #[test]
@@ -740,25 +745,28 @@ mod tests {
         use crate::testing::OrchTestingPoller;
         use ::core::task::Poll;
         use kyron::testing::mock;
-        use std::sync::{Arc, Mutex};
-        let log = Arc::new(Mutex::new(vec![]));
+        use kyron_testing::prelude::Sequence;
+        let seq = Sequence::new();
         // Create mock actions
-        let action_1 = Box::new(MockActionBuilder::new().will_once(Ok(())).with_log(1, log.clone()).build());
+        // Note: We use `in_sequence` here to enforce a deterministic, top-down execution order in tests.
+        // In practice, nodes 2 and 3 could run in parallel, so this sequence does not reflect actual concurrency.
+        // This approach ensures predictable test results, even though real execution may differ.
+        let action_1 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq).build());
         let action_2 = Box::new(
-            MockActionBuilder::new()
-                .will_once(Err(ActionExecError::Internal))
-                .with_log(2, log.clone())
+            MockActionBuilder::<()>::new()
+                .will_once_return(Err(ActionExecError::Internal))
+                .in_sequence(&seq)
                 .build(),
         );
         let action_3 = Box::new(
-            MockActionBuilder::new()
-                .will_once(Err(ActionExecError::NonRecoverableFailure))
-                .with_log(3, log.clone())
+            MockActionBuilder::<()>::new()
+                .will_once_return(Err(ActionExecError::NonRecoverableFailure))
+                .in_sequence(&seq)
                 .build(),
         );
         // Action 4 and 5 should not be executed as action 2 & 3 fails for the graph below
-        let action_4 = Box::new(MockActionBuilder::new().with_log(4, log.clone()).build());
-        let action_5 = Box::new(MockActionBuilder::new().with_log(5, log.clone()).build());
+        let action_4 = Box::new(MockActionBuilder::<()>::new().in_sequence(&seq).build());
+        let action_5 = Box::new(MockActionBuilder::<()>::new().in_sequence(&seq).build());
 
         // Create a design with default config and a graph builder
         let design = Design::new("Design".into(), DesignConfig::default());
@@ -791,8 +799,6 @@ mod tests {
             mock::runtime::step();
         };
         assert_eq!(result, Poll::Ready(Err(ActionExecError::NonRecoverableFailure)));
-        // Verify the execution order
-        assert_eq!(*log.lock().unwrap(), vec![1, 2, 3]);
     }
 
     #[test]
@@ -803,14 +809,17 @@ mod tests {
         use crate::testing::OrchTestingPoller;
         use ::core::task::Poll;
         use kyron::testing::mock;
-        use std::sync::{Arc, Mutex};
-        let log = Arc::new(Mutex::new(vec![]));
+        use kyron_testing::prelude::Sequence;
+        let seq = Sequence::new();
         // Create mock actions
-        let action_1 = Box::new(MockActionBuilder::new().will_once(Ok(())).with_log(1, log.clone()).build());
-        let action_2 = Box::new(MockActionBuilder::new().will_once(Ok(())).with_log(2, log.clone()).build());
-        let action_3 = Box::new(MockActionBuilder::new().will_once(Ok(())).with_log(3, log.clone()).build());
-        let action_4 = Box::new(MockActionBuilder::new().will_once(Ok(())).with_log(4, log.clone()).build());
-        let action_5 = Box::new(MockActionBuilder::new().will_once(Ok(())).with_log(5, log.clone()).build());
+        // Note: We use `in_sequence` here to enforce a deterministic, top-down execution order in tests.
+        // In practice, nodes 2 and 3 could run in parallel, so this sequence does not reflect actual concurrency.
+        // This approach ensures predictable test results, even though real execution may differ.
+        let action_1 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq).build());
+        let action_2 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq).build());
+        let action_3 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq).build());
+        let action_4 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq).build());
+        let action_5 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq).build());
 
         // Create a design with default config and a graph builder
         let design = Design::new("Design".into(), DesignConfig::default());
@@ -843,7 +852,7 @@ mod tests {
             mock::runtime::step();
         };
         assert_eq!(result, Poll::Ready(Ok(())));
-        assert_eq!(*log.lock().unwrap(), vec![1, 2, 3, 4, 5]);
+
         // Poll again after the future has reported ready, this causes a panic.
         let _ = poller.poll();
     }
@@ -855,20 +864,23 @@ mod tests {
         use crate::testing::OrchTestingPoller;
         use ::core::task::Poll;
         use kyron::testing::mock;
-        use std::sync::{Arc, Mutex};
-        let log = Arc::new(Mutex::new(vec![]));
+        use kyron_testing::prelude::Sequence;
+        let seq = Sequence::new();
         // Create mock actions
-        let action_1 = Box::new(MockActionBuilder::new().times(2).with_log(1, log.clone()).build());
-        let action_2 = Box::new(MockActionBuilder::new().times(2).with_log(2, log.clone()).build());
-        let action_3 = Box::new(MockActionBuilder::new().times(2).with_log(3, log.clone()).build());
+        // Note: We use `in_sequence` here to enforce a deterministic, top-down execution order in tests.
+        // In practice, nodes 2 and 3 could run in parallel, so this sequence does not reflect actual concurrency.
+        // This approach ensures predictable test results, even though real execution may differ.
+        let action_1 = Box::new(MockActionBuilder::<()>::new().times(2).in_sequence(&seq).build());
+        let action_2 = Box::new(MockActionBuilder::<()>::new().times(2).in_sequence(&seq).build());
+        let action_3 = Box::new(MockActionBuilder::<()>::new().times(2).in_sequence(&seq).build());
         let action_4 = Box::new(
-            MockActionBuilder::new()
-                .will_once(Err(ActionExecError::Internal))
-                .will_once(Ok(()))
-                .with_log(4, log.clone())
+            MockActionBuilder::<()>::new()
+                .will_once_return(Err(ActionExecError::Internal))
+                .will_once_return(Ok(()))
+                .in_sequence(&seq)
                 .build(),
         );
-        let action_5 = Box::new(MockActionBuilder::new().will_once(Ok(())).with_log(5, log.clone()).build());
+        let action_5 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq).build());
 
         // Create a design with default config and a graph builder
         let design = Design::new("Design".into(), DesignConfig::default());
@@ -907,7 +919,94 @@ mod tests {
                 // Second execution should succeed since action_4 returns Ok on the second call
                 assert_eq!(result, Poll::Ready(Ok(())));
             }
+            // This should be called whenever the graph is executed in a loop testing scenario
+            seq.verify_executed_order_and_prepare_for_next_iteration();
         }
-        assert_eq!(*log.lock().unwrap(), vec![1, 2, 3, 4, 1, 2, 3, 4, 5]);
+    }
+
+    #[test]
+    #[cfg(not(miri))]
+    #[kyron_testing_macros::ensure_clear_mock_runtime]
+    fn graph_action_with_multiple_roots_and_sequence() {
+        use crate::testing::OrchTestingPoller;
+        use ::core::task::Poll;
+        use kyron::testing::mock;
+        use kyron_testing::prelude::Sequence;
+        let seq1 = Sequence::new();
+        let seq2 = Sequence::new();
+        let seq3 = Sequence::new();
+        // Create mock actions
+        // Note: We use `in_sequence` here to enforce a deterministic, top-down execution order in tests.
+        // In practice, few nodes run in parallel, so this sequence does not reflect actual concurrency.
+        // This approach ensures predictable test results, even though real execution may differ.
+        let action_1 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq1).build());
+        let action_2 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq2).build());
+        let action_3 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq3).build());
+        let action_4 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq1).build());
+        let action_5 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq2).build());
+        let action_6 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq3).build());
+        let action_7 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq1).build());
+        let action_8 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq1).build());
+        let action_9 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq3).build());
+        let action_10 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq1).build());
+        let action_11 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq3).build());
+        let action_12 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq1).build());
+        let action_13 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq1).build());
+
+        // Create a design with default config and a graph builder
+        let design = Design::new("Design".into(), DesignConfig::default());
+        let mut builder = LocalGraphActionBuilder::new();
+        // Add nodes to the graph
+        let node_1 = builder.add_node(action_1);
+        let node_2 = builder.add_node(action_2);
+        let node_3 = builder.add_node(action_3);
+        let node_4 = builder.add_node(action_4);
+        let node_5 = builder.add_node(action_5);
+        let node_6 = builder.add_node(action_6);
+        let node_7 = builder.add_node(action_7);
+        let node_8 = builder.add_node(action_8);
+        let node_9 = builder.add_node(action_9);
+        let node_10 = builder.add_node(action_10);
+        let node_11 = builder.add_node(action_11);
+        let node_12 = builder.add_node(action_12);
+        let node_13 = builder.add_node(action_13);
+
+        // Add edges to define dependencies
+        // Graph structure from left to right:
+        //
+        //     1 ---> 4 -      8 ---> 10--
+        //               \    /            \
+        //     2 ---> 5 --7---              12 ---> 13
+        //               /    \            /
+        //     3 ---> 6 -      9 ---> 11 --
+        //
+        builder.add_edges(node_1, &[node_4]);
+        builder.add_edges(node_2, &[node_5]);
+        builder.add_edges(node_3, &[node_6]);
+        builder.add_edges(node_4, &[node_7]);
+        builder.add_edges(node_5, &[node_7]);
+        builder.add_edges(node_6, &[node_7]);
+        builder.add_edges(node_7, &[node_8, node_9]);
+        builder.add_edges(node_8, &[node_10]);
+        builder.add_edges(node_9, &[node_11]);
+        builder.add_edges(node_10, &[node_12]);
+        builder.add_edges(node_11, &[node_12]);
+        builder.add_edges(node_12, &[node_13]);
+
+        // Build the graph action
+        let mut graph_action = builder.build(&design);
+
+        // Execute the graph action
+        let mut poller = OrchTestingPoller::new(graph_action.try_execute().unwrap());
+
+        // Poll until completion
+        let result = loop {
+            let result = poller.poll();
+            if result.is_ready() {
+                break result;
+            }
+            mock::runtime::step();
+        };
+        assert_eq!(result, Poll::Ready(Ok(())));
     }
 }

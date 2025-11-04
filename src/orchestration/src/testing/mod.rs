@@ -27,99 +27,153 @@ use crate::{
 use kyron::futures::reusable_box_future::{ReusableBoxFuture, ReusableBoxFuturePool};
 use kyron_foundation::containers::{reusable_objects::ReusableObject, reusable_objects::ReusableObjects};
 use kyron_testing::{
-    mock_fn::{CallableTrait, MockFn, MockFnBuilder},
+    mock_fn::{MockFn, MockFnBuilder, Sequence},
     poller::TestingFuturePoller,
 };
-use std::sync::{Arc, Mutex};
 
 const DEFAULT_POOL_SIZE: usize = 5;
 
 ///
-/// A mock object that can be used to monitor the invocation count of actions, i.e. try_execute().
+/// A mock object that can be used to monitor the invocation count of actions, i.e. try_execute() and invocation order.
 /// Each invocation returns a (reusable) future containing values previously configured via will_once() or will_repeatedly().
 ///
-pub struct MockActionBuilder(MockFnBuilder<ActionResult>);
+pub struct MockActionBuilder<InType> {
+    action_input: InType,
+    mockfn_builder: MockFnBuilder<InType, ActionResult>,
+}
 
-impl Default for MockActionBuilder {
+pub struct MockAction<InType> {
+    action_input: InType,
+    reusable_future_pool: ReusableBoxFuturePool<ActionResult>,
+    reusable_mockfn_pool: ReusableObjects<MockFn<InType, ActionResult>>,
+}
+
+impl<InType: Clone + Default + Send + 'static> Default for MockAction<InType> {
+    fn default() -> Self {
+        MockActionBuilder::default().build()
+    }
+}
+
+impl<InType: Clone + Default + Send + 'static> Default for MockActionBuilder<InType> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl MockActionBuilder {
-    pub fn new() -> MockActionBuilder {
-        Self(MockFnBuilder::<ActionResult>::new_in_global(Ok(())))
+impl<InType: Clone + Send + 'static> MockActionBuilder<InType> {
+    ///
+    /// Create a new MockActionBuilder with default action input.
+    /// Action input is passed to the closures configured via will_once() or will_repeatedly().
+    ///
+    pub fn new() -> MockActionBuilder<InType>
+    where
+        InType: Default,
+    {
+        Self {
+            action_input: InType::default(),
+            mockfn_builder: MockFnBuilder::<InType, ActionResult>::new_in_global(|_| Ok(())),
+        }
+    }
+
+    ///
+    /// Create a new MockActionBuilder with the specified action input.
+    /// Action input is passed to the closures configured via will_once() or will_repeatedly().
+    ///
+    pub fn new_with_input(action_input: InType) -> MockActionBuilder<InType> {
+        Self {
+            action_input,
+            mockfn_builder: MockFnBuilder::<InType, ActionResult>::new_in_global(|_| Ok(())),
+        }
     }
 
     ///
     /// Set how many times exactly the try_execute() must be invoked
     ///
-    pub fn times(mut self, count: usize) -> Self {
-        self.0 = self.0.times(count);
+    pub fn times(&mut self, count: usize) -> &mut Self {
+        self.mockfn_builder.times(count);
         self
     }
 
     ///
-    /// Ensure that the try_execute() is invoked at least one more time and the try_execute() returns the ret_val
+    /// Ensure that the try_execute() is invoked at least one more time and the try_execute() returns constant value, ignoring action input.
     ///
-    pub fn will_once(mut self, ret_val: ActionResult) -> Self {
-        self.0 = self.0.will_once(ret_val);
+    pub fn will_once_return(&mut self, value: ActionResult) -> &mut Self {
+        self.mockfn_builder.will_once_return(value);
         self
     }
 
     ///
-    /// Allow the try_execute() to be invoked multiple times and the invokation returns the ret_val
-    /// If used, will_repeatedly() must be called the last
+    /// Ensure that the try_execute() is invoked at least one more time and the try_execute() returns the closure f's return value.
     ///
-    pub fn will_repeatedly(mut self, ret_val: ActionResult) -> Self {
-        self.0 = self.0.will_repeatedly(ret_val);
+    pub fn will_once_invoke<F>(&mut self, f: F) -> &mut Self
+    where
+        F: FnMut(InType) -> ActionResult + Send + 'static,
+    {
+        self.mockfn_builder.will_once_invoke(f);
         self
     }
 
     ///
-    /// Attach an action log to the mock action.
-    /// Each time the action is executed, its ID will be appended to the log.
+    /// Allow the try_execute() to be invoked multiple times and the invokation returns constant value, ignoring action input.
+    /// If used, will_repeatedly() must be called the last.
     ///
-    pub fn with_log(mut self, id: usize, action_log: Arc<Mutex<Vec<usize>>>) -> Self {
-        self.0 = self.0.with_log(id, action_log);
+    pub fn will_repeatedly_return(&mut self, value: ActionResult) -> &mut Self {
+        self.mockfn_builder.will_repeatedly_return(value);
+        self
+    }
+
+    ///
+    /// Allow the try_execute() to be invoked multiple times and the invokation returns the callback f's return value.
+    /// If used, will_repeatedly() must be called the last.
+    ///
+    pub fn will_repeatedly_invoke<F>(&mut self, f: F) -> &mut Self
+    where
+        F: FnMut(InType) -> ActionResult + Send + 'static,
+    {
+        self.mockfn_builder.will_repeatedly_invoke(f);
+        self
+    }
+
+    ///
+    /// Register the MockFn in a sequence to verify the execution order.
+    /// The execution order is same as registration order. If the execution order is incorrect, a panic occurs.
+    ///
+    pub fn in_sequence(&mut self, seq: &Sequence) -> &mut Self {
+        self.mockfn_builder.in_sequence(seq);
         self
     }
 
     ///
     /// Create the MockAction instance based on the current configuration and initialize the reusable pools
     ///
-    pub fn build(self) -> MockAction {
+    pub fn build(&mut self) -> MockAction<InType> {
         // The reusable objects pool must contain only one element to ensure every next_object() call
         // always returns the same MockFn object that preserves the call_count state from previous
         // call(s)
-        let mut reusable_mockfn_pool = ReusableObjects::<MockFn<ActionResult>>::new(1, |_| self.0.clone().build());
+        let mut reusable_mockfn_pool = ReusableObjects::<MockFn<InType, ActionResult>>::new(1, |_| self.mockfn_builder.clone().build());
 
         // Create a dummy future for the sake of initializing the reusable future pool's layout
-        let dummy_future = MockAction::execute_impl(reusable_mockfn_pool.next_object().unwrap());
+        let dummy_future = MockAction::execute_impl(reusable_mockfn_pool.next_object().unwrap(), self.action_input.clone());
         let reusable_future_pool = ReusableBoxFuturePool::<ActionResult>::for_value(DEFAULT_POOL_SIZE, dummy_future);
 
         MockAction {
+            action_input: self.action_input.clone(),
             reusable_future_pool,
             reusable_mockfn_pool,
         }
     }
 }
 
-pub struct MockAction {
-    reusable_future_pool: ReusableBoxFuturePool<ActionResult>,
-    reusable_mockfn_pool: ReusableObjects<MockFn<ActionResult>>,
-}
-
-impl MockAction {
+impl<InType> MockAction<InType> {
     ///
     /// Call the underlying MockFn
     ///
-    async fn execute_impl(mut mockfn: ReusableObject<MockFn<ActionResult>>) -> ActionResult {
-        unsafe { mockfn.as_inner_mut().call() }
+    async fn execute_impl(mut mockfn: ReusableObject<MockFn<InType, ActionResult>>, input: InType) -> ActionResult {
+        unsafe { mockfn.as_inner_mut().call(input) }
     }
 }
 
-impl ActionTrait for MockAction {
+impl<InType: Clone + Send + 'static> ActionTrait for MockAction<InType> {
     ///
     /// Return a "fresh" future that returns the current MockFn's call() result
     ///
@@ -128,7 +182,8 @@ impl ActionTrait for MockAction {
         // here, because the last one gets dropped right after its call() and returned back to the pool
         let mockfn = self.reusable_mockfn_pool.next_object()?;
 
-        self.reusable_future_pool.next(MockAction::execute_impl(mockfn))
+        self.reusable_future_pool
+            .next(MockAction::execute_impl(mockfn, self.action_input.clone()))
     }
 
     fn name(&self) -> &'static str {
@@ -138,12 +193,6 @@ impl ActionTrait for MockAction {
     fn dbg_fmt(&self, nest: usize, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         let indent = " ".repeat(nest);
         writeln!(f, "{}|-{}", indent, self.name())
-    }
-}
-
-impl Default for MockAction {
-    fn default() -> Self {
-        MockActionBuilder::default().build()
     }
 }
 
@@ -252,7 +301,7 @@ mod tests {
 
     #[test]
     fn with_times_zero_ok() {
-        let mut mock = MockActionBuilder::new().times(0).build();
+        let mut mock = MockActionBuilder::<()>::new().times(0).build();
         let _ = OrchTestingPoller::new(mock.try_execute().unwrap());
     }
     #[test]
@@ -263,7 +312,7 @@ mod tests {
     #[cfg(not(miri))]
     #[should_panic]
     fn with_times_zero_but_called_once_should_panic() {
-        let mut mock = MockActionBuilder::new().times(0).build();
+        let mut mock = MockActionBuilder::<()>::new().times(0).build();
         let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
 
         assert_eq!(poller.poll(), Poll::Ready(Ok(())));
@@ -271,15 +320,15 @@ mod tests {
 
     #[test]
     fn will_once_ok() {
-        let mut mock = MockActionBuilder::new().will_once(Ok(())).build();
+        let mut mock = MockActionBuilder::<()>::new().will_once_return(Ok(())).build();
         let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
 
         assert_eq!(poller.poll(), Poll::Ready(Ok(())));
     }
 
     #[test]
-    fn wlll_once_err_returns_correctly() {
-        let mut mock = MockActionBuilder::new().will_once(Err(ActionExecError::Internal)).build();
+    fn will_once_err_returns_correctly() {
+        let mut mock = MockActionBuilder::<()>::new().will_once_return(Err(ActionExecError::Internal)).build();
 
         let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
         assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::Internal)));
@@ -287,7 +336,7 @@ mod tests {
 
     #[test]
     fn will_repeatedly_ok() {
-        let mut mock = MockActionBuilder::new().will_repeatedly(Ok(())).build();
+        let mut mock = MockActionBuilder::<()>::new().will_repeatedly_return(Ok(())).build();
 
         for _ in 0..3 {
             let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
@@ -297,8 +346,8 @@ mod tests {
 
     #[test]
     fn will_repeatedly_err_returns_correctly() {
-        let mut mock = MockActionBuilder::new()
-            .will_repeatedly(Err(ActionExecError::NonRecoverableFailure))
+        let mut mock = MockActionBuilder::<()>::new()
+            .will_repeatedly_return(Err(ActionExecError::NonRecoverableFailure))
             .build();
 
         for _ in 0..3 {
@@ -309,7 +358,10 @@ mod tests {
 
     #[test]
     fn calls_equals_times_ok() {
-        let mut mock = MockActionBuilder::new().times(3).will_repeatedly(Err(ActionExecError::Internal)).build();
+        let mut mock = MockActionBuilder::<()>::new()
+            .times(3)
+            .will_repeatedly_return(Err(ActionExecError::Internal))
+            .build();
 
         for _ in 0..3 {
             let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
@@ -325,7 +377,7 @@ mod tests {
     #[cfg(not(miri))]
     #[should_panic]
     fn calls_less_tthan_times_should_panic() {
-        let mut mock = MockActionBuilder::new().times(3).build();
+        let mut mock = MockActionBuilder::<()>::new().times(3).build();
 
         for _ in 0..2 {
             let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
@@ -341,7 +393,7 @@ mod tests {
     #[cfg(not(miri))]
     #[should_panic]
     fn calls_more_than_times_should_panic() {
-        let mut mock = MockActionBuilder::new().times(3).build();
+        let mut mock = MockActionBuilder::<()>::new().times(3).build();
 
         for _ in 0..4 {
             let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
@@ -351,9 +403,9 @@ mod tests {
 
     #[test]
     fn multiple_will_once_err_returns_correctly() {
-        let mut mock = MockActionBuilder::new()
-            .will_once(Err(ActionExecError::Internal))
-            .will_once(Err(ActionExecError::NonRecoverableFailure))
+        let mut mock = MockActionBuilder::<()>::new()
+            .will_once_return(Err(ActionExecError::Internal))
+            .will_once_return(Err(ActionExecError::NonRecoverableFailure))
             .build();
 
         let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
@@ -365,11 +417,11 @@ mod tests {
 
     #[test]
     fn all_clauses_ok() {
-        let mut mock = MockActionBuilder::new()
+        let mut mock = MockActionBuilder::<usize>::new()
             .times(5)
-            .will_once(Ok(()))
-            .will_once(Err(ActionExecError::NonRecoverableFailure))
-            .will_repeatedly(Err(ActionExecError::Internal))
+            .will_once_return(Ok(()))
+            .will_once_return(Err(ActionExecError::NonRecoverableFailure))
+            .will_repeatedly_return(Err(ActionExecError::Internal))
             .build();
 
         let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
@@ -387,11 +439,31 @@ mod tests {
     #[test]
     #[should_panic]
     fn clause_after_will_repeated_should_panic() {
-        let mut mock = MockActionBuilder::new()
-            .will_repeatedly(Err(ActionExecError::Internal))
-            .will_once(Err(ActionExecError::NonRecoverableFailure))
+        let mut mock = MockActionBuilder::<()>::new()
+            .will_repeatedly_return(Err(ActionExecError::Internal))
+            .will_once_return(Err(ActionExecError::NonRecoverableFailure))
             .build();
 
         let _ = OrchTestingPoller::new(mock.try_execute().unwrap());
+    }
+
+    #[test]
+    fn mock_action_with_input() {
+        let mut mock = MockActionBuilder::<usize>::new_with_input(42)
+            .will_once_invoke(|x| if x == 42 { Ok(()) } else { Err(ActionExecError::Internal) })
+            .will_once_invoke(|x| if x % 4 == 0 { Ok(()) } else { Err(ActionExecError::Internal) })
+            .will_repeatedly_invoke(|x| if x == 42 { Ok(()) } else { Err(ActionExecError::Internal) })
+            .build();
+
+        let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
+        assert_eq!(poller.poll(), Poll::Ready(Ok(())));
+
+        let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
+        assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::Internal)));
+
+        for _ in 0..3 {
+            let mut poller = OrchTestingPoller::new(mock.try_execute().unwrap());
+            assert_eq!(poller.poll(), Poll::Ready(Ok(())));
+        }
     }
 }

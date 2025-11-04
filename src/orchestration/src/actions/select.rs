@@ -206,8 +206,8 @@ mod tests {
     #[ensure_clear_mock_runtime]
     fn first_action_returns_value() {
         let mock1 = Box::new(
-            MockActionBuilder::new()
-                .will_once(Err(ActionExecError::UserError(0xdeadbeef.into())))
+            MockActionBuilder::<()>::new()
+                .will_once_return(Err(ActionExecError::UserError(0xdeadbeef.into())))
                 .build(),
         );
         let mock2 = Box::new(TestAsyncAction::new(future::pending));
@@ -225,8 +225,8 @@ mod tests {
     fn middle_action_returns_value() {
         let mock1 = Box::new(TestAsyncAction::new(future::pending));
         let mock2 = Box::new(
-            MockActionBuilder::new()
-                .will_once(Err(ActionExecError::UserError(0xdeadbeef.into())))
+            MockActionBuilder::<()>::new()
+                .will_once_return(Err(ActionExecError::UserError(0xdeadbeef.into())))
                 .build(),
         );
         let mock3 = Box::new(TestAsyncAction::new(future::pending));
@@ -244,8 +244,8 @@ mod tests {
         let mock1 = Box::new(TestAsyncAction::new(future::pending));
         let mock2 = Box::new(TestAsyncAction::new(future::pending));
         let mock3 = Box::new(
-            MockActionBuilder::new()
-                .will_once(Err(ActionExecError::UserError(0xdeadbeef.into())))
+            MockActionBuilder::<()>::new()
+                .will_once_return(Err(ActionExecError::UserError(0xdeadbeef.into())))
                 .build(),
         );
 
@@ -263,8 +263,8 @@ mod tests {
         // Otherwise, the test may pass or fail randomly.
         let mock1 = Box::new(TestAsyncAction::new(future::pending));
         let mock2 = Box::new(
-            MockActionBuilder::new()
-                .will_once(Err(ActionExecError::UserError(0xdeadbeef.into())))
+            MockActionBuilder::<()>::new()
+                .will_once_return(Err(ActionExecError::UserError(0xdeadbeef.into())))
                 .build(),
         );
         let mock3 = Box::new(TestAsyncAction::new(async_fn_with_await));
@@ -282,8 +282,8 @@ mod tests {
         // Since the execution of select cases is random, we need actions which complete at different times to verify the ordering.
         // Otherwise, the test may pass or fail randomly.
         let mock1 = Box::new(
-            MockActionBuilder::new()
-                .will_once(Err(ActionExecError::UserError(0xdeadbeef.into())))
+            MockActionBuilder::<()>::new()
+                .will_once_return(Err(ActionExecError::UserError(0xdeadbeef.into())))
                 .build(),
         );
         let mock2 = Box::new(TestAsyncAction::new(future::pending));
@@ -302,8 +302,8 @@ mod tests {
         // Since the execution of select cases is random, we need actions which complete at different times to verify the ordering.
         // Otherwise, the test may pass or fail randomly.
         let mock1 = Box::new(
-            MockActionBuilder::new()
-                .will_once(Err(ActionExecError::UserError(0xdeadbeef.into())))
+            MockActionBuilder::<()>::new()
+                .will_once_return(Err(ActionExecError::UserError(0xdeadbeef.into())))
                 .build(),
         );
         let mock2 = Box::new(TestAsyncAction::new(async_fn_with_await));
@@ -322,7 +322,7 @@ mod tests {
         // Since the execution of select cases is random, we need actions which complete at different times to verify the ordering.
         // Otherwise, the test may pass or fail randomly.
         let mock1 = Box::new(TestAsyncAction::new(future::pending));
-        let mock2 = Box::new(MockActionBuilder::new().will_once(Ok(())).build());
+        let mock2 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).build());
         let mock3 = Box::new(TestAsyncAction::new(async_fn_with_await));
 
         let design = Design::new("Design".into(), DesignConfig::default());
@@ -339,8 +339,8 @@ mod tests {
         // Otherwise, the test may pass or fail randomly.
         let mock1 = Box::new(TestAsyncAction::new(future::pending));
         let mock2 = Box::new(
-            MockActionBuilder::new()
-                .will_once(Err(ActionExecError::UserError(0x1234abcd.into())))
+            MockActionBuilder::<()>::new()
+                .will_once_return(Err(ActionExecError::UserError(0x1234abcd.into())))
                 .build(),
         );
         let mock3 = Box::new(TestAsyncAction::new(async_fn_with_await));
