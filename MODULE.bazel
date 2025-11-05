@@ -66,7 +66,7 @@ git_override(
 
 git_override(
     module_name = "score_virtualization",
-    commit = "31966b7ad85a03efe5b2cfc8884d9812a6a82a88",
+    commit = "99d3f153c43796b67a63e82aad1ede6a881aa6af",
     remote = "https://github.com/qorix-group/score_virtualization.git",
 )
 
