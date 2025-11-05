@@ -56,6 +56,9 @@ cc_library(
     includes = [
         "cpp",
     ],
+    linkopts = [
+        "-lstdc++",
+    ],
     deps = [
         "//src/orchestration_macros:orchestration_macros_headers",
     ],
