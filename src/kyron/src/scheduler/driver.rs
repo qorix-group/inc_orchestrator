@@ -127,11 +127,6 @@ impl Inner {
             return;
         }
 
-        info!(
-            "Next promised wakeup time: {}, previous for worker: {} next expire time {:?} expire time u64: {}",
-            global_promis_next_time_wakeup, previous_wakeup_time, expire_time, expire_time_u64
-        );
-
         self.park_with_timeout(scheduler, worker, &expire_time_instant, expire_time_u64);
     }
 
