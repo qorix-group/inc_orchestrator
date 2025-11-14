@@ -220,7 +220,42 @@ class TestGraphCube(CommonCorrectGraphConfig):
         assert n7.timestamp == max(log.timestamp for log in logs_nodes), "Node7 is not the last executed node"
 
 
+class TestGraphParallelFlows(CommonCorrectGraphConfig):
+    _visualization = r"""
+          [n0]------->[n1]------->[n2]
+
+          [n3]------->[n4]------->[n5]
+
+
+    After topological sorting:
+    |node 0 { indegree: 0, edges: [2] }
+    |node 1 { indegree: 0, edges: [3] }
+    |node 2 { indegree: 1, edges: [4] }
+    |node 3 { indegree: 1, edges: [5] }
+    |node 4 { indegree: 1, edges: [] }
+    |node 5 { indegree: 1, edges: [] }
+    """
+
+    def graph_name(self) -> str:
+        return "parallel_flows"
+
+    def test_valid(self, logs_nodes: LogContainer):
+        assert len(logs_nodes) == 6
+        n0 = logs_nodes.find_log(field="message", pattern="node0 was executed")
+        n1 = logs_nodes.find_log(field="message", pattern="node1 was executed")
+        n2 = logs_nodes.find_log(field="message", pattern="node2 was executed")
+        n3 = logs_nodes.find_log(field="message", pattern="node3 was executed")
+        n4 = logs_nodes.find_log(field="message", pattern="node4 was executed")
+        n5 = logs_nodes.find_log(field="message", pattern="node5 was executed")
+
+        # Nodes: 0,1,2 are independent of Nodes: 3,4,5
+        assert n0.timestamp < n1.timestamp < n2.timestamp, self._visualization
+        assert n3.timestamp < n4.timestamp < n5.timestamp, self._visualization
+
+
 # region Negative Scenarios
+
+
 class CommonInvalidGraphConfig(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
@@ -307,3 +342,99 @@ class TestGraphInvalidDuplicatedEdge(CommonInvalidGraphConfig):
 
 
 # endregion
+
+
+# region Integration Scenarios
+class CommonIntegrationConfig(CitScenario):
+    @pytest.fixture(scope="class")
+    def test_config(self) -> dict[str, Any]:
+        return {
+            "runtime": {
+                "task_queue_size": 256,
+                "workers": 1,
+            },
+            "test": {"design_name": self.design_name()},
+        }
+
+    @pytest.fixture(scope="class")
+    def scenario_name(self) -> str:
+        return "orchestration.graphs.integration_graph"
+
+    @pytest.fixture(scope="class")
+    def logs_nodes(self, logs_info_level: LogContainer) -> LogContainer:
+        return logs_info_level.get_logs(field="message", pattern=r"node\d+")
+
+    @abstractmethod
+    def design_name(self) -> str: ...
+
+
+class TestGraphInSequence(CommonIntegrationConfig):
+    def design_name(self) -> str:
+        return "two_steps"
+
+    def test_valid(self, logs_nodes: LogContainer):
+        n0 = logs_nodes.find_log(field="message", pattern="node0 was executed")
+        n1 = logs_nodes.find_log(field="message", pattern="node1 was executed")
+        n2 = logs_nodes.find_log(field="message", pattern="node2 was executed")
+        n3 = logs_nodes.find_log(field="message", pattern="node3 was executed")
+
+        assert n0.timestamp < n1.timestamp < n2.timestamp < n3.timestamp, (
+            "Nodes were not executed in the expected order"
+        )
+
+
+class TestGraphInConcurrency(CommonIntegrationConfig):
+    def design_name(self) -> str:
+        return "concurrency"
+
+    def test_valid(self, logs_nodes: LogContainer):
+        n0 = logs_nodes.find_log(field="message", pattern="node0 was executed")
+        n1 = logs_nodes.find_log(field="message", pattern="node1 was executed")
+        n2 = logs_nodes.find_log(field="message", pattern="node2 was executed")
+        n3 = logs_nodes.find_log(field="message", pattern="node3 was executed")
+        n4 = logs_nodes.find_log(field="message", pattern="node4 was executed")
+
+        assert n0.timestamp < n1.timestamp, "First graph has incorrect execution order"
+        assert n2.timestamp < n3.timestamp < n4.timestamp, "Second graph has incorrect execution order"
+
+
+class TestGraphInSeparatePrograms(CommonIntegrationConfig):
+    def design_name(self) -> str:
+        return "two_programs"
+
+    @pytest.mark.xfail(reason="https://github.com/qorix-group/inc_orchestrator_internal/issues/382")
+    def test_valid(self, logs_nodes: LogContainer):
+        n0 = logs_nodes.find_log(field="message", pattern="node0 was executed")
+        n1 = logs_nodes.find_log(field="message", pattern="node1 was executed")
+        n2 = logs_nodes.find_log(field="message", pattern="node2 was executed")
+        n3 = logs_nodes.find_log(field="message", pattern="node3 was executed")
+        n4 = logs_nodes.find_log(field="message", pattern="node4 was executed")
+
+        assert n0.timestamp < n1.timestamp, "First graph has incorrect execution order"
+        assert n2.timestamp < n3.timestamp < n4.timestamp, "Second graph has incorrect execution order"
+        # Programs are executed one after another
+        assert n1.timestamp < n2.timestamp, "Programs were not executed sequentially"
+
+
+class TestGraphDedicatedWorker(CitScenario):
+    @pytest.fixture(scope="class")
+    def test_config(self) -> dict[str, Any]:
+        return {
+            "runtime": {
+                "task_queue_size": 256,
+                "workers": 4,
+                "dedicated_workers": [{"id": "dedicated_worker_0"}],
+            }
+        }
+
+    @pytest.fixture(scope="class")
+    def scenario_name(self) -> str:
+        return "orchestration.graphs.dedicated_graph"
+
+    @pytest.mark.xfail(
+        reason="https://github.com/qorix-group/inc_orchestrator_internal/issues/380",
+    )
+    def test_dedicated_execution(self, logs_info_level: LogContainer):
+        dedicated_tasks = logs_info_level.get_logs(field="message", pattern=r"sync\d*")
+        dedicated_threads = {log.thread_id for log in dedicated_tasks}
+        assert len(dedicated_threads) == 1, "Expected execution only on 1 dedicated worker"
