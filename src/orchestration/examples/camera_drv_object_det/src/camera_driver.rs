@@ -11,7 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use logging_tracing::prelude::*;
+use kyron_foundation::prelude::*;
 use orchestration::actions::invoke::InvokeResult;
 pub struct CameraDriver {}
 

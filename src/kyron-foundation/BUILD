@@ -16,6 +16,9 @@ load("@score_orchestrator_crates//:defs.bzl", "all_crate_deps")
 rust_library(
     name = "libkyron_foundation",
     srcs = glob(["src/**/*.rs"]),
+    crate_features = [
+        "tracing",
+    ],
     crate_name = "kyron_foundation",
     visibility = ["//visibility:public"],
     deps = all_crate_deps(
@@ -26,4 +29,7 @@ rust_library(
 rust_test(
     name = "tests",
     crate = ":libkyron_foundation",
+    crate_features = [
+        "tracing",
+    ],
 )

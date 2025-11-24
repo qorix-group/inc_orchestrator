@@ -68,4 +68,4 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --all-features --all-targets --workspace -- -D warnings
+          args: --features tracing --all-targets --workspace -- -D warnings

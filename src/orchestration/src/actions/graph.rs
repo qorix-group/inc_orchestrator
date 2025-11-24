@@ -241,12 +241,12 @@ struct NodeFuture {
 
 impl LocalGraphAction {
     async fn execute_impl(meta: Tag, futures_vec: ReusableObject<Vec<NodeFuture>>, edges_arr: Arc<[Box<[NodeId]>]>) -> ActionResult {
-        trace!(graph = ?meta, "Before executing nodes");
+        tracing_adapter!(graph = ?meta, "Before executing nodes");
 
         let executor = DagExecutor::spawn_graph(futures_vec, edges_arr);
         let res = executor.await;
 
-        trace!(graph = ?meta, ?res, "After executing nodes");
+        tracing_adapter!(graph = ?meta, ?res, "After executing nodes");
         res
     }
 
