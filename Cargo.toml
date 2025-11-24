@@ -1,5 +1,6 @@
 [workspace]
 resolver = "2"
+
 # Split to default members without component integration tests.
 # Used when executing cargo from project root.
 default-members = [
@@ -36,19 +37,19 @@ authors = ["S-CORE Contributors"]
 
 
 [workspace.dependencies]
-kyron = { path = "src/kyron" }
+kyron = { path = "src/kyron", default-features = false }
 kyron-foundation = { path = "src/kyron-foundation" }
 kyron-testing-macros = { path = "src/kyron-testing-macros" }
 kyron-macros = { path = "src/kyron-macros" }
 kyron-testing = { path = "src/kyron-testing" }
 
-logging_tracing = { path = "src/logging_tracing" }
+logging_tracing = { path = "src/logging_tracing", default-features = false }
 orchestration = { path = "src/orchestration" }
 xtask = { path = "src/xtask" }
 orchestration_macros = { path = "src/orchestration_macros" }
 
 
-iceoryx2 = { git = "https://github.com/eclipse-iceoryx/iceoryx2.git", rev = "d3d1c9a727d3dc405733081923be5dba8213d6d8" }
+iceoryx2 = { git = "https://github.com/eclipse-iceoryx/iceoryx2.git", rev = "d3d1c9a727d3dc405733081923be5dba8213d6d8", default-features = false }
 iceoryx2-cal = { git = "https://github.com/eclipse-iceoryx/iceoryx2.git", rev = "d3d1c9a727d3dc405733081923be5dba8213d6d8" }
 iceoryx2-bb-container = { git = "https://github.com/eclipse-iceoryx/iceoryx2.git", rev = "d3d1c9a727d3dc405733081923be5dba8213d6d8" }
 iceoryx2-bb-derive-macros = { git = "https://github.com/eclipse-iceoryx/iceoryx2.git", rev = "d3d1c9a727d3dc405733081923be5dba8213d6d8" }
@@ -63,6 +64,7 @@ iceoryx2-bb-threadsafe = { git = "https://github.com/eclipse-iceoryx/iceoryx2.gi
 iceoryx2-pal-concurrency-sync = { git = "https://github.com/eclipse-iceoryx/iceoryx2.git", rev = "d3d1c9a727d3dc405733081923be5dba8213d6d8" }
 libc = "0.2.171"
 tracing = "0.1.41"
+log = "0.4.28"
 tracing-appender = "0.2.3"
 tracing-subscriber = { version = "0.3.19", features = ["json"] }
 tracing-perfetto-sdk-layer = "0.12.0"

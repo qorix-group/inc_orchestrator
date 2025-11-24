@@ -16,6 +16,9 @@ load("@score_orchestrator_crates//:defs.bzl", "all_crate_deps")
 rust_library(
     name = "liblogging_tracing",
     srcs = glob(["src/**/*.rs"]),
+    crate_features = [
+        "tracing",
+    ],
     crate_name = "logging_tracing",
     visibility = ["//visibility:public"],
     deps = all_crate_deps(

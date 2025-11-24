@@ -31,15 +31,20 @@ loom = { version = "0.7", features = ["checkpoint"] }
 [dev-dependencies]
 kyron-testing.workspace = true
 kyron-testing-macros.workspace = true
+tracing-subscriber.workspace = true
 
 [features]
-default = ["iceoryx2_ipc"]
+default = ["iceoryx2-ipc", "tracing"]
 runtime-api-mock = []
-iceoryx2_ipc = ["iceoryx2", "iceoryx2-cal"]
+iceoryx2-ipc = ["iceoryx2", "iceoryx2-cal"]
 
 # When running SOME VMs under Windows, the time can travel backward due to wrong assumptions between Linux and Windows
 # For now we enable it always on x86_64, but when you run native Linux you can disable it by this flag
 disable_vm_correction = []
+
+score-log = ["kyron-foundation/score-log"] # Bazel compatibility only
+log = ["kyron-foundation/log"]
+tracing = ["kyron-foundation/tracing"]
 
 [lints]
 workspace = true

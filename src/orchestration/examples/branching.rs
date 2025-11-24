@@ -13,7 +13,7 @@
 
 use kyron::runtime::*;
 use kyron_foundation::prelude::*;
-use logging_tracing::TracingLibraryBuilder;
+use logging_tracing::{Level, LogAndTraceBuilder};
 use orchestration::{
     actions::{ifelse::IfElse, invoke::Invoke, sequence::SequenceBuilder, sync::SyncBuilder, trigger::TriggerBuilder},
     api::{design::Design, Orchestration},
@@ -66,8 +66,12 @@ fn program_component_design() -> Result<Design, CommonErrors> {
 }
 
 fn main() {
-    let mut logger = TracingLibraryBuilder::new().global_log_level(Level::DEBUG).enable_logging(true).build();
-    logger.init_log_trace();
+    let _logger = LogAndTraceBuilder::new()
+        .global_log_level(Level::TRACE)
+        //.enable_tracing(TraceScope::AppScope)
+        .enable_logging(true)
+        .build()
+        .expect("Failed to build tracing library");
 
     let mut orch = Orchestration::new()
         .add_design(program_component_design().expect("Failed to create design"))

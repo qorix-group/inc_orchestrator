@@ -101,12 +101,12 @@ impl Concurrency {
             }
         }
 
-        trace!(concurrent = ?meta, "Before joining branches");
+        tracing_adapter!(concurrent = ?meta, "Before joining branches");
 
         let joined = ConcurrencyJoin::new(futures_vec);
         let res = joined.await;
 
-        trace!(concurrent = ?meta, ?res, "After joining branches");
+        tracing_adapter!(concurrent = ?meta, ?res, "After joining branches");
         res
     }
 

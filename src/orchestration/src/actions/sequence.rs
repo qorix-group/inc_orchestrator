@@ -132,14 +132,14 @@ impl Sequence {
         // We can directly pop() without reversing the order here, because the reversion already took place
         // during elements transfer from Builder's GrowableVec to Sequence's Vec
         while let Some(future) = futures.pop() {
-            trace!(step = ?tag, "Before awaiting step");
+            tracing_adapter!(step = ?tag, "Before awaiting step");
             let result = future.into_pin().await;
             if result.is_err() {
                 // Terminate sequence and propagate the error
                 error!("Error in sequence step {:?}", tag);
                 return result;
             }
-            trace!(step = ?tag, "After awaiting step");
+            tracing_adapter!(step = ?tag, "After awaiting step");
         }
 
         Ok(())

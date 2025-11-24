@@ -13,7 +13,7 @@
 
 use kyron::runtime::*;
 use kyron_foundation::prelude::*;
-use logging_tracing::TracingLibraryBuilder;
+use logging_tracing::{Level, LogAndTraceBuilder};
 use orchestration::{
     api::{design::Design, Orchestration},
     common::{tag::Tag, DesignConfig},
@@ -49,9 +49,12 @@ fn main() {
     // Get the event name from the command-line arguments
     let event = &args[1];
     // Setup any logging framework you want to use.
-    let mut logger = TracingLibraryBuilder::new().global_log_level(Level::INFO).enable_logging(true).build();
-
-    logger.init_log_trace();
+    let _logger = LogAndTraceBuilder::new()
+        .global_log_level(Level::TRACE)
+        //.enable_tracing(TraceScope::AppScope)
+        .enable_logging(true)
+        .build()
+        .expect("Failed to build tracing library");
 
     // Create runtime
     let (builder, _engine_id) = kyron::runtime::RuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(256).workers(1));

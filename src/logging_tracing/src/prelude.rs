@@ -11,12 +11,4 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-pub use crate::{LogMode, TraceScope, TracingLibraryBuilder};
-pub use tracing::debug;
-pub use tracing::error;
-pub use tracing::info;
-pub use tracing::instrument;
-pub use tracing::span;
-pub use tracing::trace;
-pub use tracing::warn;
-pub use tracing::Level;
+pub use crate::{LogAndTraceBuilder, LogMode, TraceScope};
