@@ -26,10 +26,10 @@ from component_integration_tests.python_test_cases.tests.result_code import (
 
 
 # region Positive Scenarios
-class CommonCorrectGraphConfig(CitScenario):
+class CommonGraphProgramConfig(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.graphs.correct_graph"
+        return "orchestration.graphs.graph_program"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -49,7 +49,7 @@ class CommonCorrectGraphConfig(CitScenario):
         return logs_info_level.get_logs(field="message", pattern=r"node\d+")
 
 
-class TestGraphTwoNodes(CommonCorrectGraphConfig):
+class TestGraphTwoNodes(CommonGraphProgramConfig):
     def graph_name(self) -> str:
         return "two_nodes"
 
@@ -60,7 +60,7 @@ class TestGraphTwoNodes(CommonCorrectGraphConfig):
         assert logs_nodes[1].message == "node1 was executed"
 
 
-class TestGraphNoEdges(CommonCorrectGraphConfig):
+class TestGraphNoEdges(CommonGraphProgramConfig):
     def graph_name(self) -> str:
         return "no_edges"
 
@@ -73,7 +73,7 @@ class TestGraphNoEdges(CommonCorrectGraphConfig):
         assert "node1 was executed" in messages
 
 
-class TestGraphOneNode(CommonCorrectGraphConfig):
+class TestGraphOneNode(CommonGraphProgramConfig):
     def graph_name(self) -> str:
         return "one_node"
 
@@ -82,7 +82,7 @@ class TestGraphOneNode(CommonCorrectGraphConfig):
         assert "node0 was executed" in logs_nodes[0].message
 
 
-class TestGraphEmptyEdges(CommonCorrectGraphConfig):
+class TestGraphEmptyEdges(CommonGraphProgramConfig):
     def graph_name(self) -> str:
         return "empty_edges"
 
@@ -96,7 +96,7 @@ class TestGraphEmptyEdges(CommonCorrectGraphConfig):
         assert "node2 was executed" in messages
 
 
-class TestGraphMultipleEdges(CommonCorrectGraphConfig):
+class TestGraphMultipleEdges(CommonGraphProgramConfig):
     _visualization = r"""
              [    n0   ]
             /   /  |   |
@@ -150,7 +150,7 @@ class TestGraphMultipleEdges(CommonCorrectGraphConfig):
         assert n4.timestamp == max(log.timestamp for log in logs_nodes), "Node4 is not the last executed node"
 
 
-class TestGraphCube(CommonCorrectGraphConfig):
+class TestGraphCube(CommonGraphProgramConfig):
     _visualization = r"""
           [n5]------->[n7]
          ^^           ^  ^
@@ -220,7 +220,7 @@ class TestGraphCube(CommonCorrectGraphConfig):
         assert n7.timestamp == max(log.timestamp for log in logs_nodes), "Node7 is not the last executed node"
 
 
-class TestGraphParallelFlows(CommonCorrectGraphConfig):
+class TestGraphParallelFlows(CommonGraphProgramConfig):
     _visualization = r"""
           [n0]------->[n1]------->[n2]
 
@@ -259,7 +259,7 @@ class TestGraphParallelFlows(CommonCorrectGraphConfig):
 class CommonInvalidGraphConfig(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.graphs.invalid_graph"
+        return "orchestration.graphs.graph_program"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -345,31 +345,8 @@ class TestGraphInvalidDuplicatedEdge(CommonInvalidGraphConfig):
 
 
 # region Integration Scenarios
-class CommonIntegrationConfig(CitScenario):
-    @pytest.fixture(scope="class")
-    def test_config(self) -> dict[str, Any]:
-        return {
-            "runtime": {
-                "task_queue_size": 256,
-                "workers": 1,
-            },
-            "test": {"design_name": self.design_name()},
-        }
-
-    @pytest.fixture(scope="class")
-    def scenario_name(self) -> str:
-        return "orchestration.graphs.integration_graph"
-
-    @pytest.fixture(scope="class")
-    def logs_nodes(self, logs_info_level: LogContainer) -> LogContainer:
-        return logs_info_level.get_logs(field="message", pattern=r"node\d+")
-
-    @abstractmethod
-    def design_name(self) -> str: ...
-
-
-class TestGraphInSequence(CommonIntegrationConfig):
-    def design_name(self) -> str:
+class TestGraphInSequence(CommonGraphProgramConfig):
+    def graph_name(self) -> str:
         return "two_steps"
 
     def test_valid(self, logs_nodes: LogContainer):
@@ -383,8 +360,8 @@ class TestGraphInSequence(CommonIntegrationConfig):
         )
 
 
-class TestGraphInConcurrency(CommonIntegrationConfig):
-    def design_name(self) -> str:
+class TestGraphInConcurrency(CommonGraphProgramConfig):
+    def graph_name(self) -> str:
         return "concurrency"
 
     def test_valid(self, logs_nodes: LogContainer):
@@ -398,8 +375,8 @@ class TestGraphInConcurrency(CommonIntegrationConfig):
         assert n2.timestamp < n3.timestamp < n4.timestamp, "Second graph has incorrect execution order"
 
 
-class TestGraphInSeparatePrograms(CommonIntegrationConfig):
-    def design_name(self) -> str:
+class TestGraphInSeparatePrograms(CommonGraphProgramConfig):
+    def graph_name(self) -> str:
         return "two_programs"
 
     @pytest.mark.xfail(reason="https://github.com/qorix-group/inc_orchestrator_internal/issues/382")
@@ -431,9 +408,6 @@ class TestGraphDedicatedWorker(CitScenario):
     def scenario_name(self) -> str:
         return "orchestration.graphs.dedicated_graph"
 
-    @pytest.mark.xfail(
-        reason="https://github.com/qorix-group/inc_orchestrator_internal/issues/380",
-    )
     def test_dedicated_execution(self, logs_info_level: LogContainer):
         dedicated_tasks = logs_info_level.get_logs(field="message", pattern=r"sync\d*")
         dedicated_threads = {log.thread_id for log in dedicated_tasks}
