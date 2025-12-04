@@ -27,16 +27,16 @@ bazel_dep(name = "platforms", version = "1.0.0")
 
 # S-CORE process rules
 bazel_dep(name = "score_bazel_platforms", version = "0.0.2")
-bazel_dep(name = "score_docs_as_code", version = "1.4.0")
+bazel_dep(name = "score_docs_as_code", version = "2.2.0")
 bazel_dep(name = "score_tooling", version = "1.0.4")
 
 bazel_dep(name = "score_process", version = "1.2.1", dev_dependency = True)
-bazel_dep(name = "score_platform", version = "0.3.0", dev_dependency = True)  # This is main score repo
+bazel_dep(name = "score_platform", version = "0.4.2", dev_dependency = True)  # This is main score repo
 bazel_dep(name = "score_virtualization", version = "0.0.1", dev_dependency = True)
 
 # Toolchains and extensions
-bazel_dep(name = "score_toolchains_gcc", version = "0.4", dev_dependency = True)
-bazel_dep(name = "score_toolchains_qnx", version = "0.0.2", dev_dependency = True)
+bazel_dep(name = "score_toolchains_gcc", version = "0.5", dev_dependency = True)
+bazel_dep(name = "score_toolchains_qnx", version = "0.0.5", dev_dependency = True)
 bazel_dep(name = "rust_qnx8_toolchain", version = "1.2.0", dev_dependency = True)
 bazel_dep(name = "score_toolchains_rust", version = "0.1.1", dev_dependency = True)
 
@@ -46,12 +46,6 @@ bazel_dep(name = "custom_qemu", version = "1.0.0", dev_dependency = True)
 bazel_dep(name = "googletest", version = "1.14.0")
 
 # Overrides
-
-git_override(
-    module_name = "score_platform",
-    commit = "bcab25561cdce7bd4eeebdb20b0ba4e2a4becc12",
-    remote = "https://github.com/eclipse-score/score.git",
-)
 
 git_override(
     module_name = "score_toolchains_rust",
@@ -143,45 +137,10 @@ register_toolchains(
 )
 
 # Module deps
-
-# Crate configs
-crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
-crate.from_cargo(
-    name = "score_orchestrator_crates",
-    cargo_lockfile = "//:Cargo.lock",
-    manifests = [
-        "//:Cargo.toml",
-        "//:src/kyron-foundation/Cargo.toml",
-        "//:src/kyron/Cargo.toml",
-        "//src/kyron-macros:Cargo.toml",
-        "//:src/kyron-testing/Cargo.toml",
-        "//src/kyron-testing-macros:Cargo.toml",
-        "//:src/logging_tracing/Cargo.toml",
-        "//:src/orchestration/Cargo.toml",
-        "//:src/xtask/Cargo.toml",
-        "//component_integration_tests/rust_test_scenarios:Cargo.toml",
-        "//src/orchestration/examples/camera_drv_object_det:Cargo.toml",
-        "//src/orchestration_macros:Cargo.toml",
-    ],
-
-    # This shall not be here but rules_rust 0.61.0 or even 0.67.0 does not correct finds out that when we use out platform it shall append
-    # aarch64-unknown-nto-qnx710 or best aarch64-unknown-nto-qnx800 which is not fully supported in any rust_rules version for now (even if rustc 1.86.0 already supports it)
-    supported_platform_triples = [
-        "aarch64-unknown-nto-qnx710",  # This enables also QNX8 becasue OS and CPU for platform matches....
-        "x86_64-unknown-linux-gnu",
-        "x86_64-unknown-none",
-    ],
+bazel_dep(name = "score_crates", version = "0.0.5")
+bazel_dep(name = "score_kyron", version = "0.0.3")
+git_override(
+    module_name = "score_kyron",
+    commit = "caa9c0b367d18a09e969c1353e95a8c443ae896b",
+    remote = "https://github.com/eclipse-score/kyron.git",
 )
-crate.annotation(
-    crate = "iceoryx2-bb-derive-macros",
-    patches = ["//patches:iceoryx2_bb_derive_macros_readme.patch"],
-    repositories = ["score_orchestrator_crates"],
-)
-
-#iceoryx2 does not yet support QNX8 correctly
-crate.annotation(
-    crate = "iceoryx2-pal-posix",
-    patches = ["//patches:qnx8_iceoryx2.patch"],
-    repositories = ["score_orchestrator_crates"],
-)
-use_repo(crate, "score_orchestrator_crates")

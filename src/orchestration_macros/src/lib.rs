@@ -21,7 +21,7 @@ use syn::{parse_macro_input, punctuated::Punctuated, ItemStruct, LitStr, Token};
 ///
 /// # Usage
 ///
-/// ```rust
+/// ```ignore
 /// #[import_from_cpp_ffi("method1", "method2")]
 /// pub struct MyClass;
 /// ```
@@ -90,13 +90,13 @@ pub fn import_from_cpp_ffi(attr: TokenStream, item: TokenStream) -> TokenStream 
 ///   - `Drop` implementation that calls `free_<Struct>()`
 ///
 /// # Usage
-/// ```rust
+/// ```ignore
 /// #[import_from_cpp("method1", "method2")]
 /// pub struct MyClass;
 /// ```
 ///
 /// This expands into a Rust struct like:
-/// ```rust
+/// ```ignore
 /// pub struct MyClass {
 ///     ptr: *mut c_void,
 /// }

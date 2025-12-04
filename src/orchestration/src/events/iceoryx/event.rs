@@ -14,8 +14,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 use ::core::task::Waker;
 use ::core::time::Duration;
-/// ///  IMPORTANT: This is temporary solution for events handling. This will be re-written later and is done to only support basic integration
-////////////////////////////////////////////////////////////////////////////////////////////////////
+// IMPORTANT: This is temporary solution for events handling. This will be re-written later and is done to only support basic integration
+
+#[cfg(not(feature = "bazel_build_iceoryx2_qnx8"))]
+pub use iceoryx2;
+#[cfg(feature = "bazel_build_iceoryx2_qnx8")]
+pub use iceoryx2_qnx8 as iceoryx2;
+
 use iceoryx2::port::listener::Listener;
 use iceoryx2::port::notifier::Notifier;
 use iceoryx2::prelude::*;
