@@ -32,8 +32,9 @@ rust_library(
     name = "liborchestration",
     srcs = glob(["src/**/*.rs"]),
     crate_features = [
-        "iceoryx-ipc",
+        "iceoryx2-ipc",
         "orch_tracing",
+        "tracing",
     ],
     crate_name = "orchestration",
     visibility = ["//visibility:public"],
@@ -45,8 +46,9 @@ rust_test(
     name = "tests",
     srcs = glob(["src/**/*.rs"]),
     crate_features = [
-        "iceoryx-ipc",
+        "iceoryx2-ipc",
         "orch_tracing",
+        "tracing",
     ],
     proc_macro_deps = [
         "//src/kyron-testing-macros:test_macro_utils",

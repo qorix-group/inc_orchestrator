@@ -19,7 +19,7 @@ use object_detection::ObjectDetection;
 
 use kyron::{futures::sleep, *};
 use kyron_foundation::prelude::*;
-use logging_tracing::{TraceScope, TracingLibraryBuilder};
+use logging_tracing::{Level, LogAndTraceBuilder};
 use orchestration::{
     api::{design::Design, Orchestration},
     common::DesignConfig,
@@ -125,13 +125,12 @@ fn obj_det_design() -> Result<Design, CommonErrors> {
 
 fn main() {
     // Setup any logging framework you want to use.
-    let mut logger = TracingLibraryBuilder::new()
+    let _logger = LogAndTraceBuilder::new()
         .global_log_level(Level::INFO)
-        .enable_tracing(TraceScope::AppScope)
+        //.enable_tracing(TraceScope::AppScope)
         .enable_logging(true)
-        .build();
-
-    logger.init_log_trace();
+        .build()
+        .expect("Failed to build tracing library");
 
     // Create runtime
     let (builder, _engine_id) =

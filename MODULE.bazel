@@ -28,7 +28,7 @@ bazel_dep(name = "platforms", version = "1.0.0")
 # S-CORE process rules
 bazel_dep(name = "score_bazel_platforms", version = "0.0.2")
 bazel_dep(name = "score_docs_as_code", version = "1.4.0")
-bazel_dep(name = "score_tooling", version = "1.0.2")
+bazel_dep(name = "score_tooling", version = "1.0.4")
 
 bazel_dep(name = "score_process", version = "1.2.1", dev_dependency = True)
 bazel_dep(name = "score_platform", version = "0.3.0", dev_dependency = True)  # This is main score repo
@@ -46,6 +46,7 @@ bazel_dep(name = "custom_qemu", version = "1.0.0", dev_dependency = True)
 bazel_dep(name = "googletest", version = "1.14.0")
 
 # Overrides
+
 git_override(
     module_name = "score_platform",
     commit = "bcab25561cdce7bd4eeebdb20b0ba4e2a4becc12",

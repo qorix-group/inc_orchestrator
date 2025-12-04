@@ -17,7 +17,7 @@ use orchestration_macros::import_from_cpp;
 pub struct ObjectDetection;
 
 // For logging from C++ methods
-use logging_tracing::prelude::*;
+use kyron_foundation::prelude::*;
 use std::ffi::CStr;
 use std::os::raw::c_char;
 

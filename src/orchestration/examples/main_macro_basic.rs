@@ -15,7 +15,7 @@ use core::time::Duration;
 
 use kyron::spawn;
 use kyron_foundation::prelude::{vector_extension::VectorExtension, *};
-use logging_tracing::TracingLibraryBuilder;
+use logging_tracing::{Level, LogAndTraceBuilder};
 use orchestration::{
     api::{design::Design, Orchestration},
     common::DesignConfig,
@@ -98,9 +98,12 @@ fn create_orch_programs() -> Vec<Program> {
 )]
 async fn main() {
     // Setup any logging framework you want to use.
-    let mut logger = TracingLibraryBuilder::new().global_log_level(Level::INFO).enable_logging(true).build();
-
-    logger.init_log_trace();
+    let _logger = LogAndTraceBuilder::new()
+        .global_log_level(Level::INFO)
+        //.enable_tracing(TraceScope::AppScope)
+        .enable_logging(true)
+        .build()
+        .expect("Failed to build tracing library");
 
     // Get programs to run
     let mut programs = create_orch_programs();

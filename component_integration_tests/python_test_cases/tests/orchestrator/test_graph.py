@@ -1,3 +1,15 @@
+# *******************************************************************************
+# Copyright (c) 2025 Contributors to the Eclipse Foundation
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Apache License Version 2.0 which is available at
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************
 from abc import abstractmethod
 from typing import Any
 
@@ -14,10 +26,10 @@ from component_integration_tests.python_test_cases.tests.result_code import (
 
 
 # region Positive Scenarios
-class CommonCorrectGraphConfig(CitScenario):
+class CommonGraphProgramConfig(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.graphs.correct_graph"
+        return "orchestration.graphs.graph_program"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -37,7 +49,7 @@ class CommonCorrectGraphConfig(CitScenario):
         return logs_info_level.get_logs(field="message", pattern=r"node\d+")
 
 
-class TestGraphTwoNodes(CommonCorrectGraphConfig):
+class TestGraphTwoNodes(CommonGraphProgramConfig):
     def graph_name(self) -> str:
         return "two_nodes"
 
@@ -48,7 +60,7 @@ class TestGraphTwoNodes(CommonCorrectGraphConfig):
         assert logs_nodes[1].message == "node1 was executed"
 
 
-class TestGraphNoEdges(CommonCorrectGraphConfig):
+class TestGraphNoEdges(CommonGraphProgramConfig):
     def graph_name(self) -> str:
         return "no_edges"
 
@@ -61,7 +73,7 @@ class TestGraphNoEdges(CommonCorrectGraphConfig):
         assert "node1 was executed" in messages
 
 
-class TestGraphOneNode(CommonCorrectGraphConfig):
+class TestGraphOneNode(CommonGraphProgramConfig):
     def graph_name(self) -> str:
         return "one_node"
 
@@ -70,7 +82,7 @@ class TestGraphOneNode(CommonCorrectGraphConfig):
         assert "node0 was executed" in logs_nodes[0].message
 
 
-class TestGraphEmptyEdges(CommonCorrectGraphConfig):
+class TestGraphEmptyEdges(CommonGraphProgramConfig):
     def graph_name(self) -> str:
         return "empty_edges"
 
@@ -84,7 +96,7 @@ class TestGraphEmptyEdges(CommonCorrectGraphConfig):
         assert "node2 was executed" in messages
 
 
-class TestGraphMultipleEdges(CommonCorrectGraphConfig):
+class TestGraphMultipleEdges(CommonGraphProgramConfig):
     _visualization = r"""
              [    n0   ]
             /   /  |   |
@@ -138,7 +150,7 @@ class TestGraphMultipleEdges(CommonCorrectGraphConfig):
         assert n4.timestamp == max(log.timestamp for log in logs_nodes), "Node4 is not the last executed node"
 
 
-class TestGraphCube(CommonCorrectGraphConfig):
+class TestGraphCube(CommonGraphProgramConfig):
     _visualization = r"""
           [n5]------->[n7]
          ^^           ^  ^
@@ -208,11 +220,46 @@ class TestGraphCube(CommonCorrectGraphConfig):
         assert n7.timestamp == max(log.timestamp for log in logs_nodes), "Node7 is not the last executed node"
 
 
+class TestGraphParallelFlows(CommonGraphProgramConfig):
+    _visualization = r"""
+          [n0]------->[n1]------->[n2]
+
+          [n3]------->[n4]------->[n5]
+
+
+    After topological sorting:
+    |node 0 { indegree: 0, edges: [2] }
+    |node 1 { indegree: 0, edges: [3] }
+    |node 2 { indegree: 1, edges: [4] }
+    |node 3 { indegree: 1, edges: [5] }
+    |node 4 { indegree: 1, edges: [] }
+    |node 5 { indegree: 1, edges: [] }
+    """
+
+    def graph_name(self) -> str:
+        return "parallel_flows"
+
+    def test_valid(self, logs_nodes: LogContainer):
+        assert len(logs_nodes) == 6
+        n0 = logs_nodes.find_log(field="message", pattern="node0 was executed")
+        n1 = logs_nodes.find_log(field="message", pattern="node1 was executed")
+        n2 = logs_nodes.find_log(field="message", pattern="node2 was executed")
+        n3 = logs_nodes.find_log(field="message", pattern="node3 was executed")
+        n4 = logs_nodes.find_log(field="message", pattern="node4 was executed")
+        n5 = logs_nodes.find_log(field="message", pattern="node5 was executed")
+
+        # Nodes: 0,1,2 are independent of Nodes: 3,4,5
+        assert n0.timestamp < n1.timestamp < n2.timestamp, self._visualization
+        assert n3.timestamp < n4.timestamp < n5.timestamp, self._visualization
+
+
 # region Negative Scenarios
+
+
 class CommonInvalidGraphConfig(CitScenario):
     @pytest.fixture(scope="class")
     def scenario_name(self) -> str:
-        return "orchestration.graphs.invalid_graph"
+        return "orchestration.graphs.graph_program"
 
     @pytest.fixture(scope="class")
     def test_config(self) -> dict[str, Any]:
@@ -295,3 +342,73 @@ class TestGraphInvalidDuplicatedEdge(CommonInvalidGraphConfig):
 
 
 # endregion
+
+
+# region Integration Scenarios
+class TestGraphInSequence(CommonGraphProgramConfig):
+    def graph_name(self) -> str:
+        return "two_steps"
+
+    def test_valid(self, logs_nodes: LogContainer):
+        n0 = logs_nodes.find_log(field="message", pattern="node0 was executed")
+        n1 = logs_nodes.find_log(field="message", pattern="node1 was executed")
+        n2 = logs_nodes.find_log(field="message", pattern="node2 was executed")
+        n3 = logs_nodes.find_log(field="message", pattern="node3 was executed")
+
+        assert n0.timestamp < n1.timestamp < n2.timestamp < n3.timestamp, (
+            "Nodes were not executed in the expected order"
+        )
+
+
+class TestGraphInConcurrency(CommonGraphProgramConfig):
+    def graph_name(self) -> str:
+        return "concurrency"
+
+    def test_valid(self, logs_nodes: LogContainer):
+        n0 = logs_nodes.find_log(field="message", pattern="node0 was executed")
+        n1 = logs_nodes.find_log(field="message", pattern="node1 was executed")
+        n2 = logs_nodes.find_log(field="message", pattern="node2 was executed")
+        n3 = logs_nodes.find_log(field="message", pattern="node3 was executed")
+        n4 = logs_nodes.find_log(field="message", pattern="node4 was executed")
+
+        assert n0.timestamp < n1.timestamp, "First graph has incorrect execution order"
+        assert n2.timestamp < n3.timestamp < n4.timestamp, "Second graph has incorrect execution order"
+
+
+class TestGraphInSeparatePrograms(CommonGraphProgramConfig):
+    def graph_name(self) -> str:
+        return "two_programs"
+
+    @pytest.mark.xfail(reason="https://github.com/qorix-group/inc_orchestrator_internal/issues/382")
+    def test_valid(self, logs_nodes: LogContainer):
+        n0 = logs_nodes.find_log(field="message", pattern="node0 was executed")
+        n1 = logs_nodes.find_log(field="message", pattern="node1 was executed")
+        n2 = logs_nodes.find_log(field="message", pattern="node2 was executed")
+        n3 = logs_nodes.find_log(field="message", pattern="node3 was executed")
+        n4 = logs_nodes.find_log(field="message", pattern="node4 was executed")
+
+        assert n0.timestamp < n1.timestamp, "First graph has incorrect execution order"
+        assert n2.timestamp < n3.timestamp < n4.timestamp, "Second graph has incorrect execution order"
+        # Programs are executed one after another
+        assert n1.timestamp < n2.timestamp, "Programs were not executed sequentially"
+
+
+class TestGraphDedicatedWorker(CitScenario):
+    @pytest.fixture(scope="class")
+    def test_config(self) -> dict[str, Any]:
+        return {
+            "runtime": {
+                "task_queue_size": 256,
+                "workers": 4,
+                "dedicated_workers": [{"id": "dedicated_worker_0"}],
+            }
+        }
+
+    @pytest.fixture(scope="class")
+    def scenario_name(self) -> str:
+        return "orchestration.graphs.dedicated_graph"
+
+    def test_dedicated_execution(self, logs_info_level: LogContainer):
+        dedicated_tasks = logs_info_level.get_logs(field="message", pattern=r"sync\d*")
+        dedicated_threads = {log.thread_id for log in dedicated_tasks}
+        assert len(dedicated_threads) == 1, "Expected execution only on 1 dedicated worker"

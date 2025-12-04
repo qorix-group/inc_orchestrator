@@ -25,7 +25,7 @@ rust_library(
     crate_features = select({
         "//conditions:default": [],
         "//src/flags:runtime_disable_time_correction": ["disable_vm_correction"],
-    }),
+    }) + ["tracing"],
     crate_name = "kyron",
     proc_macro_deps = [
         "//src/kyron-macros:runtime_macros",
@@ -38,7 +38,10 @@ rust_library(
     name = "libkyron_mocked",
     testonly = True,
     srcs = glob(["src/**/*.rs"]),
-    crate_features = ["runtime-api-mock"],
+    crate_features = [
+        "runtime-api-mock",
+        "tracing",
+    ],
     crate_name = "kyron",
     proc_macro_deps = [
         "//src/kyron-macros:runtime_macros",

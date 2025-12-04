@@ -1,3 +1,15 @@
+# *******************************************************************************
+# Copyright (c) 2025 Contributors to the Eclipse Foundation
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Apache License Version 2.0 which is available at
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************
 from typing import Any
 
 import pytest
@@ -56,7 +68,11 @@ class TestDemo(CitScenario):
         logs_info_level: LogContainer,
         program: str,
     ):
-        expected_iterations = int(execution_timeout * 1000 / cycle_duration_ms)
+        start = logs_info_level.find_log(field="message", value=f"Start{program} was executed")
+        program_startup_time = start.timestamp.total_seconds()
+        assert program_startup_time < 0.5, f"Program {program} start took too long"
+        program_run_time = execution_timeout - program_startup_time
+        expected_iterations = int(program_run_time * 1000 / cycle_duration_ms)
         allowed_iteration_deviation = 2
 
         logs = logs_info_level.get_logs(field="message", value=f"Run{program} was executed")

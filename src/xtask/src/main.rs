@@ -126,7 +126,7 @@ fn main() {
 fn clippy(envs: HashMap<String, String>, cli_env_vars: HashMap<String, String>, passthrough_args: &[String]) {
     run_build(
         "clippy",
-        &["clippy", "--all-targets", "--all-features"],
+        &["clippy", "--all-targets", "--features", "tracing"],
         envs,
         cli_env_vars,
         passthrough_args,

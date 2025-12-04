@@ -101,12 +101,12 @@ impl Concurrency {
             }
         }
 
-        trace!(concurrent = ?meta, "Before joining branches");
+        tracing_adapter!(concurrent = ?meta, "Before joining branches");
 
         let joined = ConcurrencyJoin::new(futures_vec);
         let res = joined.await;
 
-        trace!(concurrent = ?meta, ?res, "After joining branches");
+        tracing_adapter!(concurrent = ?meta, ?res, "After joining branches");
         res
     }
 
@@ -250,8 +250,8 @@ mod tests {
 
     #[test]
     fn concurrency_builder_using_new() {
-        let mock1 = MockActionBuilder::new().build();
-        let mock2 = MockActionBuilder::new().build();
+        let mock1 = MockActionBuilder::<()>::new().build();
+        let mock2 = MockActionBuilder::<()>::new().build();
         // Create a concurrency builder using new() and add two branches.
         let design = Design::new("Design".into(), DesignConfig::default());
         let mut concurrency_builder = ConcurrencyBuilder::new();
@@ -263,7 +263,7 @@ mod tests {
 
     #[test]
     fn concurrency_builder_using_default() {
-        let mock1 = MockActionBuilder::new().build();
+        let mock1 = MockActionBuilder::<()>::new().build();
         // Create a concurrency builder using default() and add one branch.
         let design = Design::new("Design".into(), DesignConfig::default());
         let mut concurrency_builder = ConcurrencyBuilder::default();
@@ -284,8 +284,8 @@ mod tests {
     #[test]
     #[ensure_clear_mock_runtime]
     fn concurrency_execute_ok_actions() {
-        let mock1 = MockActionBuilder::new().will_once(Ok(())).build();
-        let mock2 = MockActionBuilder::new().will_once(Ok(())).build();
+        let mock1 = MockActionBuilder::<()>::new().will_once_return(Ok(())).build();
+        let mock2 = MockActionBuilder::<()>::new().will_once_return(Ok(())).build();
 
         let design = Design::new("Design".into(), DesignConfig::default());
         let mut concurrency_builder = ConcurrencyBuilder::new();
@@ -310,7 +310,9 @@ mod tests {
     #[test]
     #[ensure_clear_mock_runtime]
     fn concurrency_execute_err_action() {
-        let mock1 = MockActionBuilder::new().will_once(Err(ActionExecError::NonRecoverableFailure)).build();
+        let mock1 = MockActionBuilder::<()>::new()
+            .will_once_return(Err(ActionExecError::NonRecoverableFailure))
+            .build();
 
         let design = Design::new("Design".into(), DesignConfig::default());
         let mut concurrency_builder = ConcurrencyBuilder::new();
@@ -335,11 +337,13 @@ mod tests {
     #[test]
     #[ensure_clear_mock_runtime]
     fn concurrency_execute_ok_and_err_actions() {
-        let mock1 = MockActionBuilder::new().will_once(Ok(())).build();
-        let mock2 = MockActionBuilder::new().will_once(Err(ActionExecError::Internal)).build();
-        let mock3 = MockActionBuilder::new().will_once(Ok(())).build();
-        let mock4 = MockActionBuilder::new().will_once(Err(ActionExecError::NonRecoverableFailure)).build();
-        let mock5 = MockActionBuilder::new().will_once(Ok(())).build();
+        let mock1 = MockActionBuilder::<()>::new().will_once_return(Ok(())).build();
+        let mock2 = MockActionBuilder::<()>::new().will_once_return(Err(ActionExecError::Internal)).build();
+        let mock3 = MockActionBuilder::<()>::new().will_once_return(Ok(())).build();
+        let mock4 = MockActionBuilder::<()>::new()
+            .will_once_return(Err(ActionExecError::NonRecoverableFailure))
+            .build();
+        let mock5 = MockActionBuilder::<()>::new().will_once_return(Ok(())).build();
 
         let design = Design::new("Design".into(), DesignConfig::default());
         let mut concurrency_builder = ConcurrencyBuilder::new();
@@ -369,8 +373,8 @@ mod tests {
     #[test]
     #[ensure_clear_mock_runtime]
     fn concurrency_polled_multiple_times_before_runtime_advances() {
-        let mock1 = MockActionBuilder::new().will_once(Ok(())).build();
-        let mock2 = MockActionBuilder::new().will_once(Ok(())).build();
+        let mock1 = MockActionBuilder::<()>::new().will_once_return(Ok(())).build();
+        let mock2 = MockActionBuilder::<()>::new().will_once_return(Ok(())).build();
 
         let design = Design::new("Design".into(), DesignConfig::default());
         let mut concurrency_builder = ConcurrencyBuilder::new();
@@ -399,8 +403,8 @@ mod tests {
     #[ensure_clear_mock_runtime]
     #[should_panic]
     fn concurrency_panics_if_polled_after_future_reported_ready() {
-        let mock1 = MockActionBuilder::new().will_once(Ok(())).build();
-        let mock2 = MockActionBuilder::new().will_once(Ok(())).build();
+        let mock1 = MockActionBuilder::<()>::new().will_once_return(Ok(())).build();
+        let mock2 = MockActionBuilder::<()>::new().will_once_return(Ok(())).build();
 
         let design = Design::new("Design".into(), DesignConfig::default());
         let mut concurrency_builder = ConcurrencyBuilder::new();
@@ -428,8 +432,8 @@ mod tests {
     #[test]
     #[ensure_clear_mock_runtime]
     fn concurrency_executed_twice() {
-        let mock1 = MockActionBuilder::new().times(2).build();
-        let mock2 = MockActionBuilder::new().times(2).build();
+        let mock1 = MockActionBuilder::<()>::new().times(2).build();
+        let mock2 = MockActionBuilder::<()>::new().times(2).build();
 
         let design = Design::new("Design".into(), DesignConfig::default());
         let mut concurrency_builder = ConcurrencyBuilder::new();
@@ -458,10 +462,10 @@ mod tests {
     #[test]
     #[ensure_clear_mock_runtime]
     fn concurrency_fails_first_time_and_succeeds_second_time() {
-        let mock1 = MockActionBuilder::new().times(2).build();
-        let mock2 = MockActionBuilder::new()
-            .will_once(Err(ActionExecError::Internal))
-            .will_once(Ok(()))
+        let mock1 = MockActionBuilder::<()>::new().times(2).build();
+        let mock2 = MockActionBuilder::<()>::new()
+            .will_once_return(Err(ActionExecError::Internal))
+            .will_once_return(Ok(()))
             .build();
 
         let design = Design::new("Design".into(), DesignConfig::default());

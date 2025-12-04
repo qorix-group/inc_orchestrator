@@ -1,3 +1,15 @@
+# *******************************************************************************
+# Copyright (c) 2025 Contributors to the Eclipse Foundation
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Apache License Version 2.0 which is available at
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************
 import json
 from pathlib import Path
 from platform import platform
@@ -373,7 +385,7 @@ class TestDedicatedWorkerAffinity(CitScenario):
     def dedicated_workers(self, num_dedicated: int, affinity: list[int]) -> list[dict[str, Any]]:
         result = []
         for i in range(num_dedicated):
-            result.append({"id": f"dedicated_worker_{i}", "affinity": affinity})
+            result.append({"id": f"dedicated_worker_{i}", "thread_affinity": affinity})
         return result
 
     @pytest.fixture(scope="class")
@@ -402,11 +414,6 @@ class TestDedicatedWorkerAffinity_Valid(TestDedicatedWorkerAffinity):
         def check_num_cores(num_required: int):
             if num_cores < num_required:
                 pytest.skip(reason=f"Test requires more CPU cores, required: {num_required}, available: {num_cores}")
-
-        if mode != "all":
-            pytest.xfail(
-                reason="Affinity not set - https://github.com/qorix-group/inc_orchestrator_internal/issues/331"
-            )
 
         match mode:
             # First available core.
@@ -455,7 +462,6 @@ class TestDedicatedWorkerAffinity_Valid(TestDedicatedWorkerAffinity):
             assert affinity == act_affinity, f"Invalid affinity, expected: {affinity}, found: {act_affinity}"
 
 
-@pytest.mark.xfail(reason="Affinity not set - https://github.com/qorix-group/inc_orchestrator_internal/issues/331")
 class TestDedicatedWorkerAffinity_OffByOne(TestDedicatedWorkerAffinity):
     @pytest.fixture(scope="class")
     def affinity(self, num_cores: int) -> list[int]:
@@ -479,7 +485,6 @@ class TestDedicatedWorkerAffinity_OffByOne(TestDedicatedWorkerAffinity):
         )
 
 
-@pytest.mark.xfail(reason="Affinity not set - https://github.com/qorix-group/inc_orchestrator_internal/issues/331")
 class TestDedicatedWorkerAffinity_LargeCoreId(TestDedicatedWorkerAffinity):
     @pytest.fixture(scope="class")
     def affinity(self) -> list[int]:
@@ -500,7 +505,6 @@ class TestDedicatedWorkerAffinity_LargeCoreId(TestDedicatedWorkerAffinity):
         )
 
 
-@pytest.mark.xfail(reason="Affinity not set - https://github.com/qorix-group/inc_orchestrator_internal/issues/331")
 class TestDedicatedWorkerAffinity_AffinityMaskTooLarge(TestDedicatedWorkerAffinity):
     @pytest.fixture(scope="class")
     def affinity(self) -> list[int]:

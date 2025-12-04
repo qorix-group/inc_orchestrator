@@ -120,7 +120,7 @@ impl OrchestrationApi<_EmptyTag> {
     ///
     pub fn design_done(self) -> OrchestrationApi<_DesignTag> {
         //TODO: This is temporary and will be removed once iceoryx IPC integration is modified.
-        #[cfg(feature = "iceoryx-ipc")]
+        #[cfg(feature = "iceoryx2-ipc")]
         {
             use crate::events::iceoryx::event::Event;
             // Start the event handling thread for Iceoryx IPC
