@@ -14,14 +14,14 @@ load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
 load("@score_orchestrator_crates//:defs.bzl", "all_crate_deps")
 
 _BASE_DEPS = [
-    "//src/kyron-foundation:libkyron_foundation",
-    "//src/logging_tracing:liblogging_tracing",
+    "@score_kyron//src/kyron-foundation:libkyron_foundation",
+    "@score_kyron//src/logging_tracing:liblogging_tracing",
 ] + all_crate_deps(
     normal = True,
 )
 
 _COMMON_DEPS = _BASE_DEPS + [
-    "//src/kyron:libkyron",
+    "@score_kyron//src/kyron:libkyron",
 ]
 
 _EXAMPLE_DEPS = _COMMON_DEPS + [
@@ -51,11 +51,11 @@ rust_test(
         "tracing",
     ],
     proc_macro_deps = [
-        "//src/kyron-testing-macros:test_macro_utils",
+        "@score_kyron//src/kyron-testing-macros:test_macro_utils",
     ],
     deps = _BASE_DEPS + [
-        "//src/kyron:libkyron_mocked",
-        "//src/kyron-testing:test_utils",
+        "@score_kyron//src/kyron:libkyron_mocked",
+        "@score_kyron//src/kyron-testing:test_utils",
     ],
 )
 
@@ -74,7 +74,7 @@ rust_binary(
         "examples/main_macro_basic.rs",
     ] + glob(["examples/common/**/*.rs"]),
     proc_macro_deps = [
-        "//src/kyron-macros:runtime_macros",
+        "@score_kyron//src/kyron-macros:runtime_macros",
     ],
     visibility = ["//visibility:public"],
     deps = _EXAMPLE_DEPS,

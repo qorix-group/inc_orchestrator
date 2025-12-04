@@ -21,8 +21,8 @@ rust_binary(
     ],
     visibility = ["//component_integration_tests/python_test_cases:__pkg__"],
     deps = [
-        "//src/kyron:libkyron",
-        "//src/kyron-foundation:libkyron_foundation",
+        # "@score_kyron//src/kyron:libkyron",
+        # "@score_kyron//src/kyron-foundation:libkyron_foundation",
         "//src/orchestration:liborchestration",
     ] + all_crate_deps(
         normal = True,

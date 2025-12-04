@@ -143,6 +143,13 @@ register_toolchains(
 )
 
 # Module deps
+bazel_dep(name = "score_kyron", version = "0.0.3")
+git_override(
+    module_name = "score_kyron",
+    commit = "3894aeb5aed46f0e762f1ec937a7a911bff7310b",
+    remote = "https://github.com/eclipse-score/kyron.git"
+)
+
 
 # Crate configs
 crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
@@ -151,12 +158,6 @@ crate.from_cargo(
     cargo_lockfile = "//:Cargo.lock",
     manifests = [
         "//:Cargo.toml",
-        "//:src/kyron-foundation/Cargo.toml",
-        "//:src/kyron/Cargo.toml",
-        "//src/kyron-macros:Cargo.toml",
-        "//:src/kyron-testing/Cargo.toml",
-        "//src/kyron-testing-macros:Cargo.toml",
-        "//:src/logging_tracing/Cargo.toml",
         "//:src/orchestration/Cargo.toml",
         "//:src/xtask/Cargo.toml",
         "//component_integration_tests/rust_test_scenarios:Cargo.toml",
