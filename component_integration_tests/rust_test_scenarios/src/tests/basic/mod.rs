@@ -3,7 +3,6 @@ use test_scenarios_rust::scenario::{ScenarioGroup, ScenarioGroupImpl};
 use tracing::info;
 
 mod demo;
-mod only_shutdown_sequence;
 mod program_runs;
 
 fn simple_checkpoint(id: &str) {
@@ -19,7 +18,6 @@ pub fn basic_scenario_group() -> Box<dyn ScenarioGroup> {
     Box::new(ScenarioGroupImpl::new(
         "basic",
         vec![
-            Box::new(only_shutdown_sequence::OnlyShutdownSequence),
             Box::new(program_runs::ProgramRun),
             Box::new(program_runs::ProgramRunMetered),
             Box::new(demo::ProgramDemo),

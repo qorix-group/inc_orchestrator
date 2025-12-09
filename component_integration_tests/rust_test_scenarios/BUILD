@@ -20,10 +20,15 @@ rust_binary(
     ],
     visibility = ["//component_integration_tests/python_test_cases:__pkg__"],
     deps = [
-        # "@score_kyron//src/kyron:libkyron",
-        # "@score_kyron//src/kyron-foundation:libkyron_foundation",
         "//src/orchestration:liborchestration",
-    ] + all_crate_deps(
-        normal = True,
-    ),
+        "@score_crates//:futures",
+        "@score_crates//:libc",
+        "@score_crates//:serde",
+        "@score_crates//:serde_json",
+        "@score_crates//:tracing",
+        "@score_crates//:tracing_subscriber",
+        "@score_kyron//src/kyron:libkyron",
+        "@score_kyron//src/kyron-foundation:libkyron_foundation",
+        "@score_test_scenarios//test_scenarios_rust",
+    ],
 )

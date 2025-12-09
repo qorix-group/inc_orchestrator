@@ -1,12 +1,15 @@
 mod internals;
 mod tests;
 
-use test_scenarios_rust::cli::run_cli_app;
+use test_scenarios_rust::cli::{create_tracing_subscriber, run_cli_app};
 use test_scenarios_rust::test_context::TestContext;
 
 use crate::tests::root_scenario_group;
 
 fn main() -> Result<(), String> {
+    let subscriber = create_tracing_subscriber();
+    tracing::subscriber::set_global_default(subscriber).expect("Setting default subscriber failed!");
+
     let raw_arguments: Vec<String> = std::env::args().collect();
 
     // Root group.
