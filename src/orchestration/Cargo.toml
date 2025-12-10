@@ -46,6 +46,7 @@ loom = { version = "0.7", features = ["checkpoint"] }
 unexpected_cfgs = { level = "warn", check-cfg = [
     'cfg(loom)',
     'cfg(feature, values("runtime-api-mock", "orch_tracing"))',
+    'cfg(feature, values("bazel_build_iceoryx2_qnx8"))',
 ] }
 
 [lints.clippy]

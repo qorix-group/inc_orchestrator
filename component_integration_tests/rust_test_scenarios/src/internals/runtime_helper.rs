@@ -86,10 +86,6 @@ impl Runtime {
         serde_json::from_value(v["runtime"].clone()).map_err(|e| e.to_string())
     }
 
-    pub fn exec_engines(&self) -> &Vec<ExecEngineConfig> {
-        &self.exec_engines
-    }
-
     pub fn build(&self) -> kyron::runtime::Runtime {
         debug!("Creating kyron::Runtime with {} execution engines", self.exec_engines.len());
 
