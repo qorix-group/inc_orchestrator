@@ -19,8 +19,8 @@
 //
 
 use crate::{
-    api::design::Design,
-    common::tag::Tag,
+    api::ShutdownEvent,
+    common::{tag::Tag, DesignConfig},
     core::metering::{MeterTrait, NoneMeter},
     prelude::{ActionExecError, ActionResult, ActionTrait},
 };
@@ -31,20 +31,20 @@ use ::core::{
     task::{Context, Poll},
     time::Duration,
 };
-use async_runtime::{scheduler::join_handle::JoinHandle, time::clock::Clock};
-use foundation::prelude::CommonErrors;
-use tracing::trace;
+use kyron::{time::clock::Clock, JoinHandle};
+use kyron_foundation::prelude::*;
+use kyron_foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
 
 #[cfg(not(any(test, feature = "runtime-api-mock")))]
-use async_runtime::safety::spawn_from_reusable;
+use kyron::safety::spawn_from_reusable;
 #[cfg(any(test, feature = "runtime-api-mock"))]
-use async_runtime::testing::mock::safety::spawn_from_reusable;
+use kyron::testing::mock::safety::spawn_from_reusable;
 
 ///
 /// Whole description to Task Chain is delivered via this instance. It shall hold all actions that build as Task Chain
 ///
 pub struct Program {
-    name: String,
+    pub(crate) name: String,
     run_action: Box<dyn ActionTrait>,
     start_action: Option<Box<dyn ActionTrait>>,
     stop_action: Option<Box<dyn ActionTrait>>,
@@ -67,7 +67,7 @@ pub struct ProgramBuilder {
     start_action: Option<Box<dyn ActionTrait>>,
     stop_action: Option<Box<dyn ActionTrait>>,
     stop_timeout: Duration,
-    shutdown_event: Option<Tag>,
+    shutdown_event_tag: Option<Tag>,
 }
 
 impl ProgramBuilder {
@@ -78,7 +78,7 @@ impl ProgramBuilder {
             start_action: None,
             stop_action: None,
             stop_timeout: Default::default(),
-            shutdown_event: None,
+            shutdown_event_tag: None,
         }
     }
 
@@ -100,11 +100,11 @@ impl ProgramBuilder {
     }
 
     pub fn with_shutdown_event(&mut self, name: Tag) -> &mut Self {
-        self.shutdown_event = Some(name);
+        self.shutdown_event_tag = Some(name);
         self
     }
 
-    pub fn build(self, design: &mut Design) -> Result<Program, CommonErrors> {
+    pub(crate) fn build(self, shutdown_events: &GrowableVec<ShutdownEvent>, config: &DesignConfig) -> Result<Program, CommonErrors> {
         if self.run_action.is_none() {
             trace!("Missing run action");
             return Err(CommonErrors::NoData);
@@ -112,16 +112,12 @@ impl ProgramBuilder {
 
         let mut shutdown_sync = None;
 
-        if let Some(shutdown_event) = self.shutdown_event {
-            match design.db.get_creator_for_shutdown_event(shutdown_event) {
-                Ok(creator) => {
-                    shutdown_sync = creator.borrow_mut().create_sync();
-                }
-                Err(CommonErrors::NotFound) => {
-                    trace!("Shutdown event {} not found", shutdown_event.tracing_str());
-                    return Err(CommonErrors::NotFound);
-                }
-                Err(_) => return Err(CommonErrors::GenericError),
+        if let Some(tag) = self.shutdown_event_tag {
+            if let Some(shutdown_event) = tag.find_in_collection(shutdown_events.iter()) {
+                shutdown_sync = shutdown_event.creator().borrow_mut().create_sync(config);
+            } else {
+                trace!("Shutdown event {} not found", tag.tracing_str());
+                return Err(CommonErrors::NotFound);
             }
         }
 
@@ -323,21 +319,19 @@ impl Future for JoinEither<'_> {
 mod tests {
     use super::*;
     use crate::{
+        api::design::Design,
         common::DesignConfig,
         prelude::{Invoke, InvokeResult},
     };
-    use async_runtime::testing;
-    use std::{
-        sync::{Arc, Mutex},
-        //task::Waker,
-        time::Duration,
-    };
-    use testing_macros::ensure_clear_mock_runtime;
+    use core::time::Duration;
+    use kyron::testing;
+    use kyron_testing_macros::ensure_clear_mock_runtime;
+    use std::sync::{Arc, Mutex};
 
     #[test]
     #[ensure_clear_mock_runtime]
     fn test_start_and_stop_action() {
-        let mut design = Design::new("ExampleDesign".into(), DesignConfig::default());
+        let design = Design::new("ExampleDesign".into(), DesignConfig::default());
 
         struct Flags {
             start_called: bool,
@@ -381,11 +375,11 @@ mod tests {
 
         let mut builder = ProgramBuilder::new("TestBuilder");
         builder
-            .with_start_action(Invoke::from_tag(&start_tag))
-            .with_run_action(Invoke::from_tag(&run_tag))
-            .with_stop_action(Invoke::from_tag(&stop_tag), Duration::from_secs(10));
+            .with_start_action(Invoke::from_tag(&start_tag, design.config()))
+            .with_run_action(Invoke::from_tag(&run_tag, design.config()))
+            .with_stop_action(Invoke::from_tag(&stop_tag, design.config()), Duration::from_secs(10));
 
-        let mut program = builder.build(&mut design).unwrap();
+        let mut program = builder.build(&GrowableVec::default(), design.config()).unwrap();
         testing::mock::spawn(async move {
             program.run_n(1).await.unwrap();
         });

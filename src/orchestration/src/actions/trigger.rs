@@ -14,14 +14,14 @@
 use crate::{
     actions::action::ActionTrait,
     api::design::Design,
-    common::orch_tag::OrchestrationTag,
+    common::{orch_tag::OrchestrationTag, DesignConfig},
     events::{event_traits::NotifierTrait, events_provider::EventActionType},
 };
 
 use super::action::{ActionBaseMeta, ReusableBoxFutureResult};
 use crate::common::tag::Tag;
 
-use async_runtime::futures::reusable_box_future::*;
+use kyron::futures::reusable_box_future::*;
 
 pub struct TriggerBuilder;
 
@@ -30,8 +30,11 @@ pub struct TriggerBuilder;
 ///
 impl TriggerBuilder {
     /// Creates a new `Trigger` action based on the provided orchestration tag.
-    pub fn from_tag(tag: &OrchestrationTag) -> Box<dyn ActionTrait> {
-        let trigger = tag.action_provider().borrow_mut().provide_event(*tag.key(), EventActionType::Trigger);
+    pub fn from_tag(tag: &OrchestrationTag, config: &DesignConfig) -> Box<dyn ActionTrait> {
+        let trigger = tag
+            .action_provider()
+            .borrow_mut()
+            .provide_event(*tag.tag(), EventActionType::Trigger, config);
         assert!(
             trigger.is_some(),
             "Failed to create Trigger Action with tag {:?}, design/deployment errors where not handled properly before or You passing wrong tag.",
@@ -50,7 +53,7 @@ impl TriggerBuilder {
             name, design
         );
 
-        Self::from_tag(&tag.unwrap())
+        Self::from_tag(&tag.unwrap(), design.config())
     }
 }
 
@@ -63,13 +66,13 @@ pub(crate) struct Trigger<T: NotifierTrait + Send + 'static> {
 }
 
 impl<T: NotifierTrait + Send> Trigger<T> {
-    pub(crate) fn new(notifier: T) -> Box<Self> {
+    pub(crate) fn new(notifier: T, future_pool_size: usize) -> Box<Self> {
         const DEFAULT_TAG: &str = "orch::internal::trigger";
 
         Box::new(Self {
             base: ActionBaseMeta {
                 tag: Tag::from_str_static(DEFAULT_TAG),
-                reusable_future_pool: ReusableBoxFuturePool::new(1, notifier.notify(0)),
+                reusable_future_pool: ReusableBoxFuturePool::for_value(future_pool_size, notifier.notify(0)),
             },
             notifier,
         })

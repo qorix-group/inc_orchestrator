@@ -1,8 +1,8 @@
-use crate::internals::helpers::runtime_helper::Runtime;
-use crate::internals::scenario::Scenario;
+use crate::internals::runtime_helper::Runtime;
+use test_scenarios_rust::scenario::Scenario;
 
 use super::*;
-use foundation::prelude::*;
+use kyron_foundation::prelude::*;
 use orchestration::{
     api::{design::Design, Orchestration},
     common::DesignConfig,
@@ -18,15 +18,15 @@ fn single_concurrency_design() -> Result<Design, CommonErrors> {
     let t3_tag = design.register_invoke_fn("Function3".into(), generic_test_func!("Function3"))?;
 
     // Create a program with actions
-    design.add_program(file!(), move |_design_instance, builder| {
+    design.add_program(file!(), move |design, builder| {
         builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(
                     ConcurrencyBuilder::new()
-                        .with_branch(Invoke::from_tag(&t1_tag))
-                        .with_branch(Invoke::from_tag(&t2_tag))
-                        .with_branch(Invoke::from_tag(&t3_tag))
-                        .build(),
+                        .with_branch(Invoke::from_tag(&t1_tag, design.config()))
+                        .with_branch(Invoke::from_tag(&t2_tag, design.config()))
+                        .with_branch(Invoke::from_tag(&t3_tag, design.config()))
+                        .build(design),
                 )
                 .with_step(JustLogAction::new("FinishAction"))
                 .build(),
@@ -40,12 +40,12 @@ fn single_concurrency_design() -> Result<Design, CommonErrors> {
 
 /// Checks Concurrency Functions
 impl Scenario for SingleConcurrency {
-    fn get_name(&self) -> &'static str {
-        "single_concurrency"
+    fn name(&self) -> &str {
+        "single"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
 
         // Build Orchestration
         let orch = Orchestration::new()
@@ -53,13 +53,14 @@ impl Scenario for SingleConcurrency {
             .design_done();
 
         // Create programs
-        let mut programs = orch.create_programs().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
+        let mut programs = program_manager.get_programs();
 
         // Put programs into runtime and run them
-        let _ = rt.block_on(async move {
-            let _ = programs.programs.pop().unwrap().run_n(1).await;
+        rt.block_on(async move {
+            let mut program = programs.pop().expect("Failed to pop program");
+            let _ = program.run_n(1).await;
             info!("Program finished running.");
-            Ok(0)
         });
 
         Ok(())
@@ -78,23 +79,23 @@ fn multiple_concurrency_design() -> Result<Design, CommonErrors> {
     let t5_tag = design.register_invoke_fn("Function5".into(), generic_test_func!("Function5"))?;
     let t6_tag = design.register_invoke_fn("Function6".into(), generic_test_func!("Function6"))?;
     // Create a program with actions
-    design.add_program(file!(), move |_design_instance, builder| {
+    design.add_program(file!(), move |design, builder| {
         builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(
                     ConcurrencyBuilder::new()
-                        .with_branch(Invoke::from_tag(&t1_tag))
-                        .with_branch(Invoke::from_tag(&t2_tag))
-                        .with_branch(Invoke::from_tag(&t3_tag))
-                        .build(),
+                        .with_branch(Invoke::from_tag(&t1_tag, design.config()))
+                        .with_branch(Invoke::from_tag(&t2_tag, design.config()))
+                        .with_branch(Invoke::from_tag(&t3_tag, design.config()))
+                        .build(design),
                 )
                 .with_step(JustLogAction::new("IntermediateAction"))
                 .with_step(
                     ConcurrencyBuilder::new()
-                        .with_branch(Invoke::from_tag(&t4_tag))
-                        .with_branch(Invoke::from_tag(&t5_tag))
-                        .with_branch(Invoke::from_tag(&t6_tag))
-                        .build(),
+                        .with_branch(Invoke::from_tag(&t4_tag, design.config()))
+                        .with_branch(Invoke::from_tag(&t5_tag, design.config()))
+                        .with_branch(Invoke::from_tag(&t6_tag, design.config()))
+                        .build(design),
                 )
                 .with_step(JustLogAction::new("FinishAction"))
                 .build(),
@@ -108,12 +109,12 @@ fn multiple_concurrency_design() -> Result<Design, CommonErrors> {
 
 /// Checks Concurrency Functions
 impl Scenario for MultipleConcurrency {
-    fn get_name(&self) -> &'static str {
-        "multiple_concurrency"
+    fn name(&self) -> &str {
+        "multiple"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
 
         // Build Orchestration
         let orch = Orchestration::new()
@@ -121,13 +122,14 @@ impl Scenario for MultipleConcurrency {
             .design_done();
 
         // Create programs
-        let mut programs = orch.create_programs().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
+        let mut programs = program_manager.get_programs();
 
         // Put programs into runtime and run them
-        let _ = rt.block_on(async move {
-            let _ = programs.programs.pop().unwrap().run_n(1).await;
+        rt.block_on(async move {
+            let mut program = programs.pop().expect("Failed to pop program");
+            let _ = program.run_n(1).await;
             info!("Program finished running.");
-            Ok(0)
         });
 
         Ok(())
@@ -145,20 +147,20 @@ fn nested_concurrency_design() -> Result<Design, CommonErrors> {
     let t4_tag = design.register_invoke_fn("OuterFunction2".into(), generic_test_func!("OuterFunction2"))?;
 
     // Create a program with actions
-    design.add_program(file!(), move |_design_instance, builder| {
+    design.add_program(file!(), move |design, builder| {
         builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(
                     ConcurrencyBuilder::new()
-                        .with_branch(Invoke::from_tag(&t1_tag))
+                        .with_branch(Invoke::from_tag(&t1_tag, design.config()))
                         .with_branch(
                             ConcurrencyBuilder::new()
-                                .with_branch(Invoke::from_tag(&t2_tag))
-                                .with_branch(Invoke::from_tag(&t3_tag))
-                                .build(),
+                                .with_branch(Invoke::from_tag(&t2_tag, design.config()))
+                                .with_branch(Invoke::from_tag(&t3_tag, design.config()))
+                                .build(design),
                         )
-                        .with_branch(Invoke::from_tag(&t4_tag))
-                        .build(),
+                        .with_branch(Invoke::from_tag(&t4_tag, design.config()))
+                        .build(design),
                 )
                 .with_step(JustLogAction::new("FinishAction"))
                 .build(),
@@ -172,12 +174,12 @@ fn nested_concurrency_design() -> Result<Design, CommonErrors> {
 
 /// Checks Concurrency Functions
 impl Scenario for NestedConcurrency {
-    fn get_name(&self) -> &'static str {
-        "nested_concurrency"
+    fn name(&self) -> &str {
+        "nested"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
 
         // Build Orchestration
         let orch = Orchestration::new()
@@ -185,13 +187,14 @@ impl Scenario for NestedConcurrency {
             .design_done();
 
         // Create programs
-        let mut programs = orch.create_programs().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
+        let mut programs = program_manager.get_programs();
 
         // Put programs into runtime and run them
-        let _ = rt.block_on(async move {
-            let _ = programs.programs.pop().unwrap().run_n(1).await;
+        rt.block_on(async move {
+            let mut program = programs.pop().expect("Failed to pop program");
+            let _ = program.run_n(1).await;
             info!("Program finished running.");
-            Ok(0)
         });
 
         Ok(())

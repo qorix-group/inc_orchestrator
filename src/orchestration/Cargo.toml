@@ -4,38 +4,31 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-async_runtime.workspace = true
-foundation.workspace = true
+kyron.workspace = true
+kyron-macros.workspace = true
+kyron-foundation.workspace = true
 
-iceoryx2.workspace = true
+iceoryx2 = { workspace = true, default_features = false }
 iceoryx2-bb-container.workspace = true
 libc.workspace = true
-logging_tracing.workspace = true
-tracing.workspace = true
-tracing-subscriber.workspace = true
 
 [dev-dependencies]
-testing.workspace = true
-testing_macros.workspace = true
-async_runtime = { workspace = true, features = ["runtime-api-mock"] }
-
-[target.'cfg(loom)'.dependencies]
-loom = { version = "0.7", features = ["checkpoint"] }
-
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = [
-    'cfg(loom)',
-    'cfg(feature, values("runtime-api-mock", "orch_tracing"))',
-] }
-
-[lints.clippy]
-std_instead_of_core = "warn"
-alloc_instead_of_core = "warn"
+kyron-testing.workspace = true
+kyron-testing-macros.workspace = true
+kyron = { workspace = true, features = ["runtime-api-mock"] }
+logging_tracing.workspace = true
 
 [features]
-default = ["iceoryx-ipc", "orch_tracing"]
-iceoryx-ipc = []
+default = ["iceoryx2-ipc", "orch_tracing", "tracing"]
+iceoryx2-ipc = []
 orch_tracing = []
+
+score-log = [
+    "kyron/score-log",
+    "kyron-foundation/score-log",
+] # Bazel compatibility only
+log = ["kyron/log", "kyron-foundation/log"]
+tracing = ["kyron/tracing", "kyron-foundation/tracing"]
 
 [[example]]
 name = "inter_process_event_sender"
@@ -44,3 +37,18 @@ path = "examples/inter_process_event/sender.rs"
 [[example]]
 name = "inter_process_event_receiver"
 path = "examples/inter_process_event/receiver.rs"
+
+
+[target.'cfg(loom)'.dependencies]
+loom = { version = "0.7", features = ["checkpoint"] }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+    'cfg(loom)',
+    'cfg(feature, values("runtime-api-mock", "orch_tracing"))',
+    'cfg(feature, values("bazel_build_iceoryx2_qnx8"))',
+] }
+
+[lints.clippy]
+std_instead_of_core = "warn"
+alloc_instead_of_core = "warn"

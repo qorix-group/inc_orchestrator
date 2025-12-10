@@ -23,9 +23,8 @@
 
 use ::core::ops::{Deref, DerefMut};
 
-use foundation::cell::UnsafeCellExt;
-use foundation::{
-    cell::UnsafeCell,
+use kyron_foundation::{
+    cell::{UnsafeCell, UnsafeCellExt},
     prelude::{CommonErrors, FoundationAtomicBool},
 };
 
@@ -101,13 +100,13 @@ impl<T> Deref for OrchTryLockGuard<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        unsafe { &*self.fake_mtx.data.get_access() }
+        unsafe { self.fake_mtx.data.as_ref_unchecked() }
     }
 }
 
 impl<T> DerefMut for OrchTryLockGuard<'_, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { &mut *self.fake_mtx.data.get_access() }
+        unsafe { self.fake_mtx.data.as_mut_unchecked() }
     }
 }
 

@@ -16,30 +16,26 @@ pub mod tag;
 
 #[derive(Clone, Debug, Copy, PartialEq)]
 pub struct ProgramDatabaseParams {
-    pub clonable_invokes_capacity: usize,
+    pub registration_capacity: usize,
 }
 
 impl Default for ProgramDatabaseParams {
     fn default() -> Self {
-        Self {
-            clonable_invokes_capacity: 256,
-        }
+        Self { registration_capacity: 256 }
     }
 }
 
 #[derive(Clone, Debug, Copy, PartialEq)]
 pub struct DesignConfig {
     pub db_params: ProgramDatabaseParams,
-    /// Describes how many times the task chain can be repeated after a failure when user explicitly requests it from [`Catch`] action
-    pub max_failure_retry: u32,
+    pub max_concurrent_action_executions: usize,
 }
 
 impl Default for DesignConfig {
     fn default() -> Self {
-        const DEFAULT_MAX_FAILURE_RETRY: u32 = 3;
         DesignConfig {
             db_params: ProgramDatabaseParams::default(),
-            max_failure_retry: DEFAULT_MAX_FAILURE_RETRY,
+            max_concurrent_action_executions: 2,
         }
     }
 }

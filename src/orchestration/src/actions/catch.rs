@@ -15,10 +15,12 @@
 use ::core::ops::BitOr;
 use std::sync::{Arc, Mutex};
 
-use async_runtime::futures::reusable_box_future::*;
+use kyron::futures::reusable_box_future::*;
 
-use foundation::not_recoverable_error;
-use foundation::prelude::*;
+use kyron_foundation::not_recoverable_error;
+use kyron_foundation::prelude::*;
+
+use crate::api::design::Design;
 
 use super::action::*;
 
@@ -154,19 +156,22 @@ impl CatchBuilder {
     /// # Panics
     /// Panics if no handler is attached.
     ///
-    pub fn build(mut self) -> Box<Catch> {
+    pub fn build(mut self, design: &Design) -> Box<Catch> {
         assert!(
             !self.handler.is_none(),
             "Catch: No handler provided, this will cause an error in execution."
         );
 
-        let mut lp = ReusableBoxFuturePool::new(1, async move { Ok(()) });
+        let mut lp = ReusableBoxFuturePool::for_value(1, async move { Ok(()) });
         let action = lp.next(async { Ok(()) }).unwrap();
 
         Box::new(Catch {
             base: ActionBaseMeta {
                 tag: "orch::internal::catch_action".into(),
-                reusable_future_pool: ReusableBoxFuturePool::new(1, Catch::execute_impl(action, HandlerType::None, self.filters)),
+                reusable_future_pool: ReusableBoxFuturePool::for_value(
+                    design.config.max_concurrent_action_executions,
+                    Catch::execute_impl(action, HandlerType::None, self.filters),
+                ),
             },
             filters: self.filters,
             action: self.action.take().expect("CatchBuilder: Action must be set before building"),
@@ -286,19 +291,21 @@ impl ActionTrait for Catch {
 #[cfg(not(loom))]
 mod tests {
 
-    use testing::prelude::CallableTrait;
-
     use super::*;
-    use std::{
+    use core::{
         sync::atomic::{AtomicBool, Ordering},
         task::Poll,
     };
 
-    use crate::testing::{MockAction, MockActionBuilder, OrchTestingPoller};
+    use crate::{
+        common::DesignConfig,
+        testing::{MockAction, MockActionBuilder, OrchTestingPoller},
+    };
 
     #[test]
     fn non_recoverable_handler_not_called_before_execution() {
-        let action = Box::new(MockAction::default());
+        let design = Design::new("Design".into(), DesignConfig::default());
+        let action = Box::new(MockAction::<()>::default());
         let builder = CatchBuilder::new(ErrorFilter::UserErrors.into(), action);
 
         let handler_called = Arc::new(AtomicBool::new(false));
@@ -308,13 +315,14 @@ mod tests {
             .catch(move |_err| {
                 handler_called_clone.store(true, Ordering::SeqCst);
             })
-            .build();
-        assert!(handler_called.load(Ordering::SeqCst) == false); // Handler should not be called during build
+            .build(&design);
+        assert!(!handler_called.load(Ordering::SeqCst)); // Handler should not be called during build
     }
 
     #[test]
     fn recoverable_handler_not_called_before_execution() {
-        let action = Box::new(MockAction::default());
+        let design = Design::new("Design".into(), DesignConfig::default());
+        let action = Box::new(MockAction::<()>::default());
         let builder = CatchBuilder::new(ErrorFilter::UserErrors.into(), action);
 
         let handler_called = Arc::new(AtomicBool::new(false));
@@ -325,14 +333,14 @@ mod tests {
                 handler_called_clone.store(true, Ordering::SeqCst);
                 true
             })
-            .build();
-        assert!(handler_called.load(Ordering::SeqCst) == false); // Handler should not be called during build
+            .build(&design);
+        assert!(!handler_called.load(Ordering::SeqCst)); // Handler should not be called during build
     }
 
     #[test]
     #[should_panic(expected = "Catch: Cannot set handler multiple times, this will cause an error in execution.")]
     fn multiple_handlers_panic() {
-        let action = Box::new(MockAction::default());
+        let action = Box::new(MockAction::<()>::default());
         let mut builder = CatchBuilder::new(ErrorFilter::UserErrors.into(), action);
 
         builder = builder.catch(|_err| {});
@@ -342,24 +350,26 @@ mod tests {
     #[test]
     #[should_panic(expected = "Catch: No handler provided, this will cause an error in execution.")]
     fn no_handler_panic() {
-        let action = Box::new(MockAction::default());
+        let design = Design::new("Design".into(), DesignConfig::default());
+        let action = Box::new(MockAction::<()>::default());
         let builder = CatchBuilder::new(ErrorFilter::UserErrors.into(), action);
 
-        builder.build(); // This should panic
+        builder.build(&design); // This should panic
     }
 
     #[test]
     fn when_user_action_finished_without_error_catch_returns_ok() {
-        let action = Box::new(MockAction::default());
+        let design = Design::new("Design".into(), DesignConfig::default());
+        let action = Box::new(MockAction::<()>::default());
         let builder = CatchBuilder::new(ErrorFilter::UserErrors.into(), action);
 
-        let mut handler_mock = testing::mock_fn::MockFnBuilder::<bool>::new().times(0).build();
+        let mut handler_mock = kyron_testing::mock_fn::MockFnBuilder::<(), bool>::new().times(0).build();
 
         let mut catch = builder
             .catch(move |_err| {
-                handler_mock.call();
+                handler_mock.call(());
             })
-            .build();
+            .build(&design);
 
         let f = catch.try_execute().unwrap();
 
@@ -370,16 +380,21 @@ mod tests {
 
     #[test]
     fn when_user_action_finished_with_filtered_error_catch_calls_handler() {
-        let action = Box::new(MockActionBuilder::new().will_once(Err(UserErrValue::from(64).into())).build());
+        let design = Design::new("Design".into(), DesignConfig::default());
+        let action = Box::new(
+            MockActionBuilder::<()>::new()
+                .will_once_return(Err(UserErrValue::from(64).into()))
+                .build(),
+        );
         let builder = CatchBuilder::new(ErrorFilter::UserErrors.into(), action);
 
-        let mut handler_mock = testing::mock_fn::MockFnBuilder::<bool>::new().times(1).build();
+        let mut handler_mock = kyron_testing::mock_fn::MockFnBuilder::<(), bool>::new().times(1).build();
 
         let mut catch = builder
             .catch(move |_err| {
-                handler_mock.call();
+                handler_mock.call(());
             })
-            .build();
+            .build(&design);
 
         let f = catch.try_execute().unwrap();
 
@@ -391,16 +406,17 @@ mod tests {
     #[test]
     fn when_user_action_finished_with_not_filtered_error_catch_does_not_call_handler() {
         {
-            let action = Box::new(MockActionBuilder::new().will_once(Err(ActionExecError::Timeout)).build());
+            let design = Design::new("Design".into(), DesignConfig::default());
+            let action = Box::new(MockActionBuilder::<()>::new().will_once_return(Err(ActionExecError::Timeout)).build());
             let builder = CatchBuilder::new(ErrorFilter::UserErrors.into(), action);
 
-            let mut handler_mock = testing::mock_fn::MockFnBuilder::<bool>::new().times(0).build();
+            let mut handler_mock = kyron_testing::mock_fn::MockFnBuilder::<(), bool>::new().times(0).build();
 
             let mut catch = builder
                 .catch(move |_err| {
-                    handler_mock.call();
+                    handler_mock.call(());
                 })
-                .build();
+                .build(&design);
 
             let f = catch.try_execute().unwrap();
 
@@ -410,16 +426,21 @@ mod tests {
         }
 
         {
-            let action = Box::new(MockActionBuilder::new().will_once(Err(UserErrValue::from(64).into())).build());
+            let design = Design::new("Design".into(), DesignConfig::default());
+            let action = Box::new(
+                MockActionBuilder::<()>::new()
+                    .will_once_return(Err(UserErrValue::from(64).into()))
+                    .build(),
+            );
             let builder = CatchBuilder::new(ErrorFilter::Timeouts.into(), action);
 
-            let mut handler_mock = testing::mock_fn::MockFnBuilder::<bool>::new().times(0).build();
+            let mut handler_mock = kyron_testing::mock_fn::MockFnBuilder::<(), bool>::new().times(0).build();
 
             let mut catch = builder
                 .catch(move |_err| {
-                    handler_mock.call();
+                    handler_mock.call(());
                 })
-                .build();
+                .build(&design);
 
             let f = catch.try_execute().unwrap();
 
@@ -431,16 +452,17 @@ mod tests {
 
     #[test]
     fn when_action_finished_with_internal_err_error_is_propagated() {
-        let action = Box::new(MockActionBuilder::new().will_once(Err(ActionExecError::Internal)).build());
+        let design = Design::new("Design".into(), DesignConfig::default());
+        let action = Box::new(MockActionBuilder::<()>::new().will_once_return(Err(ActionExecError::Internal)).build());
         let builder = CatchBuilder::new(ErrorFilter::UserErrors.into(), action);
 
-        let mut handler_mock = testing::mock_fn::MockFnBuilder::<bool>::new().times(0).build();
+        let mut handler_mock = kyron_testing::mock_fn::MockFnBuilder::<(), bool>::new().times(0).build();
 
         let mut catch = builder
             .catch(move |_err| {
-                handler_mock.call();
+                handler_mock.call(());
             })
-            .build();
+            .build(&design);
 
         let f = catch.try_execute().unwrap();
 
@@ -451,17 +473,22 @@ mod tests {
 
     #[test]
     fn when_user_action_finished_with_filtered_error_catch_calls_handler_and_continue_execution() {
-        let action = Box::new(MockActionBuilder::new().will_once(Err(UserErrValue::from(64).into())).build());
+        let design = Design::new("Design".into(), DesignConfig::default());
+        let action = Box::new(
+            MockActionBuilder::<()>::new()
+                .will_once_return(Err(UserErrValue::from(64).into()))
+                .build(),
+        );
         let builder = CatchBuilder::new(ErrorFilter::UserErrors.into(), action);
 
-        let mut handler_mock = testing::mock_fn::MockFnBuilder::<bool>::new().times(1).build();
+        let mut handler_mock = kyron_testing::mock_fn::MockFnBuilder::<(), bool>::new().times(1).build();
 
         let mut catch = builder
             .catch_recoverable(move |_err| {
-                handler_mock.call();
+                handler_mock.call(());
                 true
             })
-            .build();
+            .build(&design);
 
         let f = catch.try_execute().unwrap();
 
@@ -472,17 +499,22 @@ mod tests {
 
     #[test]
     fn when_user_action_finished_with_filtered_error_catch_calls_handler_and_returns_err() {
-        let action = Box::new(MockActionBuilder::new().will_once(Err(UserErrValue::from(64).into())).build());
+        let design = Design::new("Design".into(), DesignConfig::default());
+        let action = Box::new(
+            MockActionBuilder::<()>::new()
+                .will_once_return(Err(UserErrValue::from(64).into()))
+                .build(),
+        );
         let builder = CatchBuilder::new(ErrorFilter::UserErrors.into(), action);
 
-        let mut handler_mock = testing::mock_fn::MockFnBuilder::<bool>::new().times(1).build();
+        let mut handler_mock = kyron_testing::mock_fn::MockFnBuilder::<(), bool>::new().times(1).build();
 
         let mut catch = builder
             .catch_recoverable(move |_err| {
-                handler_mock.call();
+                handler_mock.call(());
                 false
             })
-            .build();
+            .build(&design);
 
         let f = catch.try_execute().unwrap();
 

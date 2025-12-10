@@ -10,28 +10,33 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 # *******************************************************************************
-load("@crates//:defs.bzl", "all_crate_deps")
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
 
 _BASE_DEPS = [
-    "//src/foundation:libfoundation",
-    "//src/logging_tracing:liblogging_tracing",
-] + all_crate_deps(
-    normal = True,
-)
+    "@score_kyron//src/kyron-foundation:libkyron_foundation",
+    "@score_crates//:iceoryx2_qnx8",
+    "@score_crates//:iceoryx2_bb_container_qnx8",
+    "@score_crates//:libc",
+]
 
 _COMMON_DEPS = _BASE_DEPS + [
-    "//src/async_runtime:libasync_runtime",
+    "@score_kyron//src/kyron:libkyron",
 ]
 
 _EXAMPLE_DEPS = _COMMON_DEPS + [
     ":liborchestration",
+    "@score_kyron//src/logging_tracing:liblogging_tracing",
 ]
 
 rust_library(
     name = "liborchestration",
     srcs = glob(["src/**/*.rs"]),
-    crate_features = ["iceoryx-ipc"],
+    crate_features = [
+        "iceoryx2-ipc",
+        "orch_tracing",
+        "tracing",
+        "bazel_build_iceoryx2_qnx8",
+    ],
     crate_name = "orchestration",
     visibility = ["//visibility:public"],
     deps = _COMMON_DEPS,
@@ -42,14 +47,17 @@ rust_test(
     name = "tests",
     srcs = glob(["src/**/*.rs"]),
     crate_features = [
-        "iceoryx-ipc",
+        "iceoryx2-ipc",
+        "orch_tracing",
+        "tracing",
+        "bazel_build_iceoryx2_qnx8",
     ],
     proc_macro_deps = [
-        "//src/testing_macros:test_macro_utils",
+        "@score_kyron//src/kyron-testing-macros:test_macro_utils",
     ],
     deps = _BASE_DEPS + [
-        "//src/async_runtime:libasync_runtime_mocked",
-        "//src/testing:test_utils",
+        "@score_kyron//src/kyron:libkyron_mocked",
+        "@score_kyron//src/kyron-testing:test_utils",
     ],
 )
 
@@ -58,6 +66,18 @@ rust_binary(
     srcs = [
         "examples/basic.rs",
     ] + glob(["examples/common/**/*.rs"]),
+    visibility = ["//visibility:public"],
+    deps = _EXAMPLE_DEPS,
+)
+
+rust_binary(
+    name = "main_macro_basic",
+    srcs = [
+        "examples/main_macro_basic.rs",
+    ] + glob(["examples/common/**/*.rs"]),
+    proc_macro_deps = [
+        "@score_kyron//src/kyron-macros:runtime_macros",
+    ],
     visibility = ["//visibility:public"],
     deps = _EXAMPLE_DEPS,
 )
@@ -81,12 +101,21 @@ rust_binary(
 )
 
 rust_binary(
-    name = "camera_drv_object_det",
+    name = "inter_process_event_sender",
     srcs = [
-        "examples/camera_drv_object_det/camera_driver.rs",
-        "examples/camera_drv_object_det/main.rs",
-        "examples/camera_drv_object_det/object_detection.rs",
+        "examples/inter_process_event/sender.rs",
     ] + glob(["examples/common/**/*.rs"]),
+    crate_root = "examples/inter_process_event/sender.rs",
+    visibility = ["//visibility:public"],
+    deps = _EXAMPLE_DEPS,
+)
+
+rust_binary(
+    name = "inter_process_event_receiver",
+    srcs = [
+        "examples/inter_process_event/receiver.rs",
+    ] + glob(["examples/common/**/*.rs"]),
+    crate_root = "examples/inter_process_event/receiver.rs",
     visibility = ["//visibility:public"],
     deps = _EXAMPLE_DEPS,
 )

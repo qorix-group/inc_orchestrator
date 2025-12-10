@@ -1,10 +1,25 @@
+# *******************************************************************************
+# Copyright (c) 2025 Contributors to the Eclipse Foundation
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Apache License Version 2.0 which is available at
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************
 name: Component Integration Tests
 
 on:
+  push:
+    branches: [main, development]
   pull_request:
-    types: [opened, reopened, synchronize]
-  merge_group:
-    types: [checks_requested]
+    branches: [main, development]
+    types: [opened, ready_for_review, reopened, synchronize]
+  schedule:
+    - cron: '45 1 * * *' # This runs every day at 1:45 UTC
 
 env:
   CARGO_TERM_COLOR: always
@@ -13,9 +28,7 @@ env:
 jobs:
   component-integration-tests:
     permissions:
-      contents: write
-      pages: write
-      id-token: write
+      contents: read
     runs-on: ${{ vars.REPO_RUNNER_LABELS && fromJSON(vars.REPO_RUNNER_LABELS) || 'ubuntu-latest' }}
     defaults:
       run:
@@ -45,8 +58,18 @@ jobs:
           source .venv/bin/activate
           pip install -r requirements.txt
 
-      - name: Run Python tests with pytest
+      - name: Run Python tests with pytest (PR)
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
         working-directory: component_integration_tests/python_test_cases
         run: |
           source .venv/bin/activate
-          python -m pytest
+          python -m pytest --traces=all
+
+      - name: Run Python tests with pytest (Nightly)
+        if: github.event_name == 'schedule'
+        env:
+          NIGHTLY: TRUE
+        working-directory: component_integration_tests/python_test_cases
+        run: |
+          source .venv/bin/activate
+          python -m pytest --traces=all --count=20 --repeat-scope=session

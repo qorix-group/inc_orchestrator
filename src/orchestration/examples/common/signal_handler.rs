@@ -17,7 +17,7 @@ use ::core::{
     sync::atomic::{AtomicI32, Ordering},
     time::Duration,
 };
-use libc::{sigaction, sighandler_t, SA_RESTART, SIGINT, SIGTERM};
+use libc::{sigaction, sighandler_t, SIGINT, SIGTERM};
 
 pub struct SignalHandler {
     signal: AtomicI32,
@@ -32,12 +32,11 @@ impl SignalHandler {
 
     /// Registers signal handlers for SIGINT and SIGTERM.
     pub unsafe fn register_signal_handlers(&self) {
-        let mut action: sigaction = std::mem::zeroed();
+        let mut action: sigaction = core::mem::zeroed();
         action.sa_sigaction = handler as sighandler_t;
-        action.sa_flags = SA_RESTART;
 
-        sigaction(SIGINT, &action, std::ptr::null_mut());
-        sigaction(SIGTERM, &action, std::ptr::null_mut());
+        sigaction(SIGINT, &action, core::ptr::null_mut());
+        sigaction(SIGTERM, &action, core::ptr::null_mut());
     }
 
     /// Returns the current signal value.

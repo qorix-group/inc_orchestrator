@@ -14,6 +14,7 @@
 pub use crate::actions::action::*;
 pub use crate::actions::catch::*;
 pub use crate::actions::concurrency::*;
+pub use crate::actions::graph::*;
 pub use crate::actions::invoke::*;
 pub use crate::actions::sequence::*;
 pub use crate::actions::sync::*;

@@ -11,10 +11,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use crate::common::orch_tag::{MapIdentifier, OrchestrationTag};
-use crate::common::tag::{AsTagTrait, Tag};
+use crate::actions::ifelse::{IfElse, IfElseCondition};
+use crate::common::orch_tag::OrchestrationTag;
+use crate::common::tag::Tag;
 use crate::common::DesignConfig;
-use crate::events::events_provider::{DesignEvent, EventActionType, DEFAULT_EVENTS_CAPACITY};
+use crate::events::events_provider::EventActionType;
 use crate::{
     actions::{
         action::ActionTrait,
@@ -22,10 +23,9 @@ use crate::{
     },
     events::events_provider::EventCreator,
 };
-use async_runtime::core::types::UniqueWorkerId;
-use foundation::containers::growable_vec::GrowableVec;
-use foundation::prelude::*;
-use iceoryx2_bb_container::slotmap::{SlotMap, SlotMapKey};
+use iceoryx2_bb_container::flatmap::{FlatMap, FlatMapError};
+use kyron::core::types::UniqueWorkerId;
+use kyron_foundation::prelude::*;
 use std::{
     boxed::Box,
     rc::Rc,
@@ -34,38 +34,45 @@ use std::{
 
 use ::core::{cell::RefCell, fmt::Debug, future::Future};
 
-struct ActionData {
-    tag: Tag,
-    worker_id: Option<UniqueWorkerId>,
-    generator: Box<dyn Fn(Tag, Option<UniqueWorkerId>) -> Box<dyn ActionTrait>>,
-}
-
 pub(crate) struct ActionProvider {
-    clonable_invokes: SlotMap<ActionData>,
-    design_events: SlotMap<DesignEvent>,
+    data: FlatMap<Tag, ActionData>,
 }
 
 impl ActionProvider {
-    pub(crate) fn new(clonable_invokes_capacity: usize) -> Self {
+    pub(crate) fn new(config: DesignConfig) -> Self {
         Self {
-            clonable_invokes: SlotMap::new(clonable_invokes_capacity),
-            design_events: SlotMap::new(DEFAULT_EVENTS_CAPACITY),
+            data: FlatMap::new(config.db_params.registration_capacity),
         }
     }
 
-    pub(crate) fn provide_invoke(&mut self, key: SlotMapKey) -> Option<Box<dyn ActionTrait>> {
-        if let Some(data) = self.clonable_invokes.get(key) {
-            Some((data.generator)(data.tag, data.worker_id))
-        } else {
-            None
-        }
+    pub(crate) fn provide_invoke(&mut self, tag: Tag, config: &DesignConfig) -> Option<Box<dyn ActionTrait>> {
+        self.data.get_ref(&tag).and_then(|data| match data {
+            ActionData::Invoke(invoke_data) => Some((invoke_data.generator)(tag, invoke_data.worker_id, config)),
+            _ => None,
+        })
     }
 
-    pub(crate) fn provide_event(&mut self, key: SlotMapKey, t: EventActionType) -> Option<Box<dyn ActionTrait>> {
-        match t {
-            EventActionType::Trigger => self.design_events.get(key).and_then(|e| e.creator()?.borrow_mut().create_trigger()),
-            EventActionType::Sync => self.design_events.get(key).and_then(|e| e.creator()?.borrow_mut().create_sync()),
-        }
+    pub(crate) fn provide_event(&mut self, tag: Tag, t: EventActionType, config: &DesignConfig) -> Option<Box<dyn ActionTrait>> {
+        self.data.get_ref(&tag).and_then(|data| match data {
+            ActionData::Event(event_data) => match t {
+                EventActionType::Trigger => event_data.creator()?.borrow_mut().create_trigger(config),
+                EventActionType::Sync => event_data.creator()?.borrow_mut().create_sync(config),
+            },
+            _ => None,
+        })
+    }
+
+    pub(crate) fn provide_if_else(
+        &mut self,
+        tag: Tag,
+        true_branch: Box<dyn ActionTrait>,
+        false_branch: Box<dyn ActionTrait>,
+        config: &DesignConfig,
+    ) -> Option<Box<dyn ActionTrait>> {
+        self.data.get_ref(&tag).and_then(|data| match data {
+            ActionData::IfElse(ifelse_data) => Some((ifelse_data.generator)(true_branch, false_branch, config)),
+            _ => None,
+        })
     }
 }
 
@@ -77,47 +84,13 @@ impl Debug for ActionProvider {
 
 pub struct ProgramDatabase {
     action_provider: Rc<RefCell<ActionProvider>>,
-    design_shutdown_events: GrowableVec<DesignEvent>,
 }
 
 impl ProgramDatabase {
     /// Creates a new instance of `ProgramDatabase`.
-    pub fn new(params: DesignConfig) -> Self {
-        // TODO: Provider needs to keep DesignConfig probably so tags can have info from it
+    pub fn new(config: DesignConfig) -> Self {
         Self {
-            action_provider: Rc::new(RefCell::new(ActionProvider::new(params.db_params.clonable_invokes_capacity))),
-            design_shutdown_events: GrowableVec::default(),
-        }
-    }
-
-    pub fn register_event(&self, tag: Tag) -> Result<OrchestrationTag, CommonErrors> {
-        let mut ap = self.action_provider.borrow_mut();
-
-        if tag.is_in_collection(ap.design_events.iter()) || tag.is_in_collection(self.design_shutdown_events.iter()) {
-            return Err(CommonErrors::AlreadyDone);
-        }
-
-        ap.design_events
-            .insert(DesignEvent::new(tag))
-            .ok_or(CommonErrors::NoSpaceLeft)
-            .map(|key| {
-                trace!("Registered event with tag: {:?}", tag);
-                OrchestrationTag::new(tag, key, MapIdentifier::Event, Rc::clone(&self.action_provider))
-            })
-    }
-
-    pub fn register_shutdown_event(&mut self, tag: Tag) -> Result<(), CommonErrors> {
-        let ap = self.action_provider.borrow_mut();
-
-        if tag.is_in_collection(ap.design_events.iter()) || tag.is_in_collection(self.design_shutdown_events.iter()) {
-            return Err(CommonErrors::AlreadyDone);
-        }
-
-        if self.design_shutdown_events.push(DesignEvent::new(tag)) {
-            trace!("Registered shutdown event with tag: {:?}", tag);
-            Ok(())
-        } else {
-            Err(CommonErrors::GenericError)
+            action_provider: Rc::new(RefCell::new(ActionProvider::new(config))),
         }
     }
 
@@ -125,23 +98,18 @@ impl ProgramDatabase {
     pub fn register_invoke_fn(&self, tag: Tag, action: InvokeFunctionType) -> Result<OrchestrationTag, CommonErrors> {
         let mut ap = self.action_provider.borrow_mut();
 
-        if !tag.is_in_collection(ap.clonable_invokes.iter()) {
-            if let Some(key) = ap.clonable_invokes.insert(ActionData {
-                tag,
+        match ap.data.insert(
+            tag,
+            ActionData::Invoke(InvokeData {
                 worker_id: None,
-                generator: Box::new(move |tag: Tag, worker_id: Option<UniqueWorkerId>| Invoke::from_fn(tag, action, worker_id)),
-            }) {
-                Ok(OrchestrationTag::new(
-                    tag,
-                    key,
-                    MapIdentifier::ClonableInvokeMap,
-                    Rc::clone(&self.action_provider),
-                ))
-            } else {
-                Err(CommonErrors::NoSpaceLeft)
-            }
-        } else {
-            Err(CommonErrors::AlreadyDone)
+                generator: Rc::new(move |tag: Tag, worker_id: Option<UniqueWorkerId>, config: &DesignConfig| {
+                    Invoke::from_fn(tag, action, worker_id, config)
+                }),
+            }),
+        ) {
+            Ok(_) => Ok(OrchestrationTag::new(tag, Rc::clone(&self.action_provider))),
+            Err(FlatMapError::IsFull) => Err(CommonErrors::NoSpaceLeft),
+            Err(FlatMapError::KeyAlreadyExists) => Err(CommonErrors::AlreadyDone),
         }
     }
 
@@ -153,23 +121,18 @@ impl ProgramDatabase {
     {
         let mut ap = self.action_provider.borrow_mut();
 
-        if !tag.is_in_collection(ap.clonable_invokes.iter()) {
-            if let Some(key) = ap.clonable_invokes.insert(ActionData {
-                tag,
+        match ap.data.insert(
+            tag,
+            ActionData::Invoke(InvokeData {
                 worker_id: None,
-                generator: Box::new(move |tag: Tag, worker_id: Option<UniqueWorkerId>| Invoke::from_async(tag, action.clone(), worker_id)),
-            }) {
-                Ok(OrchestrationTag::new(
-                    tag,
-                    key,
-                    MapIdentifier::ClonableInvokeMap,
-                    Rc::clone(&self.action_provider),
-                ))
-            } else {
-                Err(CommonErrors::NoSpaceLeft)
-            }
-        } else {
-            Err(CommonErrors::AlreadyDone)
+                generator: Rc::new(move |tag: Tag, worker_id: Option<UniqueWorkerId>, config: &DesignConfig| {
+                    Invoke::from_async(tag, action.clone(), worker_id, config)
+                }),
+            }),
+        ) {
+            Ok(_) => Ok(OrchestrationTag::new(tag, Rc::clone(&self.action_provider))),
+            Err(FlatMapError::IsFull) => Err(CommonErrors::NoSpaceLeft),
+            Err(FlatMapError::KeyAlreadyExists) => Err(CommonErrors::AlreadyDone),
         }
     }
 
@@ -182,25 +145,18 @@ impl ProgramDatabase {
     ) -> Result<OrchestrationTag, CommonErrors> {
         let mut ap = self.action_provider.borrow_mut();
 
-        if !tag.is_in_collection(ap.clonable_invokes.iter()) {
-            if let Some(key) = ap.clonable_invokes.insert(ActionData {
-                tag,
+        match ap.data.insert(
+            tag,
+            ActionData::Invoke(InvokeData {
                 worker_id: None,
-                generator: Box::new(move |tag: Tag, worker_id: Option<UniqueWorkerId>| {
-                    Invoke::from_method(tag, Arc::clone(&object), method, worker_id)
+                generator: Rc::new(move |tag: Tag, worker_id: Option<UniqueWorkerId>, config: &DesignConfig| {
+                    Invoke::from_method(tag, Arc::clone(&object), method, worker_id, config)
                 }),
-            }) {
-                Ok(OrchestrationTag::new(
-                    tag,
-                    key,
-                    MapIdentifier::ClonableInvokeMap,
-                    Rc::clone(&self.action_provider),
-                ))
-            } else {
-                Err(CommonErrors::NoSpaceLeft)
-            }
-        } else {
-            Err(CommonErrors::AlreadyDone)
+            }),
+        ) {
+            Ok(_) => Ok(OrchestrationTag::new(tag, Rc::clone(&self.action_provider))),
+            Err(FlatMapError::IsFull) => Err(CommonErrors::NoSpaceLeft),
+            Err(FlatMapError::KeyAlreadyExists) => Err(CommonErrors::AlreadyDone),
         }
     }
 
@@ -213,48 +169,79 @@ impl ProgramDatabase {
     {
         let mut ap = self.action_provider.borrow_mut();
 
-        if !tag.is_in_collection(ap.clonable_invokes.iter()) {
-            if let Some(key) = ap.clonable_invokes.insert(ActionData {
-                tag,
+        match ap.data.insert(
+            tag,
+            ActionData::Invoke(InvokeData {
                 worker_id: None,
-                generator: Box::new(move |tag: Tag, worker_id: Option<UniqueWorkerId>| {
-                    Invoke::from_method_async(tag, Arc::clone(&object), method.clone(), worker_id)
+                generator: Rc::new(move |tag: Tag, worker_id: Option<UniqueWorkerId>, config: &DesignConfig| {
+                    Invoke::from_method_async(tag, Arc::clone(&object), method.clone(), worker_id, config)
                 }),
-            }) {
-                Ok(OrchestrationTag::new(
-                    tag,
-                    key,
-                    MapIdentifier::ClonableInvokeMap,
-                    Rc::clone(&self.action_provider),
-                ))
-            } else {
-                Err(CommonErrors::NoSpaceLeft)
-            }
-        } else {
-            Err(CommonErrors::AlreadyDone)
+            }),
+        ) {
+            Ok(_) => Ok(OrchestrationTag::new(tag, Rc::clone(&self.action_provider))),
+            Err(FlatMapError::IsFull) => Err(CommonErrors::NoSpaceLeft),
+            Err(FlatMapError::KeyAlreadyExists) => Err(CommonErrors::AlreadyDone),
         }
     }
 
-    /// Associates an invoke action with a tag with the given worker id.
-    pub fn set_invoke_worker_id(&mut self, tag: Tag, worker_id: UniqueWorkerId) -> Result<(), CommonErrors> {
-        let ap = &mut self.action_provider.borrow_mut();
-        let map = &mut ap.clonable_invokes;
+    /// Registers an event for the Sync and Trigger actions.
+    pub fn register_event(&self, tag: Tag) -> Result<OrchestrationTag, CommonErrors> {
+        let mut ap = self.action_provider.borrow_mut();
 
-        if let Some((key, _)) = tag.find_in_collection(map.iter()) {
-            // A mutable borrow is needed to take the data out of the entry, but iter_mut is not implemented for SlotMap.
-            if let Some(data) = map.get_mut(key) {
-                if data.worker_id.is_some() {
-                    return Err(CommonErrors::AlreadyDone);
-                }
-
-                trace!("Setting worker id {:?} for invoke action with tag {:?}", worker_id, tag);
-                data.worker_id = Some(worker_id);
-
-                return Ok(());
+        match ap.data.insert(tag, ActionData::Event(EventData { creator: None })) {
+            Ok(_) => {
+                trace!("Registered event with tag: {:?}", tag);
+                Ok(OrchestrationTag::new(tag, Rc::clone(&self.action_provider)))
             }
+            Err(FlatMapError::IsFull) => Err(CommonErrors::NoSpaceLeft),
+            Err(FlatMapError::KeyAlreadyExists) => Err(CommonErrors::AlreadyDone),
         }
+    }
 
-        Err(CommonErrors::NotFound)
+    /// Registers an arc condition for an IfElse action.
+    pub fn register_if_else_arc_condition<C>(&mut self, tag: Tag, condition: Arc<C>) -> Result<OrchestrationTag, CommonErrors>
+    where
+        C: IfElseCondition + Send + Sync + 'static,
+    {
+        let mut ap = self.action_provider.borrow_mut();
+
+        match ap.data.insert(
+            tag,
+            ActionData::IfElse(IfElseData {
+                generator: Rc::new(
+                    move |true_branch: Box<dyn ActionTrait>, false_branch: Box<dyn ActionTrait>, config: &DesignConfig| {
+                        IfElse::from_arc_condition(Arc::clone(&condition), true_branch, false_branch, config)
+                    },
+                ),
+            }),
+        ) {
+            Ok(_) => Ok(OrchestrationTag::new(tag, Rc::clone(&self.action_provider))),
+            Err(FlatMapError::IsFull) => Err(CommonErrors::NoSpaceLeft),
+            Err(FlatMapError::KeyAlreadyExists) => Err(CommonErrors::AlreadyDone),
+        }
+    }
+
+    /// Registers an arc mutex condition for an IfElse action.
+    pub fn register_if_else_arc_mutex_condition<C>(&mut self, tag: Tag, condition: Arc<Mutex<C>>) -> Result<OrchestrationTag, CommonErrors>
+    where
+        C: IfElseCondition + Send + 'static,
+    {
+        let mut ap = self.action_provider.borrow_mut();
+
+        match ap.data.insert(
+            tag,
+            ActionData::IfElse(IfElseData {
+                generator: Rc::new(
+                    move |true_branch: Box<dyn ActionTrait>, false_branch: Box<dyn ActionTrait>, config: &DesignConfig| {
+                        IfElse::from_arc_mutex_condition(Arc::clone(&condition), true_branch, false_branch, config)
+                    },
+                ),
+            }),
+        ) {
+            Ok(_) => Ok(OrchestrationTag::new(tag, Rc::clone(&self.action_provider))),
+            Err(FlatMapError::IsFull) => Err(CommonErrors::NoSpaceLeft),
+            Err(FlatMapError::KeyAlreadyExists) => Err(CommonErrors::AlreadyDone),
+        }
     }
 
     /// Returns an `OrchestrationTag` for an action previously registered with the given tag.
@@ -262,68 +249,54 @@ impl ProgramDatabase {
     /// # Returns
     /// - `Ok(OrchestrationTag)` if the tag exists and is associated with an action.
     /// - `Err(CommonErrors::NotFound)` if the tag does not exist.
-    /// - `Err(CommonErrors::GenericError)` if the tag is associated ambiguously (since we allow same tag for invoke/events/others)
     ///
     pub fn get_orchestration_tag(&self, tag: Tag) -> Result<OrchestrationTag, CommonErrors> {
-        let ap = self.action_provider.borrow();
-
-        let invoke = tag.find_in_collection(ap.clonable_invokes.iter());
-        let evt = tag.find_in_collection(ap.design_events.iter()).map(|(key, _)| key);
-
-        if evt.is_some() && invoke.is_some() {
-            return Err(CommonErrors::GenericError);
-        }
-
-        if let Some((key, entry)) = invoke {
-            Ok(OrchestrationTag::new(
-                entry.tag,
-                key,
-                MapIdentifier::ClonableInvokeMap,
-                Rc::clone(&self.action_provider),
-            ))
-        } else if let Some(key) = evt {
-            Ok(OrchestrationTag::new(tag, key, MapIdentifier::Event, Rc::clone(&self.action_provider)))
+        if self.action_provider.borrow().data.contains(&tag) {
+            Ok(OrchestrationTag::new(tag, Rc::clone(&self.action_provider)))
         } else {
             Err(CommonErrors::NotFound)
         }
     }
 
-    pub(crate) fn set_creator_for_events(&self, creator: EventCreator, user_events: &[Tag]) -> Result<(), CommonErrors> {
+    /// Associates an invoke action with a tag with the given worker id.
+    pub(crate) fn set_invoke_worker_id(&mut self, tag: Tag, worker_id: UniqueWorkerId) -> Result<(), CommonErrors> {
+        let ap = &mut self.action_provider.borrow_mut();
+
+        if let Some(data) = ap.data.get_mut_ref(&tag) {
+            match data {
+                ActionData::Invoke(invoke_data) => {
+                    if invoke_data.worker_id.is_some() {
+                        return Err(CommonErrors::AlreadyDone);
+                    }
+
+                    trace!("Setting worker id {:?} for invoke action with tag {:?}", worker_id, tag);
+                    invoke_data.worker_id = Some(worker_id);
+
+                    Ok(())
+                }
+                _ => Err(CommonErrors::NotFound),
+            }
+        } else {
+            Err(CommonErrors::NotFound)
+        }
+    }
+
+    pub(crate) fn set_creator_for_events(&self, creator: EventCreator, user_event_tags: &[Tag]) -> Result<(), CommonErrors> {
         let mut ap = self.action_provider.borrow_mut();
         let mut ret = Ok(());
 
-        for event in user_events {
-            let item = event.find_in_collection(ap.design_events.iter());
-
-            if let Some((key, _)) = item {
-                trace!("Event {:?} has been successfully bound", event);
-                ap.design_events.get_mut(key).unwrap().set_creator(Rc::clone(&creator));
+        for tag in user_event_tags {
+            if let Some(data) = ap.data.get_mut_ref(tag) {
+                match data {
+                    ActionData::Event(event_data) => event_data.set_creator(Rc::clone(&creator), tag),
+                    _ => ret = Err(CommonErrors::NotFound),
+                }
             } else {
                 ret = Err(CommonErrors::NotFound)
             }
         }
 
         ret
-    }
-
-    pub(crate) fn set_creator_for_shutdown_event(&mut self, creator: EventCreator, shutdown_event: Tag) -> Result<(), CommonErrors> {
-        if let Some(design_event) = shutdown_event.find_in_collection(self.design_shutdown_events.iter_mut()) {
-            trace!("Shutdown event {:?} has been successfully bound", shutdown_event);
-            design_event.set_creator(Rc::clone(&creator));
-            Ok(())
-        } else {
-            Err(CommonErrors::NotFound)
-        }
-    }
-
-    pub(crate) fn get_creator_for_shutdown_event(&self, shutdown_event: Tag) -> Result<EventCreator, CommonErrors> {
-        if let Some(design_event) = shutdown_event.find_in_collection(self.design_shutdown_events.iter()) {
-            if let Some(creator) = design_event.creator() {
-                return Ok(creator);
-            }
-        }
-
-        Err(CommonErrors::NotFound)
     }
 }
 
@@ -333,10 +306,45 @@ impl Default for ProgramDatabase {
     }
 }
 
-impl AsTagTrait for (SlotMapKey, &ActionData) {
-    fn as_tag(&self) -> &Tag {
-        &self.1.tag
+type InvokeGenerator = dyn Fn(Tag, Option<UniqueWorkerId>, &DesignConfig) -> Box<dyn ActionTrait>;
+type IfElseGenerator = dyn Fn(Box<dyn ActionTrait>, Box<dyn ActionTrait>, &DesignConfig) -> Box<dyn ActionTrait>;
+
+#[derive(Clone)]
+struct InvokeData {
+    worker_id: Option<UniqueWorkerId>,
+    // Rc needed for Clone
+    generator: Rc<InvokeGenerator>,
+}
+
+#[derive(Clone)]
+struct EventData {
+    creator: Option<EventCreator>,
+}
+
+impl EventData {
+    pub fn creator(&self) -> Option<EventCreator> {
+        self.creator.clone()
     }
+
+    pub fn set_creator(&mut self, creator: EventCreator, tag: &Tag) {
+        let prev = self.creator.replace(creator);
+        if prev.is_some() {
+            warn!("Event with tag {:?} already has a binding, we replace it with new one provided.", tag);
+        }
+    }
+}
+
+#[derive(Clone)]
+struct IfElseData {
+    // Rc needed for Clone
+    generator: Rc<IfElseGenerator>,
+}
+
+#[derive(Clone)]
+enum ActionData {
+    Invoke(InvokeData),
+    Event(EventData),
+    IfElse(IfElseData),
 }
 
 #[cfg(test)]
@@ -349,12 +357,13 @@ mod tests {
         testing::OrchTestingPoller,
     };
     use ::core::task::Poll;
-    use async_runtime::testing;
-    use testing_macros::ensure_clear_mock_runtime;
+    use kyron::testing;
+    use kyron_testing_macros::ensure_clear_mock_runtime;
 
     #[test]
     fn test_register_invoke_fn() {
         let pd = ProgramDatabase::default();
+        let config = DesignConfig::default();
 
         fn test1() -> InvokeResult {
             Err(0xcafe_u64.into())
@@ -368,18 +377,19 @@ mod tests {
         assert!(pd.register_invoke_fn("tag1".into(), test1).is_err());
         assert!(pd.register_invoke_fn("tag2".into(), test2).is_ok());
 
-        let mut invoke = Invoke::from_tag(&tag);
+        let mut invoke = Invoke::from_tag(&tag, &config);
         let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
         assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xcafe_u64.into()))));
 
         let tag = pd.get_orchestration_tag("tag2".into()).unwrap();
-        let mut invoke = Invoke::from_tag(&tag);
+        let mut invoke = Invoke::from_tag(&tag, &config);
         let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
         assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xbeef_u64.into()))));
     }
 
     #[test]
     fn test_register_invoke_async() {
+        let config = DesignConfig::default();
         let pd = ProgramDatabase::default();
 
         async fn test1() -> InvokeResult {
@@ -394,18 +404,19 @@ mod tests {
         assert!(pd.register_invoke_async("tag1".into(), test1).is_err());
         assert!(pd.register_invoke_async("tag2".into(), test2).is_ok());
 
-        let mut invoke = Invoke::from_tag(&tag);
+        let mut invoke = Invoke::from_tag(&tag, &config);
         let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
         assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xcafe_u64.into()))));
 
         let tag = pd.get_orchestration_tag("tag2".into()).unwrap();
-        let mut invoke = Invoke::from_tag(&tag);
+        let mut invoke = Invoke::from_tag(&tag, &config);
         let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
         assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xbeef_u64.into()))));
     }
 
     #[test]
     fn test_register_invoke_method() {
+        let config = DesignConfig::default();
         let pd = ProgramDatabase::default();
 
         struct Test1 {}
@@ -431,18 +442,19 @@ mod tests {
         assert!(pd.register_invoke_method("tag1".into(), Arc::clone(&obj1), Test1::test1).is_err());
         assert!(pd.register_invoke_method("tag2".into(), Arc::clone(&obj2), Test2::test2).is_ok());
 
-        let mut invoke = Invoke::from_tag(&tag);
+        let mut invoke = Invoke::from_tag(&tag, &config);
         let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
         assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xcafe_u64.into()))));
 
         let tag = pd.get_orchestration_tag("tag2".into()).unwrap();
-        let mut invoke = Invoke::from_tag(&tag);
+        let mut invoke = Invoke::from_tag(&tag, &config);
         let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
         assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xbeef_u64.into()))));
     }
 
     #[test]
     fn test_register_invoke_method_async() {
+        let config = DesignConfig::default();
         let pd = ProgramDatabase::default();
 
         struct Test1 {}
@@ -466,12 +478,12 @@ mod tests {
         assert!(pd.register_invoke_method_async("tag1".into(), Arc::clone(&obj1), test1).is_err());
         assert!(pd.register_invoke_method_async("tag2".into(), Arc::clone(&obj2), test2).is_ok());
 
-        let mut invoke = Invoke::from_tag(&tag);
+        let mut invoke = Invoke::from_tag(&tag, &config);
         let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
         assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xcafe_u64.into()))));
 
         let tag = pd.get_orchestration_tag("tag2".into()).unwrap();
-        let mut invoke = Invoke::from_tag(&tag);
+        let mut invoke = Invoke::from_tag(&tag, &config);
         let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
         assert_eq!(poller.poll(), Poll::Ready(Err(ActionExecError::UserError(0xbeef_u64.into()))));
     }
@@ -479,6 +491,7 @@ mod tests {
     #[test]
     #[ensure_clear_mock_runtime]
     fn test_invoke_fn_with_worker_id() {
+        let config = DesignConfig::default();
         let mut pd = ProgramDatabase::default();
 
         fn test1() -> InvokeResult {
@@ -487,7 +500,7 @@ mod tests {
 
         let tag = pd.register_invoke_fn("tag1".into(), test1).unwrap();
         assert_eq!(pd.set_invoke_worker_id("tag1".into(), "worker_id".into()), Ok(()));
-        let mut invoke = Invoke::from_tag(&tag);
+        let mut invoke = Invoke::from_tag(&tag, &config);
         let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
 
         // Wait for invoke to schedule the action.
@@ -503,6 +516,7 @@ mod tests {
     #[test]
     #[ensure_clear_mock_runtime]
     fn test_invoke_async_with_worker_id() {
+        let config = DesignConfig::default();
         let mut pd = ProgramDatabase::default();
 
         async fn test1() -> InvokeResult {
@@ -511,7 +525,7 @@ mod tests {
 
         let tag = pd.register_invoke_async("tag1".into(), test1).unwrap();
         assert_eq!(pd.set_invoke_worker_id("tag1".into(), "worker_id".into()), Ok(()));
-        let mut invoke = Invoke::from_tag(&tag);
+        let mut invoke = Invoke::from_tag(&tag, &config);
         let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
 
         // Wait for invoke to schedule the action.
@@ -527,6 +541,7 @@ mod tests {
     #[test]
     #[ensure_clear_mock_runtime]
     fn test_invoke_method_with_worker_id() {
+        let config = DesignConfig::default();
         let mut pd = ProgramDatabase::default();
 
         struct Test1 {}
@@ -541,7 +556,7 @@ mod tests {
             .register_invoke_method("tag1".into(), Arc::new(Mutex::new(Test1 {})), Test1::test1)
             .unwrap();
         assert_eq!(pd.set_invoke_worker_id("tag1".into(), "worker_id".into()), Ok(()));
-        let mut invoke = Invoke::from_tag(&tag);
+        let mut invoke = Invoke::from_tag(&tag, &config);
         let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
 
         // Wait for invoke to schedule the action.
@@ -557,6 +572,7 @@ mod tests {
     #[test]
     #[ensure_clear_mock_runtime]
     fn test_invoke_method_async_with_worker_id() {
+        let config = DesignConfig::default();
         let mut pd = ProgramDatabase::default();
 
         struct Test1 {}
@@ -570,7 +586,7 @@ mod tests {
             .register_invoke_method_async("tag1".into(), Arc::new(Mutex::new(Test1 {})), test1)
             .unwrap();
         assert_eq!(pd.set_invoke_worker_id("tag1".into(), "worker_id".into()), Ok(()));
-        let mut invoke = Invoke::from_tag(&tag);
+        let mut invoke = Invoke::from_tag(&tag, &config);
         let mut poller = OrchTestingPoller::new(invoke.try_execute().unwrap());
 
         // Wait for invoke to schedule the action.
@@ -594,9 +610,8 @@ mod tests {
 
         let orch_tag = pd.register_event(tag);
         assert!(orch_tag.is_ok());
-        let key = *(orch_tag.unwrap().key());
         let found = pd.get_orchestration_tag(tag);
-        assert_eq!(key, *(found.unwrap().key()));
+        assert_eq!(tag, *(found.unwrap().tag()));
     }
 
     #[test]
@@ -613,10 +628,11 @@ mod tests {
 
     #[test]
     fn register_event_no_space_left() {
-        let pd = ProgramDatabase::default();
+        let config = DesignConfig::default();
+        let pd = ProgramDatabase::new(config);
 
         // Fill up the slotmap to its capacity
-        for i in 0..DEFAULT_EVENTS_CAPACITY {
+        for i in 0..config.db_params.registration_capacity {
             let tag = make_tag(i as u32);
             let res = pd.register_event(tag);
             assert!(res.is_ok());
@@ -639,11 +655,11 @@ mod tests {
         struct TestEventCreator {}
 
         impl EventCreatorTrait for TestEventCreator {
-            fn create_trigger(&mut self) -> Option<Box<dyn ActionTrait>> {
+            fn create_trigger(&mut self, _: &DesignConfig) -> Option<Box<dyn ActionTrait>> {
                 todo!()
             }
 
-            fn create_sync(&mut self) -> Option<Box<dyn ActionTrait>> {
+            fn create_sync(&mut self, _: &DesignConfig) -> Option<Box<dyn ActionTrait>> {
                 todo!()
             }
 
@@ -661,19 +677,15 @@ mod tests {
         let orch1 = pd.get_orchestration_tag(tag1).unwrap();
         let orch2 = pd.get_orchestration_tag(tag2).unwrap();
 
-        let c1 = pd
-            .action_provider
-            .borrow()
-            .design_events
-            .get(*(orch1.key()))
-            .and_then(|e| e.creator().clone());
+        fn get_event_creator(ap: Rc<RefCell<ActionProvider>>, tag: &Tag) -> Option<EventCreator> {
+            ap.borrow().data.get_ref(tag).and_then(|data| match data {
+                ActionData::Event(event_data) => event_data.creator().clone(),
+                _ => None,
+            })
+        }
 
-        let c2 = pd
-            .action_provider
-            .borrow()
-            .design_events
-            .get(*(orch2.key()))
-            .and_then(|e| e.creator().clone());
+        let c1 = get_event_creator(Rc::clone(&pd.action_provider), orch1.tag());
+        let c2 = get_event_creator(Rc::clone(&pd.action_provider), orch2.tag());
 
         assert!(Rc::ptr_eq(&c1.unwrap(), &c2.unwrap()));
     }

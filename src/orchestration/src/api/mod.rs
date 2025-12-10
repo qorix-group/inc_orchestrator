@@ -45,15 +45,18 @@
 //! This separation ensures that each phase of the orchestration process is modular, testable, and maintainable.
 //!
 
-use crate::events::events_provider::EventsProvider;
+use crate::common::tag::{AsTagTrait, Tag};
+use crate::events::events_provider::{EventCreator, EventsProvider, ShutdownNotifier};
 use crate::{
     api::{deployment::Deployment, design::Design},
     program::Program,
 };
 use ::core::marker::PhantomData;
-use foundation::prelude::Vec;
-use foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
+use kyron_foundation::prelude::vector_extension::VectorExtension;
+use kyron_foundation::prelude::{Vec, Vector};
+use kyron_foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
 use std::path::Path;
+use std::rc::Rc;
 
 pub mod deployment;
 pub mod design;
@@ -66,6 +69,7 @@ pub type Orchestration<'a> = OrchestrationApi<_EmptyTag>;
 pub struct OrchestrationApi<T> {
     designs: GrowableVec<Design>,
     events: EventsProvider,
+    shutdown_events: GrowableVec<ShutdownEvent>,
     _p: PhantomData<T>,
 }
 
@@ -82,6 +86,7 @@ impl OrchestrationApi<_EmptyTag> {
             _p: PhantomData,
             designs: GrowableVec::default(),
             events: EventsProvider::default(),
+            shutdown_events: GrowableVec::default(),
         }
     }
 
@@ -115,7 +120,7 @@ impl OrchestrationApi<_EmptyTag> {
     ///
     pub fn design_done(self) -> OrchestrationApi<_DesignTag> {
         //TODO: This is temporary and will be removed once iceoryx IPC integration is modified.
-        #[cfg(feature = "iceoryx-ipc")]
+        #[cfg(feature = "iceoryx2-ipc")]
         {
             use crate::events::iceoryx::event::Event;
             // Start the event handling thread for Iceoryx IPC
@@ -126,6 +131,7 @@ impl OrchestrationApi<_EmptyTag> {
             _p: PhantomData,
             designs: self.designs,
             events: self.events,
+            shutdown_events: GrowableVec::default(),
         }
     }
 }
@@ -135,7 +141,7 @@ impl OrchestrationApi<_DesignTag> {
     /// # Returns
     ///
     /// Returns a `Deployment` instance that provides methods to manage the deployment of programs.
-    pub fn get_deployment_mut(&mut self) -> Deployment<'_, _DesignTag> {
+    pub fn get_deployment_mut(&mut self) -> Deployment<'_> {
         Deployment::new(self)
     }
 
@@ -155,25 +161,121 @@ impl OrchestrationApi<_DesignTag> {
     /// # Errors
     ///
     /// Returns an error if there is an issue while creating the programs, such as a design not being valid.
-    pub fn create_programs(mut self) -> Result<OrchProgramManager, CommonErrors> {
+    pub fn into_program_manager(mut self) -> Result<OrchProgramManager, CommonErrors> {
         let mut programs = GrowableVec::default();
         while let Some(design) = self.designs.pop() {
-            programs = design.get_programs(programs).unwrap(); //TODO: handle error properly once surrounding are implemented
+            design.into_programs(&self.shutdown_events, &mut programs)?
         }
 
-        Ok(OrchProgramManager { programs: programs.into() })
+        Ok(OrchProgramManager {
+            programs: programs.into(),
+            shutdown_events: self.shutdown_events.into(),
+        })
+    }
+
+    pub(crate) fn register_shutdown_event(&mut self, tag: Tag, creator: EventCreator) -> Result<(), CommonErrors> {
+        if tag.find_in_collection(self.shutdown_events.iter()).is_some() {
+            Err(CommonErrors::AlreadyDone)
+        } else if self.shutdown_events.push(ShutdownEvent { tag, creator }) {
+            Ok(())
+        } else {
+            Err(CommonErrors::NoSpaceLeft)
+        }
     }
 }
 
 pub struct OrchProgramManager {
-    pub programs: Vec<Program>, // For now pub, until new Program is ready
+    programs: Vec<Program>,
+    shutdown_events: Vec<ShutdownEvent>,
 }
 
 impl OrchProgramManager {
-    //TODO: Add impl
+    /// Moves all programs out of the manager and returns them.
+    pub fn get_programs(&mut self) -> Vec<Program> {
+        let empty = Vec::new_in_global(0);
+        core::mem::replace(&mut self.programs, empty)
+    }
+
+    /// Moves the named program out of the manager and returns it.
+    pub fn get_program(&mut self, name: &str) -> Option<Program> {
+        if let Some((index, _)) = self.programs.iter().enumerate().find(|(_, program)| program.name == name) {
+            self.programs.remove(index)
+        } else {
+            None
+        }
+    }
+
+    /// Retrieve a shutdown notifier for the given event.
+    pub fn get_shutdown_notifier(&self, shutdown_event_tag: Tag) -> Result<Box<dyn ShutdownNotifier>, CommonErrors> {
+        if let Some(shutdown_event) = shutdown_event_tag.find_in_collection(self.shutdown_events.iter()) {
+            if let Some(shutdown_notifier) = shutdown_event.creator().borrow_mut().create_shutdown_notifier() {
+                return Ok(shutdown_notifier);
+            } else {
+                return Err(CommonErrors::GenericError);
+            }
+        }
+
+        Err(CommonErrors::NotFound)
+    }
+
+    /// Retrieve a shutdown notifier for all shutdown events.
+    pub fn get_shutdown_all_notifier(&self) -> Result<Box<dyn ShutdownNotifier>, CommonErrors> {
+        let mut shutdown_notifiers = Vec::new_in_global(self.shutdown_events.len());
+
+        for event in self.shutdown_events.iter() {
+            if let Some(notifier) = event.creator().borrow_mut().create_shutdown_notifier() {
+                let _ = shutdown_notifiers.push(notifier);
+            } else {
+                return Err(CommonErrors::GenericError);
+            }
+        }
+
+        Ok(Box::new(ShutdownAllNotifierImpl { shutdown_notifiers }))
+    }
 }
 
-// TODO add more tests once new Program skeleton is created
+pub(crate) struct ShutdownEvent {
+    tag: Tag,
+    creator: EventCreator,
+}
+
+impl ShutdownEvent {
+    pub fn creator(&self) -> EventCreator {
+        Rc::clone(&self.creator)
+    }
+}
+
+impl AsTagTrait for ShutdownEvent {
+    fn as_tag(&self) -> &Tag {
+        &self.tag
+    }
+}
+
+impl AsTagTrait for &ShutdownEvent {
+    fn as_tag(&self) -> &Tag {
+        &self.tag
+    }
+}
+
+impl AsTagTrait for &mut ShutdownEvent {
+    fn as_tag(&self) -> &Tag {
+        &self.tag
+    }
+}
+
+struct ShutdownAllNotifierImpl {
+    shutdown_notifiers: Vec<Box<dyn ShutdownNotifier>>,
+}
+
+impl ShutdownNotifier for ShutdownAllNotifierImpl {
+    fn shutdown(&mut self) -> crate::prelude::ActionResult {
+        for notifier in self.shutdown_notifiers.iter_mut() {
+            notifier.shutdown()?
+        }
+
+        Ok(())
+    }
+}
 
 #[doc(hidden)]
 pub struct _EmptyTag {}

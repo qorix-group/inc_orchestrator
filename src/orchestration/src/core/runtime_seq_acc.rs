@@ -14,7 +14,7 @@
 use ::core::cell::UnsafeCell;
 use ::core::ops::{Deref, DerefMut};
 
-use foundation::prelude::FoundationAtomicBool;
+use kyron_foundation::prelude::FoundationAtomicBool;
 
 pub struct RuntimeSequentialAccess<T> {
     data: UnsafeCell<T>,

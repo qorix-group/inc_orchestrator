@@ -12,32 +12,20 @@
 //
 
 use crate::{
-    actions::invoke,
+    actions::{ifelse::IfElseCondition, invoke},
+    api::ShutdownEvent,
     common::{orch_tag::OrchestrationTag, tag::Tag, DesignConfig},
     prelude::InvokeResult,
     program::{Program, ProgramBuilder},
     program_database::ProgramDatabase,
 };
-use ::core::{future::Future, ops::Deref};
-
 use ::core::fmt::Debug;
+use ::core::future::Future;
+use kyron_foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
 use std::sync::{Arc, Mutex};
-
-use foundation::{containers::growable_vec::GrowableVec, prelude::CommonErrors};
 
 pub type ProgramTag = Tag;
 pub type DesignTag = Tag;
-
-/// Provides [`DesignConfig`] with is bounded to the `Design` instance.
-pub struct DesignConfigBounded(DesignConfig);
-
-impl Deref for DesignConfigBounded {
-    type Target = DesignConfig;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
 
 ///
 /// Design is a container for Application developer to register all it's components (functions, events, conditions, etc.)
@@ -46,7 +34,7 @@ impl Deref for DesignConfigBounded {
 ///
 pub struct Design {
     id: DesignTag,
-    params: DesignConfig, // TODO: probably remove when we store it in ProgramDatabase
+    pub(crate) config: DesignConfig,
     pub(crate) db: ProgramDatabase,
     programs: GrowableVec<ProgramData>,
 }
@@ -59,24 +47,24 @@ impl Debug for Design {
 
 impl Design {
     /// Creates a new `Design` instance with the given identifier and configuration `parameters`.
-    pub fn new(id: DesignTag, params: DesignConfig) -> Self {
+    pub fn new(id: DesignTag, config: DesignConfig) -> Self {
         const DEFAULT_PROGRAMS_CNT: usize = 1;
         Design {
             id,
-            params,
-            db: ProgramDatabase::new(params),
+            config,
+            db: ProgramDatabase::new(config),
             programs: GrowableVec::new(DEFAULT_PROGRAMS_CNT),
         }
-    }
-
-    /// Returns the configuration parameters for this design.
-    pub fn get_config(&self) -> DesignConfigBounded {
-        DesignConfigBounded(self.params)
     }
 
     /// Returns the unique identifier for this design.
     pub fn id(&self) -> Tag {
         self.id
+    }
+
+    /// Returns the configuration parameters for this design.
+    pub fn config(&self) -> &DesignConfig {
+        &self.config
     }
 
     /// Registers a function as an invoke action.
@@ -118,9 +106,28 @@ impl Design {
         self.db.register_event(tag)
     }
 
-    /// Registers a shutdown event in the design.
-    pub fn register_shutdown_event(&mut self, tag: Tag) -> Result<(), CommonErrors> {
-        self.db.register_shutdown_event(tag)
+    /// Registers a condition for an IfElse action.
+    pub fn register_if_else_condition<C>(&mut self, tag: Tag, condition: C) -> Result<OrchestrationTag, CommonErrors>
+    where
+        C: IfElseCondition + Send + Sync + 'static,
+    {
+        self.db.register_if_else_arc_condition(tag, Arc::new(condition))
+    }
+
+    /// Registers an arc condition for an IfElse action.
+    pub fn register_if_else_arc_condition<C>(&mut self, tag: Tag, condition: Arc<C>) -> Result<OrchestrationTag, CommonErrors>
+    where
+        C: IfElseCondition + Send + Sync + 'static,
+    {
+        self.db.register_if_else_arc_condition(tag, condition)
+    }
+
+    /// Registers an arc mutex condition for an IfElse action.
+    pub fn register_if_else_arc_mutex_condition<C>(&mut self, tag: Tag, condition: Arc<Mutex<C>>) -> Result<OrchestrationTag, CommonErrors>
+    where
+        C: IfElseCondition + Send + 'static,
+    {
+        self.db.register_if_else_arc_mutex_condition(tag, condition)
     }
 
     /// Fetches an [`OrchestrationTag`] for a given tag, which can be used to reference the orchestration in programs.
@@ -140,14 +147,18 @@ impl Design {
         !self.programs.is_empty()
     }
 
-    pub(super) fn get_programs(mut self, mut container: GrowableVec<Program>) -> Result<GrowableVec<Program>, CommonErrors> {
+    pub(super) fn into_programs(
+        mut self,
+        shutdown_events: &GrowableVec<ShutdownEvent>,
+        container: &mut GrowableVec<Program>,
+    ) -> Result<(), CommonErrors> {
         while let Some(program_data) = self.programs.pop() {
             let mut builder = ProgramBuilder::new(program_data.0);
             (program_data.1)(&mut self, &mut builder)?;
-            container.push(builder.build(&mut self)?);
+            container.push(builder.build(shutdown_events, self.config())?);
         }
 
-        Ok(container)
+        Ok(())
     }
 }
 
@@ -163,7 +174,6 @@ impl ProgramData {
 }
 
 #[cfg(test)]
-
 mod tests {
     // Tests are disabled in Miri due to limitations of using OS calls that are done in Iceroxy2 backend.
     // Currently we do not have any constructor that can inject IPC provider (subject to change in the near future).
@@ -175,12 +185,12 @@ mod tests {
     #[test]
     fn design_creation() {
         let id = Tag::from_str_static("design1");
-        let params = DesignConfig::default();
+        let config = DesignConfig::default();
 
-        let design = Design::new(id, params.clone());
+        let design = Design::new(id, config);
 
         assert_eq!(design.id(), id);
-        assert_eq!(*design.get_config(), params);
+        assert_eq!(*design.config(), config);
     }
 
     fn action() -> Result<(), UserErrValue> {
@@ -190,12 +200,12 @@ mod tests {
     #[test]
     fn register_invoke_fn_success() {
         let id = Tag::from_str_static("design1");
-        let params = DesignConfig::default();
-        let design = Design::new(id, params);
+        let config = DesignConfig::default();
+        let design = Design::new(id, config);
 
         let tag = Tag::from_str_static("invoke_fn");
 
-        let result = design.register_invoke_fn(tag.clone(), action);
+        let result = design.register_invoke_fn(tag, action);
 
         assert!(result.is_ok());
         let orchestration_tag = result.unwrap();
@@ -205,17 +215,17 @@ mod tests {
     #[test]
     fn register_invoke_fn_duplicate() {
         let id = Tag::from_str_static("design1");
-        let params = DesignConfig::default();
-        let design = Design::new(id, params);
+        let config = DesignConfig::default();
+        let design = Design::new(id, config);
 
         let tag = Tag::from_str_static("invoke_fn");
 
         // Register the function once
-        let result = design.register_invoke_fn(tag.clone(), action.clone());
+        let result = design.register_invoke_fn(tag, action);
         assert!(result.is_ok());
 
         // Attempt to register the same function again
-        let duplicate_result = design.register_invoke_fn(tag.clone(), action);
+        let duplicate_result = design.register_invoke_fn(tag, action);
         assert!(duplicate_result.is_err());
         assert_eq!(duplicate_result.unwrap_err(), CommonErrors::AlreadyDone);
     }
@@ -223,16 +233,16 @@ mod tests {
     #[test]
     fn get_orchestration_tag_success() {
         let id = Tag::from_str_static("design1");
-        let params = DesignConfig::default();
-        let design = Design::new(id, params);
+        let config = DesignConfig::default();
+        let design = Design::new(id, config);
 
         let tag = Tag::from_str_static("orchestration_tag");
 
         // Register the function
-        let _ = design.register_invoke_fn(tag.clone(), action);
+        let _ = design.register_invoke_fn(tag, action);
 
         // Retrieve the orchestration tag
-        let orchestration_tag = design.get_orchestration_tag(tag.clone());
+        let orchestration_tag = design.get_orchestration_tag(tag);
         assert!(orchestration_tag.is_ok());
         assert_eq!(*orchestration_tag.unwrap().tag(), tag);
     }
@@ -240,8 +250,8 @@ mod tests {
     #[test]
     fn get_orchestration_tag_not_found() {
         let id = Tag::from_str_static("design1");
-        let params = DesignConfig::default();
-        let design = Design::new(id, params);
+        let config = DesignConfig::default();
+        let design = Design::new(id, config);
 
         let tag = Tag::from_str_static("non_existent_tag");
 

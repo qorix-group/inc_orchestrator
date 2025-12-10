@@ -1,61 +1,157 @@
-use crate::internals::scenario::{ScenarioGroup, ScenarioGroupImpl};
+use crate::tests::orchestration::{
+    orchestration_methods::{InvalidInvokes, TagMethods, TooManyTags},
+    orchestration_shutdown::ShutdownBeforeStart,
+};
 use orchestration_concurrency::{MultipleConcurrency, NestedConcurrency, SingleConcurrency};
+use orchestration_dedicated_worker::dedicated_worker_scenario_group;
+use orchestration_graph::graph_scenario_group;
 use orchestration_sequence::{AwaitSequence, NestedSequence, SingleSequence};
 use orchestration_sleep::SleepUnderLoad;
 use orchestration_trigger_sync::{
     OneTriggerOneSyncTwoPrograms, OneTriggerTwoSyncsThreePrograms, TriggerAndSyncInNestedBranches, TriggerSyncOneAfterAnother,
 };
+use orchestration_user_error_catch::{
+    CatchConcurrencyUserError, CatchDoubleMixedUserError, CatchDoubleRecoverableUserError, CatchNestedConcurrencyUserError,
+    CatchNestedSequenceUserError, CatchSequenceUserError, DoubleCatchSequence,
+};
+use test_scenarios_rust::scenario::{ScenarioGroup, ScenarioGroupImpl};
 
-use async_runtime::futures::reusable_box_future::ReusableBoxFuturePool;
+use orchestration_double_handler_catch::{CatchDoubleDiffHandlerError, CatchDoubleSameHandlerError};
+
+use kyron::futures::reusable_box_future::ReusableBoxFuturePool;
+use kyron::futures::{sleep, yield_now};
+
 use orchestration::{common::tag::Tag, prelude::*};
 
+use orchestration_shutdown::{GetAllShutdowns, OneProgramNotShut, SingleProgramSingleShutdown, TwoProgramsSingleShutdown, TwoProgramsTwoShutdowns};
 use tracing::info;
 
+pub mod orchestration_user_error_catch;
 macro_rules! generic_test_func {
     ($name:expr) => {
         || generic_test_sync_func($name)
     };
 }
+
+macro_rules! generic_async_test_func {
+    ($name:expr) => {
+        || generic_test_async_func($name)
+    };
+}
 #[macro_use]
-pub mod orchestration_concurrency;
-pub mod orchestration_sequence;
-pub mod orchestration_sleep;
-pub mod orchestration_trigger_sync;
+mod orchestration_concurrency;
+mod orchestration_dedicated_worker;
+mod orchestration_double_handler_catch;
+mod orchestration_graph;
+mod orchestration_if_else;
+mod orchestration_methods;
+mod orchestration_sequence;
+mod orchestration_shutdown;
+mod orchestration_sleep;
+mod orchestration_trigger_sync;
 
-pub struct OrchestrationScenarioGroup {
-    group: ScenarioGroupImpl,
+fn sequence_scenario_group() -> Box<dyn ScenarioGroup> {
+    Box::new(ScenarioGroupImpl::new(
+        "sequence",
+        vec![Box::new(SingleSequence), Box::new(NestedSequence), Box::new(AwaitSequence)],
+        vec![],
+    ))
 }
 
-impl OrchestrationScenarioGroup {
-    pub fn new() -> Self {
-        OrchestrationScenarioGroup {
-            group: ScenarioGroupImpl::new("orchestration"),
-        }
-    }
+fn concurrency_scenario_group() -> Box<dyn ScenarioGroup> {
+    Box::new(ScenarioGroupImpl::new(
+        "concurrency",
+        vec![Box::new(SingleConcurrency), Box::new(MultipleConcurrency), Box::new(NestedConcurrency)],
+        vec![],
+    ))
 }
 
-impl ScenarioGroup for OrchestrationScenarioGroup {
-    fn get_group_impl(&mut self) -> &mut ScenarioGroupImpl {
-        &mut self.group
-    }
+fn trigger_sync_scenario_group() -> Box<dyn ScenarioGroup> {
+    Box::new(ScenarioGroupImpl::new(
+        "trigger_sync",
+        vec![
+            Box::new(OneTriggerOneSyncTwoPrograms),
+            Box::new(OneTriggerTwoSyncsThreePrograms),
+            Box::new(TriggerAndSyncInNestedBranches),
+            Box::new(TriggerSyncOneAfterAnother),
+        ],
+        vec![],
+    ))
+}
 
-    fn init(&mut self) -> () {
-        // Sequence scenarios
-        self.group.add_scenario(Box::new(SingleSequence));
-        self.group.add_scenario(Box::new(NestedSequence));
-        self.group.add_scenario(Box::new(AwaitSequence));
-        // Concurrency scenarios
-        self.group.add_scenario(Box::new(SingleConcurrency));
-        self.group.add_scenario(Box::new(MultipleConcurrency));
-        self.group.add_scenario(Box::new(NestedConcurrency));
-        // Trigger and sync scenarios
-        self.group.add_scenario(Box::new(OneTriggerOneSyncTwoPrograms));
-        self.group.add_scenario(Box::new(OneTriggerTwoSyncsThreePrograms));
-        self.group.add_scenario(Box::new(TriggerAndSyncInNestedBranches));
-        self.group.add_scenario(Box::new(TriggerSyncOneAfterAnother));
-        // Sleep scenarios
-        self.group.add_scenario(Box::new(SleepUnderLoad));
-    }
+fn sleep_scenario_group() -> Box<dyn ScenarioGroup> {
+    Box::new(ScenarioGroupImpl::new("sleep", vec![Box::new(SleepUnderLoad)], vec![]))
+}
+
+fn shutdown_scenario_group() -> Box<dyn ScenarioGroup> {
+    Box::new(ScenarioGroupImpl::new(
+        "shutdown",
+        vec![
+            Box::new(SingleProgramSingleShutdown),
+            Box::new(TwoProgramsSingleShutdown),
+            Box::new(TwoProgramsTwoShutdowns),
+            Box::new(GetAllShutdowns),
+            Box::new(OneProgramNotShut),
+            Box::new(ShutdownBeforeStart),
+        ],
+        vec![],
+    ))
+}
+
+fn catch_scenario_group() -> Box<dyn ScenarioGroup> {
+    Box::new(ScenarioGroupImpl::new(
+        "catch",
+        vec![
+            Box::new(CatchSequenceUserError),
+            Box::new(CatchNestedSequenceUserError),
+            Box::new(CatchConcurrencyUserError),
+            Box::new(CatchDoubleRecoverableUserError),
+            Box::new(CatchDoubleMixedUserError),
+            Box::new(CatchDoubleSameHandlerError),
+            Box::new(CatchDoubleDiffHandlerError),
+            Box::new(CatchNestedConcurrencyUserError),
+            Box::new(DoubleCatchSequence),
+        ],
+        vec![],
+    ))
+}
+
+fn ifelse_scenario_group() -> Box<dyn ScenarioGroup> {
+    Box::new(ScenarioGroupImpl::new(
+        "if_else",
+        vec![
+            Box::new(orchestration_if_else::BasicIfElse),
+            Box::new(orchestration_if_else::NestedIfElse),
+        ],
+        vec![],
+    ))
+}
+
+fn tag_methods_scenario_group() -> Box<dyn ScenarioGroup> {
+    Box::new(ScenarioGroupImpl::new(
+        "tag_methods",
+        vec![Box::new(TagMethods), Box::new(InvalidInvokes), Box::new(TooManyTags)],
+        vec![],
+    ))
+}
+
+pub fn orchestration_scenario_group() -> Box<dyn ScenarioGroup> {
+    Box::new(ScenarioGroupImpl::new(
+        "orchestration",
+        vec![],
+        vec![
+            sequence_scenario_group(),
+            concurrency_scenario_group(),
+            trigger_sync_scenario_group(),
+            sleep_scenario_group(),
+            shutdown_scenario_group(),
+            catch_scenario_group(),
+            ifelse_scenario_group(),
+            tag_methods_scenario_group(),
+            dedicated_worker_scenario_group(),
+            graph_scenario_group(),
+        ],
+    ))
 }
 
 pub struct JustLogAction {
@@ -70,7 +166,7 @@ impl JustLogAction {
         Box::new(Self {
             base: ActionBaseMeta {
                 tag: Tag::from_str_static(DEFAULT_TAG),
-                reusable_future_pool: ReusableBoxFuturePool::new(1, Self::execute_impl("JustLogAction".into())),
+                reusable_future_pool: ReusableBoxFuturePool::for_value(1, Self::execute_impl("JustLogAction".into())),
             },
             name: name.into(),
         })
@@ -107,6 +203,18 @@ fn busy_sleep() -> ActionResult {
 fn generic_test_sync_func(name: &'static str) -> InvokeResult {
     info!("Start of '{}' function", name);
     // Spend some time to simulate work
+    let _ = busy_sleep();
+    info!("End of '{}' function", name);
+    Ok(())
+}
+
+async fn generic_test_async_func(name: &'static str) -> InvokeResult {
+    info!("Start of '{}' function", name);
+
+    info!("'{}' function yielding", name);
+    yield_now::yield_now().await;
+    info!("'{}' function resuming", name);
+
     let _ = busy_sleep();
     info!("End of '{}' function", name);
     Ok(())

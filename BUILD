@@ -10,11 +10,9 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 # *******************************************************************************
-load("@score_cr_checker//:cr_checker.bzl", "copyright_checker")
-load("@score_dash_license_checker//:dash.bzl", "dash_license_checker")
-load("@score_format_checker//:macros.bzl", "use_format_targets")
-load("@score_python_basics//:defs.bzl", "score_virtualenv")
-load("@score_starpls_lsp//:starpls.bzl", "setup_starpls")
+load("@score_docs_as_code//:docs.bzl", "docs")
+load("@score_toolchains_qnx//rules/fs:ifs.bzl", "qnx_ifs")
+load("@score_tooling//:defs.bzl", "copyright_checker", "dash_license_checker", "setup_starpls", "use_format_targets")
 load("//:project_config.bzl", "PROJECT_CONFIG")
 
 setup_starpls(
@@ -22,36 +20,53 @@ setup_starpls(
     visibility = ["//visibility:public"],
 )
 
-score_virtualenv(
-    name = "ide_support",
-    reqs = [],
-    venv_name = ".venv",
-)
-
 copyright_checker(
     name = "copyright",
     srcs = [
+        ".github",
+        "component_integration_tests",
+        "docs",
+        "internal_docs",
+        "patches",
+        "scripts",
         "src",
         "tests",
+        "virtualization",
         "//:BUILD",
         "//:MODULE.bazel",
+        "//:project_config.bzl",
     ],
-    config = "@score_cr_checker//resources:config",
-    template = "@score_cr_checker//resources:templates",
+    config = "@score_tooling//cr_checker/resources:config",
+    template = "@score_tooling//cr_checker/resources:templates",
     visibility = ["//visibility:public"],
 )
 
 # Needed for Dash tool to check python dependency licenses.
-filegroup(
-    name = "cargo_lock",
-    srcs = [
-        "Cargo.lock",
-    ],
-    visibility = ["//visibility:public"],
+# This is a workaround to filter out local packages from the Cargo.lock file.
+# The tool is intended for third-party content.
+genrule(
+    name = "filtered_cargo_lock",
+    srcs = ["Cargo.lock"],
+    outs = ["Cargo.lock.filtered"],
+    cmd = """
+    awk '
+    BEGIN { skip = 0; data = "" }
+    /^\\[\\[package\\]\\]/ {
+        if (data != "" && !skip) print data;
+        skip = 1;
+        data = $$0;
+        next;
+    }
+    data != "" { data = data "\\n" $$0 }
+    # any package that has a "source = " line will not be skipped.
+    /^source = / { skip = 0 }
+    END { if (data != "" && !skip) print data }
+    ' $(location Cargo.lock) > $@
+    """,
 )
 
 dash_license_checker(
-    src = ":cargo_lock",
+    src = ":filtered_cargo_lock",
     file_type = "",  # let it auto-detect based on project_config
     project_config = PROJECT_CONFIG,
     visibility = ["//visibility:public"],
@@ -63,3 +78,13 @@ use_format_targets()
 exports_files([
     "MODULE.bazel",
 ])
+
+# Creates all documentation targets:
+# - `:docs` for building documentation at build-time
+docs(
+    data = [
+        # "@score_platform//:needs_json",
+        # "@score_process//:needs_json",
+    ],
+    source_dir = "docs",
+)

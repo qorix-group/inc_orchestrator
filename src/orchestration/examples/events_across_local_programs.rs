@@ -11,9 +11,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use async_runtime::{runtime::async_runtime::AsyncRuntimeBuilder, scheduler::execution_engine::*};
-use foundation::prelude::*;
-use logging_tracing::TracingLibraryBuilder;
+use kyron::runtime::*;
+use kyron_foundation::prelude::*;
+use logging_tracing::{Level, LogAndTraceBuilder};
 use orchestration::{
     actions::{invoke::Invoke, sequence::SequenceBuilder, sync::SyncBuilder, trigger::TriggerBuilder},
     api::{design::Design, Orchestration},
@@ -29,11 +29,11 @@ fn program1_component_design() -> Result<Design, CommonErrors> {
     register_all_common_into_design(&mut design)?; // Register our common functions, events, etc
 
     // Create a program describing task chain
-    design.add_program("ExampleDesign1".into(), move |design_instance, builder| {
+    design.add_program("ExampleDesign1", move |design_instance, builder| {
         builder.with_run_action(
             SequenceBuilder::new()
-                .with_step(SyncBuilder::from_design("Event1", &design_instance))
-                .with_step(Invoke::from_design("test1_sync_func", &design_instance))
+                .with_step(SyncBuilder::from_design("Event1", design_instance))
+                .with_step(Invoke::from_design("test1_sync_func", design_instance))
                 .build(),
         );
         Ok(())
@@ -48,11 +48,11 @@ fn program2_component_design() -> Result<Design, CommonErrors> {
     register_all_common_into_design(&mut design)?; // Register our common functions, events, etc
 
     // Create a program describing task chain
-    design.add_program("ExampleDesign2".into(), move |design_instance, builder| {
+    design.add_program("ExampleDesign2", move |design_instance, builder| {
         builder.with_run_action(
             SequenceBuilder::new()
-                .with_step(Invoke::from_design("test4_sync_func", &design_instance))
-                .with_step(TriggerBuilder::from_design("Event1", &design_instance))
+                .with_step(Invoke::from_design("test4_sync_func", design_instance))
+                .with_step(TriggerBuilder::from_design("Event1", design_instance))
                 .build(),
         );
         Ok(())
@@ -63,16 +63,15 @@ fn program2_component_design() -> Result<Design, CommonErrors> {
 
 fn main() {
     // Setup any logging framework you want to use.
-    let mut logger = TracingLibraryBuilder::new()
-        .global_log_level(Level::DEBUG)
-        // .enable_tracing(TraceScope::AppScope)
+    let _logger = LogAndTraceBuilder::new()
+        .global_log_level(Level::INFO)
+        //.enable_tracing(TraceScope::AppScope)
         .enable_logging(true)
-        .build();
-
-    logger.init_log_trace();
+        .build()
+        .expect("Failed to build tracing library");
 
     // Create runtime
-    let (builder, _engine_id) = AsyncRuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(256).workers(2));
+    let (builder, _engine_id) = kyron::runtime::RuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(256).workers(2));
     let mut runtime = builder.build().unwrap();
 
     // Build Orchestration
@@ -88,18 +87,19 @@ fn main() {
         .expect("Failed to specify event");
 
     // Create programs
-    let mut programs = orch.create_programs().unwrap();
+    let mut program_manager = orch.into_program_manager().unwrap();
+    let mut programs = program_manager.get_programs();
 
     // Put programs into runtime and run them
-    let _ = runtime.block_on(async move {
-        let mut program1 = programs.programs.pop().unwrap();
-        let mut program2 = programs.programs.pop().unwrap();
+    runtime.block_on(async move {
+        let mut program1 = programs.pop().unwrap();
+        let mut program2 = programs.pop().unwrap();
 
-        let h1 = async_runtime::spawn(async move {
+        let h1 = kyron::spawn(async move {
             let _ = program1.run_n(3).await;
         });
 
-        let h2 = async_runtime::spawn(async move {
+        let h2 = kyron::spawn(async move {
             let _ = program2.run_n(3).await;
         });
 
@@ -107,6 +107,5 @@ fn main() {
         let _ = h2.await;
 
         info!("Programs finished running");
-        Ok(0)
     });
 }

@@ -11,9 +11,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use async_runtime::{runtime::async_runtime::AsyncRuntimeBuilder, scheduler::execution_engine::*};
-use foundation::prelude::*;
-use logging_tracing::TracingLibraryBuilder;
+use kyron::runtime::*;
+use kyron_foundation::prelude::*;
+use logging_tracing::{Level, LogAndTraceBuilder};
 use orchestration::{
     api::{design::Design, Orchestration},
     common::{tag::Tag, DesignConfig},
@@ -28,7 +28,7 @@ fn example_component_design() -> Result<Design, CommonErrors> {
 
     // Create a program with trigger action
     design.add_program("ExampleProgram", move |design_instance, builder| {
-        builder.with_run_action(TriggerBuilder::from_design("InternalEvent", &design_instance));
+        builder.with_run_action(TriggerBuilder::from_design("InternalEvent", design_instance));
 
         Ok(())
     });
@@ -49,12 +49,15 @@ fn main() {
     // Get the event name from the command-line arguments
     let event = &args[1];
     // Setup any logging framework you want to use.
-    let mut logger = TracingLibraryBuilder::new().global_log_level(Level::INFO).enable_logging(true).build();
-
-    logger.init_log_trace();
+    let _logger = LogAndTraceBuilder::new()
+        .global_log_level(Level::TRACE)
+        //.enable_tracing(TraceScope::AppScope)
+        .enable_logging(true)
+        .build()
+        .expect("Failed to build tracing library");
 
     // Create runtime
-    let (builder, _engine_id) = AsyncRuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(256).workers(1));
+    let (builder, _engine_id) = kyron::runtime::RuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(256).workers(1));
 
     let mut runtime = builder.build().unwrap();
 
@@ -72,13 +75,13 @@ fn main() {
         .expect("Failed to specify event");
 
     // Create programs
-    let mut programs = orch.create_programs().unwrap();
+    let mut program_manager = orch.into_program_manager().unwrap();
+    let mut programs = program_manager.get_programs();
 
     // Put programs into runtime and run them
-    let _ = runtime.block_on(async move {
-        let _ = programs.programs.pop().unwrap().run_n(1).await;
+    runtime.block_on(async move {
+        let _ = programs.pop().unwrap().run_n(1).await;
         debug!("Program finished running.");
-        Ok(0)
     });
 
     info!("Successfully sent IPC event: {}", event);

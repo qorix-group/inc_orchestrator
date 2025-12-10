@@ -14,10 +14,10 @@
 use super::action::{ActionBaseMeta, ActionResult, ActionTrait, ReusableBoxFutureResult};
 use crate::common::tag::Tag;
 
-use async_runtime::futures::reusable_box_future::{ReusableBoxFuture, ReusableBoxFuturePool};
-use foundation::{
+use kyron::futures::reusable_box_future::{ReusableBoxFuture, ReusableBoxFuturePool};
+use kyron_foundation::{
     containers::{growable_vec::GrowableVec, reusable_objects::ReusableObject, reusable_vec_pool::ReusableVecPool},
-    prelude::*,
+    prelude::{vector_extension::VectorExtension, *},
 };
 
 const REUSABLE_FUTURE_POOL_SIZE: usize = 2;
@@ -79,9 +79,9 @@ impl SequenceBuilder {
         // Move the actions from Builder's GrowableVec to Sequence's fixed-sized Vec
         // Here we also reverse the order, so that the actions become already in the correct order,
         // when they are popped out in the execute_impl() later on
-        let mut actions = Vec::<Box<dyn ActionTrait>>::new(self.actions.len());
+        let mut actions = Vec::<Box<dyn ActionTrait>>::new_in_global(self.actions.len());
         while let Some(action) = self.actions.pop() {
-            actions.push(action);
+            actions.push(action).expect("Unable to transfer action from Builder to Sequence");
         }
 
         // Finally, return the `Sequence` action
@@ -99,11 +99,12 @@ impl SequenceBuilder {
     /// Create pools of reusable futures vec and reusable future
     ///
     fn create_pools(futures_size: usize) -> (ReusableVecPool<ReusableBoxFuture<ActionResult>>, ReusableBoxFuturePool<ActionResult>) {
-        let mut futures_vec_pool = ReusableVecPool::<ReusableBoxFuture<ActionResult>>::new(REUSABLE_VEC_POOL_SIZE, |_| Vec::new(futures_size));
+        let mut futures_vec_pool =
+            ReusableVecPool::<ReusableBoxFuture<ActionResult>>::new(REUSABLE_VEC_POOL_SIZE, |_| Vec::new_in_global(futures_size));
         let futures_vec = futures_vec_pool.next_object().unwrap();
 
         // Populate the futures' collection to initialize the reusable future pool's layout
-        let reusable_future_pool = ReusableBoxFuturePool::<ActionResult>::new(
+        let reusable_future_pool = ReusableBoxFuturePool::<ActionResult>::for_value(
             REUSABLE_FUTURE_POOL_SIZE,
             Sequence::execute_impl(Tag::from_str_static(DEFAULT_TAG), futures_vec),
         );
@@ -131,14 +132,14 @@ impl Sequence {
         // We can directly pop() without reversing the order here, because the reversion already took place
         // during elements transfer from Builder's GrowableVec to Sequence's Vec
         while let Some(future) = futures.pop() {
-            trace!(step = ?tag, "Before awaiting step");
+            tracing_adapter!(step = ?tag, "Before awaiting step");
             let result = future.into_pin().await;
             if result.is_err() {
                 // Terminate sequence and propagate the error
                 error!("Error in sequence step {:?}", tag);
                 return result;
             }
-            trace!(step = ?tag, "After awaiting step");
+            tracing_adapter!(step = ?tag, "After awaiting step");
         }
 
         Ok(())
@@ -200,9 +201,10 @@ mod tests {
 
     #[test]
     fn all_subsequent_steps_are_called() {
+        let seq = kyron_testing::prelude::Sequence::new();
         // Create a sequence with no nested branch
-        let mock_1 = Box::new(MockActionBuilder::new().times(1).build());
-        let mock_2 = Box::new(MockActionBuilder::new().times(1).build());
+        let mock_1 = Box::new(MockActionBuilder::<()>::new().times(1).in_sequence(&seq).build());
+        let mock_2 = Box::new(MockActionBuilder::<()>::new().times(1).in_sequence(&seq).build());
         let mut seq = SequenceBuilder::new().with_step(mock_1).with_step(mock_2).build();
 
         // Execute the sequence
@@ -212,11 +214,12 @@ mod tests {
 
     #[test]
     fn all_steps_within_nested_steps_seq_are_called() {
+        let seq = kyron_testing::prelude::Sequence::new();
         // Create a sequence with a nested branch
-        let mock_1 = Box::new(MockActionBuilder::new().times(1).build());
-        let mock_nested_a = Box::new(MockActionBuilder::new().times(1).build());
-        let mock_nested_b = Box::new(MockActionBuilder::new().times(1).build());
-        let mock_2 = Box::new(MockActionBuilder::new().times(1).build());
+        let mock_1 = Box::new(MockActionBuilder::<()>::new().times(1).in_sequence(&seq).build());
+        let mock_nested_a = Box::new(MockActionBuilder::<()>::new().times(1).in_sequence(&seq).build());
+        let mock_nested_b = Box::new(MockActionBuilder::<()>::new().times(1).in_sequence(&seq).build());
+        let mock_2 = Box::new(MockActionBuilder::<()>::new().times(1).in_sequence(&seq).build());
         let mut seq = SequenceBuilder::new()
             .with_step(mock_1)
             .with_step(SequenceBuilder::new().with_step(mock_nested_a).with_step(mock_nested_b).build())
@@ -230,13 +233,14 @@ mod tests {
 
     #[test]
     fn all_steps_within_double_nested_steps_seq_are_called() {
+        let seq = kyron_testing::prelude::Sequence::new();
         // Create a sequence with double nested branches
-        let mock_1 = Box::new(MockActionBuilder::new().times(1).build());
-        let mock_2 = Box::new(MockActionBuilder::new().times(1).build());
-        let mock_nested_2a = Box::new(MockActionBuilder::new().times(1).build());
-        let mock_double_nested_2aa = Box::new(MockActionBuilder::new().times(1).build());
-        let mock_double_nested_2ab = Box::new(MockActionBuilder::new().times(1).build());
-        let mock_nested_2b = Box::new(MockActionBuilder::new().times(1).build());
+        let mock_1 = Box::new(MockActionBuilder::<()>::new().times(1).in_sequence(&seq).build());
+        let mock_2 = Box::new(MockActionBuilder::<()>::new().times(1).in_sequence(&seq).build());
+        let mock_nested_2a = Box::new(MockActionBuilder::<()>::new().times(1).in_sequence(&seq).build());
+        let mock_double_nested_2aa = Box::new(MockActionBuilder::<()>::new().times(1).in_sequence(&seq).build());
+        let mock_double_nested_2ab = Box::new(MockActionBuilder::<()>::new().times(1).in_sequence(&seq).build());
+        let mock_nested_2b = Box::new(MockActionBuilder::<()>::new().times(1).in_sequence(&seq).build());
         let mut seq = SequenceBuilder::new()
             .with_step(mock_1)
             .with_step(mock_2)
@@ -261,11 +265,12 @@ mod tests {
 
     #[test]
     fn step_with_err_terminates_immediately() {
+        let seq = kyron_testing::prelude::Sequence::new();
         // Create a sequence that contains an error
-        let mock_ok = Box::new(MockActionBuilder::new().will_once(Ok(())).build());
+        let mock_ok = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq).build());
         let user_err = ActionExecError::UserError(UserErrValue::from(42));
-        let mock_err_1 = Box::new(MockActionBuilder::new().will_once(Err(user_err)).build());
-        let mock_err_2 = Box::new(MockActionBuilder::new().times(0).build());
+        let mock_err_1 = Box::new(MockActionBuilder::<()>::new().will_once_return(Err(user_err)).in_sequence(&seq).build());
+        let mock_err_2 = Box::new(MockActionBuilder::<()>::new().times(0).in_sequence(&seq).build());
         let mut seq = SequenceBuilder::new()
             .with_step(mock_ok)
             .with_step(mock_err_1)
@@ -279,12 +284,18 @@ mod tests {
 
     #[test]
     fn step_with_err_in_nested_branch_terminates_immediately() {
+        let seq = kyron_testing::prelude::Sequence::new();
         // Create a sequence that contains an error step within a nested branch
-        let mock_1 = Box::new(MockActionBuilder::new().times(1).build());
-        let mock_2 = Box::new(MockActionBuilder::new().will_once(Ok(())).build());
-        let mock_nested_2a = Box::new(MockActionBuilder::new().will_once(Ok(())).build());
-        let mock_nested_err = Box::new(MockActionBuilder::new().will_once(Err(ActionExecError::NonRecoverableFailure)).build());
-        let mock_nested_2b = Box::new(MockActionBuilder::new().times(0).build());
+        let mock_1 = Box::new(MockActionBuilder::<()>::new().times(1).in_sequence(&seq).build());
+        let mock_2 = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq).build());
+        let mock_nested_2a = Box::new(MockActionBuilder::<()>::new().will_once_return(Ok(())).in_sequence(&seq).build());
+        let mock_nested_err = Box::new(
+            MockActionBuilder::<()>::new()
+                .will_once_return(Err(ActionExecError::NonRecoverableFailure))
+                .in_sequence(&seq)
+                .build(),
+        );
+        let mock_nested_2b = Box::new(MockActionBuilder::<()>::new().times(0).in_sequence(&seq).build());
         let mut seq = SequenceBuilder::new()
             .with_step(mock_1)
             .with_step(mock_2)

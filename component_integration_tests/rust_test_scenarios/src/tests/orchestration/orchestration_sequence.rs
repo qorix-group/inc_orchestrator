@@ -1,8 +1,8 @@
-use crate::internals::helpers::runtime_helper::Runtime;
-use crate::internals::scenario::Scenario;
+use crate::internals::runtime_helper::Runtime;
+use test_scenarios_rust::scenario::Scenario;
 
 use super::*;
-use foundation::prelude::*;
+use kyron_foundation::prelude::*;
 use orchestration::{
     api::{design::Design, Orchestration},
     common::DesignConfig,
@@ -30,12 +30,12 @@ fn single_sequence_design() -> Result<Design, CommonErrors> {
 
 /// Checks three actions in a single sequence execution
 impl Scenario for SingleSequence {
-    fn get_name(&self) -> &'static str {
-        "single_sequence"
+    fn name(&self) -> &str {
+        "single"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
 
         // Build Orchestration
         let orch = Orchestration::new()
@@ -43,13 +43,14 @@ impl Scenario for SingleSequence {
             .design_done();
 
         // Create programs
-        let mut programs = orch.create_programs().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
+        let mut programs = program_manager.get_programs();
 
         // Put programs into runtime and run them
-        let _ = rt.block_on(async move {
-            let _ = programs.programs.pop().unwrap().run_n(1).await;
+        rt.block_on(async move {
+            let mut program = programs.pop().expect("Failed to pop program");
+            let _ = program.run_n(1).await;
             info!("Program finished running.");
-            Ok(0)
         });
 
         Ok(())
@@ -84,12 +85,12 @@ fn nested_sequence_design() -> Result<Design, CommonErrors> {
 
 /// Checks actions in a inner and outer sequence execution
 impl Scenario for NestedSequence {
-    fn get_name(&self) -> &'static str {
-        "nested_sequence"
+    fn name(&self) -> &str {
+        "nested"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
 
         // Build Orchestration
         let orch = Orchestration::new()
@@ -97,13 +98,14 @@ impl Scenario for NestedSequence {
             .design_done();
 
         // Create programs
-        let mut programs = orch.create_programs().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
+        let mut programs = program_manager.get_programs();
 
         // Put programs into runtime and run them
-        let _ = rt.block_on(async move {
-            let _ = programs.programs.pop().unwrap().run_n(1).await;
+        rt.block_on(async move {
+            let mut program = programs.pop().expect("Failed to pop program");
+            let _ = program.run_n(1).await;
             info!("Program finished running.");
-            Ok(0)
         });
 
         Ok(())
@@ -118,7 +120,7 @@ fn awaited_sequence_design() -> Result<Design, CommonErrors> {
     let evt1 = design.register_event(Tag::from_str_static("Test_Event_1"))?;
 
     // Create a program with actions
-    design.add_program(file!(), move |_design_instance, builder| {
+    design.add_program(file!(), move |design, builder| {
         builder.with_run_action(
             SequenceBuilder::new()
                 .with_step(JustLogAction::new("Action1"))
@@ -133,12 +135,12 @@ fn awaited_sequence_design() -> Result<Design, CommonErrors> {
                         .with_branch(
                             SequenceBuilder::new()
                                 .with_step(JustLogAction::new("Action4"))
-                                .with_step(SyncBuilder::from_tag(&evt1))
-                                .with_step(TriggerBuilder::from_tag(&evt1))
+                                .with_step(SyncBuilder::from_tag(&evt1, design.config()))
+                                .with_step(TriggerBuilder::from_tag(&evt1, design.config()))
                                 .with_step(JustLogAction::new("Action5"))
                                 .build(),
                         )
-                        .build(),
+                        .build(design),
                 )
                 .with_step(JustLogAction::new("FinishAction"))
                 .build(),
@@ -152,12 +154,12 @@ fn awaited_sequence_design() -> Result<Design, CommonErrors> {
 
 /// Checks three actions in a single sequence execution
 impl Scenario for AwaitSequence {
-    fn get_name(&self) -> &'static str {
-        "await_sequence"
+    fn name(&self) -> &str {
+        "await"
     }
 
-    fn run(&self, input: Option<String>) -> Result<(), String> {
-        let mut rt = Runtime::new(&input).build();
+    fn run(&self, input: &str) -> Result<(), String> {
+        let mut rt = Runtime::from_json(input)?.build();
 
         // Build Orchestration
         let orch = Orchestration::new()
@@ -165,13 +167,14 @@ impl Scenario for AwaitSequence {
             .design_done();
 
         // Create programs
-        let mut programs = orch.create_programs().unwrap();
+        let mut program_manager = orch.into_program_manager().expect("Failed to create programs");
+        let mut programs = program_manager.get_programs();
 
         // Put programs into runtime and run them
-        let _ = rt.block_on(async move {
-            let _ = programs.programs.pop().unwrap().run_n(1).await;
+        rt.block_on(async move {
+            let mut program = programs.pop().expect("Failed to pop program");
+            let _ = program.run_n(1).await;
             info!("Program finished running.");
-            Ok(0)
         });
 
         Ok(())

@@ -14,13 +14,14 @@
 pub mod event_traits;
 pub mod events_provider;
 pub mod local_events;
+pub mod timer_events;
 
-#[cfg(feature = "iceoryx-ipc")]
+#[cfg(feature = "iceoryx2-ipc")]
 pub(crate) mod iceoryx;
-#[cfg(not(feature = "iceoryx-ipc"))]
+#[cfg(not(feature = "iceoryx2-ipc"))]
 pub(crate) mod stub_global_events;
 
-#[cfg(feature = "iceoryx-ipc")]
+#[cfg(feature = "iceoryx2-ipc")]
 pub type GlobalEventProvider = super::events::iceoryx::global_events::GlobalEvents;
-#[cfg(not(feature = "iceoryx-ipc"))]
+#[cfg(not(feature = "iceoryx2-ipc"))]
 pub type GlobalEventProvider = super::events::stub_global_events::StubGlobalEvents;

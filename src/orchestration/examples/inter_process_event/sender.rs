@@ -12,9 +12,9 @@
 //
 
 use ::core::time::Duration;
-use async_runtime::{futures::sleep, runtime::async_runtime::AsyncRuntimeBuilder, scheduler::execution_engine::*};
-use foundation::prelude::*;
-use logging_tracing::{TraceScope, TracingLibraryBuilder};
+use kyron::{futures::sleep, runtime::*};
+use kyron_foundation::prelude::*;
+use logging_tracing::{Level, LogAndTraceBuilder};
 use orchestration::{
     api::{design::Design, Orchestration},
     common::{tag::Tag, DesignConfig},
@@ -42,9 +42,9 @@ fn collision_detection_component_design() -> Result<Design, CommonErrors> {
     design.add_program("CollisionDetectionProgram", move |design_instance, builder| {
         builder.with_run_action(
             SequenceBuilder::new()
-                .with_step(Invoke::from_design("collision_detection", &design_instance))
-                .with_step(TriggerBuilder::from_design("ForwardCollisionEvent", &design_instance))
-                .with_step(Invoke::from_design("some_work".into(), &design_instance))
+                .with_step(Invoke::from_design("collision_detection", design_instance))
+                .with_step(TriggerBuilder::from_design("ForwardCollisionEvent", design_instance))
+                .with_step(Invoke::from_design("some_work", design_instance))
                 .build(),
         );
 
@@ -55,17 +55,15 @@ fn collision_detection_component_design() -> Result<Design, CommonErrors> {
 }
 
 fn main() {
-    // Setup any logging framework you want to use.
-    let mut logger = TracingLibraryBuilder::new()
-        .global_log_level(Level::DEBUG)
-        .enable_tracing(TraceScope::AppScope)
+    let _logger = LogAndTraceBuilder::new()
+        .global_log_level(Level::INFO)
+        //.enable_tracing(TraceScope::AppScope)
         .enable_logging(true)
-        .build();
-
-    logger.init_log_trace();
+        .build()
+        .expect("Failed to build tracing library");
 
     // Create runtime
-    let (builder, _engine_id) = AsyncRuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(256).workers(2));
+    let (builder, _engine_id) = kyron::runtime::RuntimeBuilder::new().with_engine(ExecutionEngineBuilder::new().task_queue_size(256).workers(2));
 
     let mut runtime = builder.build().unwrap();
 
@@ -79,17 +77,17 @@ fn main() {
 
     // Bind design event to the system event
     deployment
-        .bind_events_as_global("ADASEmergencyBrakeEvent".into(), &["ForwardCollisionEvent".into()])
+        .bind_events_as_global("ADASEmergencyBrakeEvent", &["ForwardCollisionEvent".into()])
         .expect("Failed to specify event");
 
     // Create programs
-    let mut programs = orch.create_programs().unwrap();
+    let mut program_manager = orch.into_program_manager().unwrap();
+    let mut programs = program_manager.get_programs();
 
     // Put programs into runtime and run them
-    let _ = runtime.block_on(async move {
-        let _ = programs.programs.pop().unwrap().run_n(2).await;
+    runtime.block_on(async move {
+        let _ = programs.pop().unwrap().run_n(2).await;
         info!("Program finished running.");
-        Ok(0)
     });
 
     info!("Exit.");

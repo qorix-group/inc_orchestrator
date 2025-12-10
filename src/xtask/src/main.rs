@@ -62,6 +62,24 @@ fn main() {
             envs.insert("RUSTFLAGS".into(), "--cfg loom".into());
             run_build("loom_build", &["test", "--release"], envs, cli_env_vars, &passthrough_args);
         }
+        "build:qnx_x86_64" => {
+            run_build(
+                "",
+                &["+qnx7.1_rust", "build", "--target", "x86_64-pc-nto-qnx710"],
+                envs,
+                cli_env_vars,
+                &passthrough_args,
+            );
+        }
+        "build:qnx_arm" => {
+            run_build(
+                "",
+                &["+qnx7.1_rust", "build", "--target", "aarch64-unknown-nto-qnx710"],
+                envs,
+                cli_env_vars,
+                &passthrough_args,
+            );
+        }
         "check_lic" => {
             check_license_header();
         }
@@ -106,7 +124,13 @@ fn main() {
 }
 
 fn clippy(envs: HashMap<String, String>, cli_env_vars: HashMap<String, String>, passthrough_args: &[String]) {
-    run_build("clippy", &["clippy"], envs, cli_env_vars, passthrough_args);
+    run_build(
+        "clippy",
+        &["clippy", "--all-targets", "--features", "tracing"],
+        envs,
+        cli_env_vars,
+        passthrough_args,
+    );
 }
 
 fn test(envs: HashMap<String, String>, cli_env_vars: HashMap<String, String>, passthrough_args: &[String]) {
@@ -156,15 +180,17 @@ fn run_command(cargo_args: &[&str], default_envs: HashMap<String, String>, extra
 fn print_usage_and_exit() -> ! {
     eprintln!(
         "Usage: xtask {{
-    build          build in debug mode
-    run            runs executable
-    build:release  build in release mode
-    run:release    runs executable in release mode
-    build:test     build and runs tests
-    build:loom     builds and tuns loom tests only
-    clippy         runs clippy
-    check          runs fundamental checks, good to run before push
-    check_lic      runs source code license check
+    build               build in debug mode
+    run                 runs executable
+    build:release       build in release mode
+    run:release         runs executable in release mode
+    build:test          build and runs tests
+    build:loom          builds and runs loom tests only
+    build:qnx_x86_64    build for QNX7.1 target: x86_64-pc-nto-qnx710
+    build:qnx_arm       build for QNX7.1 target: aarch64-pc-nto-qnx710
+    clippy              runs clippy
+    check               runs fundamental checks, good to run before push
+    check_lic           runs source code license check
 
     [ENV_VAR=value ...] [-- cargo args...]"
     );

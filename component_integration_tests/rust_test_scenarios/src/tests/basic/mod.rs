@@ -1,24 +1,27 @@
-use crate::internals::scenario::{ScenarioGroup, ScenarioGroupImpl};
+use orchestration::prelude::*;
+use test_scenarios_rust::scenario::{ScenarioGroup, ScenarioGroupImpl};
+use tracing::info;
 
-pub mod basic;
-pub struct BasicScenarioGroup {
-    group: ScenarioGroupImpl,
+mod demo;
+mod program_runs;
+
+fn simple_checkpoint(id: &str) {
+    info!(id = id);
 }
 
-impl BasicScenarioGroup {
-    pub fn new() -> Self {
-        BasicScenarioGroup {
-            group: ScenarioGroupImpl::new("basic"),
-        }
-    }
+async fn basic_task() -> InvokeResult {
+    simple_checkpoint("basic_task");
+    Ok(())
 }
 
-impl ScenarioGroup for BasicScenarioGroup {
-    fn get_group_impl(&mut self) -> &mut ScenarioGroupImpl {
-        &mut self.group
-    }
-
-    fn init(&mut self) -> () {
-        self.group.add_scenario(Box::new(basic::OnlyShutdownSequence));
-    }
+pub fn basic_scenario_group() -> Box<dyn ScenarioGroup> {
+    Box::new(ScenarioGroupImpl::new(
+        "basic",
+        vec![
+            Box::new(program_runs::ProgramRun),
+            Box::new(program_runs::ProgramRunMetered),
+            Box::new(demo::ProgramDemo),
+        ],
+        vec![],
+    ))
 }
