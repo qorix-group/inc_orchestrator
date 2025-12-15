@@ -87,3 +87,20 @@ docs(
     ],
     source_dir = "docs",
 )
+
+# Test suites
+test_suite(
+    name = "unit_tests",
+    testonly = True,
+    tests = [
+        "//src/orchestration:tests",
+    ],
+)
+
+test_suite(
+    name = "cit_tests",
+    testonly = True,
+    tests = [
+        "//component_integration_tests/python_test_cases:cit",
+    ],
+)
