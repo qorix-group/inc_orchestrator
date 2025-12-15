@@ -26,7 +26,7 @@ bazel_dep(name = "buildifier_prebuilt", version = "7.3.1")
 bazel_dep(name = "platforms", version = "1.0.0")
 
 # S-CORE process rules
-bazel_dep(name = "score_bazel_platforms", version = "0.0.2")
+bazel_dep(name = "score_bazel_platforms", version = "0.0.3")
 bazel_dep(name = "score_docs_as_code", version = "2.2.0")
 bazel_dep(name = "score_tooling", version = "1.0.4")
 
@@ -36,7 +36,7 @@ bazel_dep(name = "score_virtualization", version = "0.0.1", dev_dependency = Tru
 
 # Toolchains and extensions
 bazel_dep(name = "score_toolchains_gcc", version = "0.5", dev_dependency = True)
-bazel_dep(name = "score_toolchains_qnx", version = "0.0.5", dev_dependency = True)
+bazel_dep(name = "score_toolchains_qnx", version = "0.0.6", dev_dependency = True)
 bazel_dep(name = "rust_qnx8_toolchain", version = "1.2.0", dev_dependency = True)
 bazel_dep(name = "score_toolchains_rust", version = "0.1.1", dev_dependency = True)
 
@@ -55,14 +55,8 @@ git_override(
 
 git_override(
     module_name = "score_toolchains_rust",
-    commit = "6651945b4ba8e7c342d9740e9cb2d37842f56261",
+    commit = "bcf8e5364f72cf136ec81960350a82e2b5c45449",
     remote = "https://github.com/eclipse-score/toolchains_rust.git",
-)
-
-git_override(
-    module_name = "score_toolchains_qnx",
-    commit = "3477ac13a8015a4e2016588fba573c2f9519237d",
-    remote = "https://github.com/eclipse-score/toolchains_qnx.git",
 )
 
 git_override(
@@ -128,25 +122,11 @@ use_repo(toolchains_qnx, "toolchains_qnx_sdp")
 use_repo(toolchains_qnx, "toolchains_qnx_qcc")
 use_repo(toolchains_qnx, "toolchains_qnx_ifs")
 
-# Registers the custom Rust toolchain wired to @qnx_rust
-register_toolchains(
-    "@toolchains_qnx_qcc//:qcc_aarch64",
-    "@score_toolchains_rust//toolchains/aarch64-unknown-qnx8_0:toolchain_aarch64_qnx8_0",
-    "@score_toolchains_rust//toolchains/x86_64-unknown-linux-gnu:toolchain_x86_64_linux",
-    dev_dependency = True,
-)
-
-register_toolchains(
-    "@toolchains_qnx_ifs//:ifs_x86_64",
-    "@toolchains_qnx_ifs//:ifs_aarch64",
-    dev_dependency = True,
-)
-
 # Module deps
 bazel_dep(name = "score_crates", version = "0.0.5")
 bazel_dep(name = "score_kyron", version = "0.0.3")
 git_override(
     module_name = "score_kyron",
-    commit = "caa9c0b367d18a09e969c1353e95a8c443ae896b",
+    commit = "85d8045d0cb8b2e8252dcf06ee17788dc4f52c36",
     remote = "https://github.com/eclipse-score/kyron.git",
 )
