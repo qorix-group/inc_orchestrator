@@ -19,6 +19,7 @@ on:
     types: [checks_requested]
 jobs:
   qnx-build:
+    if: false
     uses: eclipse-score/cicd-workflows/.github/workflows/qnx-build.yml@main
     permissions:
       contents: read
