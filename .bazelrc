@@ -17,3 +17,10 @@ build:build_qnx8 --extra_toolchains=@toolchains_qnx_ifs//:ifs_x86_64
 build:build_qnx8 --extra_toolchains=@toolchains_qnx_ifs//:ifs_aarch64
 
 common --extra_toolchains=@gcc_toolchain//:host_gcc_12
+
+
+# Clippy linting (enabled by default)
+build --aspects=@score_rust_policies//clippy:linters.bzl%clippy_strict
+build --output_groups=+rules_lint_human
+build:lint --@aspect_rules_lint//lint:fail_on_violation=true
+
