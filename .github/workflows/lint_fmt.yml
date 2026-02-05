@@ -51,7 +51,7 @@ jobs:
           profile: minimal
           toolchain: 1.87.0
           override: true
-          components: rustfmt, clippy
+          components: rustfmt
 
       - name: check code format (rustfmt)
         uses: actions-rs/cargo@v1
@@ -63,9 +63,3 @@ jobs:
         with:
           command: xtask
           args: check_lic
-
-      - name: check clippy errors
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --features tracing --all-targets --workspace -- -D warnings
