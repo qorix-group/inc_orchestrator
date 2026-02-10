@@ -92,6 +92,42 @@ rust_binary(
 )
 
 rust_binary(
+    name = "branching",
+    srcs = [
+        "examples/branching.rs",
+    ] + glob(["examples/common/**/*.rs"]),
+    visibility = ["//visibility:public"],
+    deps = _EXAMPLE_DEPS,
+)
+
+rust_binary(
+    name = "dag",
+    srcs = [
+        "examples/dag.rs",
+    ] + glob(["examples/common/**/*.rs"]),
+    visibility = ["//visibility:public"],
+    deps = _EXAMPLE_DEPS,
+)
+
+rust_binary(
+    name = "shutdown",
+    srcs = [
+        "examples/shutdown.rs",
+    ] + glob(["examples/common/**/*.rs"]),
+    visibility = ["//visibility:public"],
+    deps = _EXAMPLE_DEPS,
+)
+
+rust_binary(
+    name = "shutdown_using_signals",
+    srcs = [
+        "examples/shutdown_using_signals.rs",
+    ] + glob(["examples/common/**/*.rs"]),
+    visibility = ["//visibility:public"],
+    deps = _EXAMPLE_DEPS,
+)
+
+rust_binary(
     name = "events_across_local_programs",
     srcs = [
         "examples/events_across_local_programs.rs",
