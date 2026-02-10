@@ -25,5 +25,5 @@ jobs:
   bazel-clippy:
     uses: eclipse-score/cicd-workflows/.github/workflows/static-analysis.yml@main
     with:
-      bazel-targets: "//src/..."
-      bazel-config: "lint"
+      bazel-targets: '//src/...'
+      bazel-config: 'lint'
