@@ -42,9 +42,9 @@ rust_library(
     deps = _COMMON_DEPS,
 )
 
-# manually pick files and deps as we need to run it with different runtime linked
+# Test target with proc_macro_deps for tests that use kyron_testing_macros
 rust_test(
-    name = "tests",
+    name = "tests_with_macros",
     srcs = glob(["src/**/*.rs"]),
     crate_features = [
         "iceoryx2-ipc",
@@ -54,6 +54,31 @@ rust_test(
     ],
     proc_macro_deps = [
         "@score_kyron//src/kyron-testing-macros:test_macro_utils",
+    ],
+    deps = _BASE_DEPS + [
+        "@score_kyron//src/kyron:libkyron_mocked",
+        "@score_kyron//src/kyron-testing:test_utils",
+    ],
+)
+
+# Test target without proc_macro_deps for tests that don't use testing macros
+rust_test(
+    name = "tests_without_macros",
+    srcs = glob(
+        ["src/**/*.rs"],
+        exclude = [
+            "src/program.rs",
+            "src/actions/select.rs",
+            "src/program_database.rs",
+            "src/actions/concurrency.rs",
+            "src/actions/graph.rs",
+        ],
+    ),
+    crate_features = [
+        "iceoryx2-ipc",
+        "orch_tracing",
+        "tracing",
+        "bazel_build_iceoryx2_qnx8",
     ],
     deps = _BASE_DEPS + [
         "@score_kyron//src/kyron:libkyron_mocked",

@@ -94,7 +94,8 @@ rust_coverage_report(
         "x86_64-linux",
         "ferrocene-coverage",
     ],
-    query = 'kind("rust_test", //src/...)',
+    # Ferrocene compiler panics with proc macros, so we need to exclude them now
+    query = 'kind("rust_test", //src/... except //src/orchestration:tests_with_macros)',
     visibility = ["//visibility:public"],
 )
 
@@ -109,7 +110,8 @@ test_suite(
     name = "unit_tests",
     testonly = True,
     tests = [
-        "//src/orchestration:tests",
+        "//src/orchestration:tests_with_macros",
+        "//src/orchestration:tests_without_macros",
     ],
 )
 
